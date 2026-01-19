@@ -1,0 +1,14 @@
+# System
+.DS_Store
+
+# Environments
+.env
+venv/
+__pycache__/
+
+# Intermediate/Temp files
+.tmp/
+
+# Credentials
+credentials.json
+token.json

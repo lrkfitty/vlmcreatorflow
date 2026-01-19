@@ -1,0 +1,752 @@
+{
+    "characters": {
+        "shay_main": {
+            "name": "Shay",
+            "type": "protagonist",
+            "description": "The main digital influencer, fashion forward, usually center of attention.",
+            "default_img": "assets/AI Content Creators/Shay.So.Fine/SHAY STOCK Photo/Shay blonde bob back.png"
+        }
+    },
+    "relations": {
+        "friend_jess": {
+            "name": "Jess",
+            "type": "supporting",
+            "relationship": "Best Friend",
+            "description": "Edgy style, often wears leather jackets.",
+            "default_img": ""
+        }
+    },
+    "pets": {
+        "coco_poodle": {
+            "name": "Coco",
+            "type": "dog",
+            "breed": "Brown Poodle",
+            "description": "Cute brown toy poodle.",
+            "default_img": ""
+        }
+    },
+    "vehicles": {
+        "gwagon_black": {
+            "name": "Black G-Wagon",
+            "type": "car",
+            "make": "Mercedes",
+            "model": "G-Class",
+            "color": "Matte Black",
+            "description": "Luxury SUV, matte black finish.",
+            "default_img": ""
+        }
+    },
+    "locations": {
+        "luxury_apt_kitchen": {
+            "name": "Luxury Apartment Kitchen",
+            "type": "indoor",
+            "description": "Modern marble countertops, open plan, bright lighting.",
+            "default_img": ""
+        },
+        "podcast_studio": {
+            "name": "Podcast Studio",
+            "type": "indoor",
+            "description": "Neon signs, microphone boom arms, sound foam on walls.",
+            "default_img": ""
+        }
+    },
+    "scenarios": {
+        "cooking_with_friends": {
+            "name": "Cooking with Friend",
+            "template_prompt": "[PROTAGONIST] and [RELATION] standing in [LOCATION], preparing a meal. They are laughing and cutting vegetables. Ingredients visible on counter. [PROTAGONIST] is wearing [OUTFIT].",
+            "required_slots": [
+                "relation",
+                "location",
+                "outfit"
+            ]
+        },
+        "podcast_recording": {
+            "name": "Podcast Recording",
+            "template_prompt": "[PROTAGONIST] sitting at a microphone in [LOCATION], wearing headphones. [RELATION] is sitting across, also with headphones, deep in conversation.",
+            "required_slots": [
+                "relation",
+                "location"
+            ]
+        },
+        "get_ready_with_me": {
+            "name": "Get Ready With Me (GRWM)",
+            "template_prompt": "[PROTAGONIST] standing in front of a mirror in [LOCATION], holding up [OUTFIT] against her body. Make-up products scattered on vanity.",
+            "required_slots": [
+                "location",
+                "outfit"
+            ]
+        },
+        "driving_vlog": {
+            "name": "Driving Vlog",
+            "template_prompt": "[PROTAGONIST] sitting in the driver seat of [VEHICLE]. Camera angle from passenger seat. [PROTAGONIST] is looking at camera and talking.",
+            "required_slots": [
+                "vehicle"
+            ]
+        },
+        "gym_workout": {
+            "name": "Gym Workout",
+            "template_prompt": "[PROTAGONIST] working out at the gym. Wearing athletic gear. Sweat on skin. [PROPS] and [RELATIONS] visible in background.",
+            "required_slots": []
+        },
+        "treadmill_cardio": {
+            "name": "Treadmill Cardio",
+            "template_prompt": "[PROTAGONIST] running on a treadmill. High energy, motion blur on legs. Listening to music. [PROPS] nearby.",
+            "required_slots": []
+        },
+        "grocery_shopping": {
+            "name": "Grocery Shopping",
+            "template_prompt": "[PROTAGONIST] pushing a shopping cart in a grocery store aisle. Shelves stocked with colorful products. [RELATIONS] accompanying her.",
+            "required_slots": []
+        },
+        "morning_prayer": {
+            "name": "Morning Prayer / Meditation",
+            "template_prompt": "[PROTAGONIST] sitting cross-legged on a mat, eyes closed, hands in prayer position or resting on knees. Peaceful morning light streaming in. [PROPS] in scene.",
+            "required_slots": []
+        },
+        "journaling": {
+            "name": "Journaling",
+            "template_prompt": "[PROTAGONIST] sitting at a cozy desk or in bed, writing in a notebook with a pen. Warm lighting, coffee cup nearby. [PROPS] included.",
+            "required_slots": []
+        },
+        "mirror_selfie": {
+            "name": "Mirror Selfie",
+            "template_prompt": "[PROTAGONIST] holding phone up to a large mirror, taking a selfie. Outfit clearly visible. [PROPS] visible in reflection.",
+            "required_slots": []
+        },
+        "nightlife_dining": {
+            "name": "Nightlife Dining",
+            "template_prompt": "A flash photography shot of [PROTAGONIST] and [RELATION] at a trendy restaurant, [PROPS_AND_CAST], wearing [OUTFIT], candlelight dinner, holding wine glasses, laughing, high contrast flash style, [LOCATION] background",
+            "required_slots": []
+        },
+        "coffee_shop_laptop": {
+            "name": "Coffee Shop Work Mode",
+            "template_prompt": "A candid shot of [PROTAGONIST] working on a laptop at a aesthetic coffee shop, [PROPS_AND_CAST], wearing [OUTFIT], latte art on table, cozy lighting, focused expression, productivity vibes, [LOCATION] background",
+            "required_slots": []
+        },
+        "beach_sunset": {
+            "name": "Beach Sunset Walk",
+            "template_prompt": "A cinematic wide shot of [PROTAGONIST] walking along the shoreline at sunset, [PROPS_AND_CAST], wearing [OUTFIT], golden hour lighting, hair blowing in wind, peaceful atmosphere, ocean waves, [LOCATION] background",
+            "required_slots": []
+        },
+        "poolside_lounging": {
+            "name": "Poolside Lounging",
+            "template_prompt": "A high-angle shot of [PROTAGONIST] lounging on a pool chair, [PROPS_AND_CAST], wearing [OUTFIT], summer vibes, sunglasses, refreshing drink, bright sunny day, clear blue water, [LOCATION] background",
+            "required_slots": []
+        },
+        "street_style_photoshoot": {
+            "name": "Street Style Photoshoot",
+            "template_prompt": "A full-body fashion shot of [PROTAGONIST] crossing a city street, [PROPS_AND_CAST], wearing [OUTFIT], dynamic movement, city traffic blur in background, confident stride, urban fashion photography, [LOCATION] background",
+            "required_slots": []
+        },
+        "makeup_tutorial": {
+            "name": "Makeup Tutorial (Close Up)",
+            "template_prompt": "A close-up beauty shot of [PROTAGONIST] applying lipstick in a mirror, [PROPS_AND_CAST], wearing [OUTFIT], ring light reflection in eyes, flawless skin texture, beauty influencer aesthetic, makeup products visible, [LOCATION] background",
+            "required_slots": []
+        },
+        "unboxing_video": {
+            "name": "Unboxing / Haul",
+            "template_prompt": "A medium shot of [PROTAGONIST] sitting on the floor holding a branded package, [PROPS_AND_CAST], wearing [OUTFIT], excited expression, surrounded by shopping bags, haul video vibe, bright indoor lighting, [LOCATION] background",
+            "required_slots": []
+        },
+        "cooking_tutorial": {
+            "name": "Cooking Tutorial",
+            "template_prompt": "A medium shot of [PROTAGONIST] in a modern kitchen chopping vegetables, [PROPS_AND_CAST], wearing [OUTFIT], fresh ingredients on counter, cinematic depth of field, warm home lighting, lifestyle vlog aesthetic, [LOCATION] background",
+            "required_slots": []
+        },
+        "podcast_interview": {
+            "name": "Podcast Interview",
+            "template_prompt": "A side-profile shot of [PROTAGONIST] speaking into a professional microphone, [PROPS_AND_CAST], wearing [OUTFIT], recording studio setting, wearing headphones, engaged conversation, neon sign in background, [LOCATION] background",
+            "required_slots": []
+        },
+        "red_carpet_event": {
+            "name": "Red Carpet Glam",
+            "template_prompt": "A full-body glamour shot of [PROTAGONIST] posing on a red carpet, [PROPS_AND_CAST], wearing [OUTFIT], paparazzi flashes, elegant posture, movie premiere atmosphere, velvet ropes, [LOCATION] background",
+            "required_slots": []
+        },
+        "travel_vlog_airport": {
+            "name": "Travel / Airport Vlog",
+            "template_prompt": "A shot of [PROTAGONIST] walking through an airport terminal pulling a suitcase, [PROPS_AND_CAST], wearing [OUTFIT], holding passport and coffee, travel day vibes, modern architecture, [LOCATION] background",
+            "required_slots": []
+        },
+        "private_jet_luxury": {
+            "name": "Private Jet Interior",
+            "template_prompt": "A wide angle shot of [PROTAGONIST] seated in a cream leather private jet seat, [PROPS_AND_CAST], wearing [OUTFIT], champagne glass in hand, cloud view out window, ultimate luxury aesthetic, [LOCATION] background",
+            "required_slots": []
+        },
+        "yacht_party_deck": {
+            "name": "Yacht Party (Deck)",
+            "template_prompt": "A sunny energetic shot of [PROTAGONIST] dancing on the deck of a superyacht, [PROPS_AND_CAST], wearing [OUTFIT], blue ocean background, holding a cocktail, summer party vibes, high life, [LOCATION] background",
+            "required_slots": []
+        },
+        "red_carpet_interview": {
+            "name": "Red Carpet Interview",
+            "template_prompt": "A press shot of [PROTAGONIST] holding a microphone with logos, speaking to reporters, [PROPS_AND_CAST], wearing [OUTFIT], flash photography, crowded background, premiere event, [LOCATION] background",
+            "required_slots": []
+        },
+        "ted_talk_stage": {
+            "name": "TED Talk / Keynote",
+            "template_prompt": "A powerful shot of [PROTAGONIST] standing on a stage with a red circle carpet, [PROPS_AND_CAST], wearing [OUTFIT], holding a clicker, gesture of speaking, dark auditorium background with spotlight, [LOCATION] background",
+            "required_slots": []
+        },
+        "coachella_vip": {
+            "name": "Music Festival VIP",
+            "template_prompt": "A golden hour festival shot of [PROTAGONIST] in a VIP tent, [PROPS_AND_CAST], wearing [OUTFIT], ferris wheel in distance, boho aesthetic, festival wristbands, joyful energy, [LOCATION] background",
+            "required_slots": []
+        },
+        "luxury_spa_robe": {
+            "name": "Luxury Spa Day",
+            "template_prompt": "A serene shot of [PROTAGONIST] wearing a white fluffy robe and towel turban, [PROPS_AND_CAST], holding cucumber water, relaxing in a marble spa lounge, steam room aesthetic, [LOCATION] background",
+            "required_slots": []
+        },
+        "sneaker_collection_closet": {
+            "name": "Walk-in Closet / Sneaker Wall",
+            "template_prompt": "A wide shot of [PROTAGONIST] standing in a massive walk-in closet, [PROPS_AND_CAST], wearing [OUTFIT], surrounded by shelves of designer bags and sneakers, fashion influencer goal, [LOCATION] background",
+            "required_slots": []
+        },
+        "gaming_setup_streamer": {
+            "name": "Twitch Streamer Setup",
+            "template_prompt": "A shot of [PROTAGONIST] wearing a gaming headset, sitting in a racer chair, [PROPS_AND_CAST], wearing [OUTFIT], RGB lighting in background, intense focus on screen, streamer aesthetic, [LOCATION] background",
+            "required_slots": []
+        },
+        "convertible_driving_sunset": {
+            "name": "Driving Convertible (Sunset)",
+            "template_prompt": "A dynamic shot of [PROTAGONIST] driving a convertible top-down, [PROPS_AND_CAST], wearing [OUTFIT], wind in hair, sunset horizon reflection in sunglasses, road trip freedom, [LOCATION] background",
+            "required_slots": []
+        },
+        "winter_cabin_fireplace": {
+            "name": "Cozy Winter Cabin",
+            "template_prompt": "A warm shot of [PROTAGONIST] sitting by a stone fireplace, [PROPS_AND_CAST], wearing [OUTFIT], holding hot cocoa, snowy window view, fuzzy blanket, hygge vibes, [LOCATION] background",
+            "required_slots": []
+        },
+        "rooftop_bar_night": {
+            "name": "City Rooftop Bar",
+            "template_prompt": "A night shot of [PROTAGONIST] analyzing a cocktail at a rooftop bar, [PROPS_AND_CAST], wearing [OUTFIT], bokeh city skyline lights, sophisticated nightlife, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_rooftop_brunch": {
+            "name": "Rooftop Brunch with Friends",
+            "template_prompt": "A bright sunny shot of [PROTAGONIST] having brunch on a rooftop with friends, [PROPS_AND_CAST], wearing [OUTFIT], mimosas on table, city skyline background, vibrant and social, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_podcast_interview": {
+            "name": "Podcast Interview (Viral Clip)",
+            "template_prompt": "A high-quality podcast close-up of [PROTAGONIST] speaking into a large professional broadcast microphone (Shure SM7B), [PROPS_AND_CAST], wearing [OUTFIT], warm studio lighting, blurred sound-proofed wall background, intense storytelling vibe, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_poolside_hotel": {
+            "name": "Poolside Hotel Afternoon",
+            "template_prompt": "A relaxed shot of [PROTAGONIST] lounging by a luxury hotel pool, [PROPS_AND_CAST], wearing [OUTFIT], turquoise water, white cabanas, summer vacation vibes, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_luxury_bathroom": {
+            "name": "Getting Ready in Luxury Bathroom",
+            "template_prompt": "A mirror shot of [PROTAGONIST] in a marble bathroom, [PROPS_AND_CAST], wearing [OUTFIT], applying makeup, plush towels, spa-like atmosphere, perfectly lit, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_sunset_balcony": {
+            "name": "Sunset Balcony Chill",
+            "template_prompt": "A golden hour shot of [PROTAGONIST] leaning on a balcony railing, [PROPS_AND_CAST], wearing [OUTFIT], watching the sunset, warm orange glow, peaceful mood, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_coffee_run": {
+            "name": "Coffee Run in Athleisure",
+            "template_prompt": "A street style shot of [PROTAGONIST] walking with an iced coffee, [PROPS_AND_CAST], wearing [OUTFIT], matching athletic set, busy city street, morning energy, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_beach_club": {
+            "name": "Beach Club Daytime Party",
+            "template_prompt": "A high-energy shot of [PROTAGONIST] at a beach club, [PROPS_AND_CAST], wearing [OUTFIT], DJ booth in background, tropical cocktails, dancing crowd, sunny and fun, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_gym_mirror": {
+            "name": "Gym Mirror Moment",
+            "template_prompt": "A fitness selfie of [PROTAGONIST] in a gym mirror, [PROPS_AND_CAST], wearing [OUTFIT], gym equipment visible, post-workout glow, confident pose, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_smoothie_stop": {
+            "name": "Post-Workout Smoothie Stop",
+            "template_prompt": "A casual shot of [PROTAGONIST] holding a green smoothie, [PROPS_AND_CAST], wearing [OUTFIT], healthy lifestyle vibes, organic cafe setting, natural lighting, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_shopping_stroll": {
+            "name": "Shopping District Stroll",
+            "template_prompt": "A walking shot of [PROTAGONIST] carrying shopping bags, [PROPS_AND_CAST], wearing [OUTFIT], high-end storefronts in background, fashion influencer aesthetic, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_dressing_room": {
+            "name": "Dressing Room Try-On",
+            "template_prompt": "A mirror selfie of [PROTAGONIST] in a boutique dressing room, [PROPS_AND_CAST], wearing [OUTFIT], clothes hanging in background, evaluating the look, fashion haul vibe, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_airport_fit": {
+            "name": "Airport Terminal Fit Check",
+            "template_prompt": "A full body shot of [PROTAGONIST] standing in an airport terminal with luggage, [PROPS_AND_CAST], wearing [OUTFIT], travel ready, departure board in background, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_private_villa": {
+            "name": "Private Villa Morning",
+            "template_prompt": "A serene morning shot of [PROTAGONIST] stepping out onto a private villa patio, [PROPS_AND_CAST], wearing [OUTFIT], lush tropical garden, breakfast tray, vacation luxury, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_late_night_drive": {
+            "name": "Late-Night City Drive",
+            "template_prompt": "A FLASH photography shot of [PROTAGONIST] in the passenger seat of a car at night, [PROPS_AND_CAST], wearing [OUTFIT], city lights blurring outside window, cool car interior, mysterious vibe, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_golden_hour_street": {
+            "name": "Golden Hour Street Photos",
+            "template_prompt": "A cinematic backlit shot of [PROTAGONIST] standing in the middle of a quiet street during golden hour, [PROPS_AND_CAST], wearing [OUTFIT], lens flare, dreamy atmosphere, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_spa_day": {
+            "name": "Spa Day with Girls",
+            "template_prompt": "A relaxing shot of [PROTAGONIST] and friends in robes at a spa, [PROPS_AND_CAST], wearing [OUTFIT], cucumber slices, herbal tea, wellness retreat, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_yacht_calm": {
+            "name": "Yacht Day on Calm Water",
+            "template_prompt": "A peaceful wide shot of [PROTAGONIST] lying on the front net of a catamaran, [PROPS_AND_CAST], wearing [OUTFIT], vast blue ocean, reading a book, pure relaxation, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_backyard_party": {
+            "name": "Backyard House Party",
+            "template_prompt": "A candid social shot of [PROTAGONIST] at a backyard gathering, [PROPS_AND_CAST], wearing [OUTFIT], string lights above, red cups, laughter, summer evening, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_festival_day": {
+            "name": "Festival Daytime Hangout",
+            "template_prompt": "A boho-chic shot of [PROTAGONIST] sitting on the grass at a music festival, [PROPS_AND_CAST], wearing [OUTFIT], festival flags, crowd in distance, sunny and free-spirited, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_casual_lunch": {
+            "name": "Casual Lunch Caf\u00e9",
+            "template_prompt": "A shot of [PROTAGONIST] sitting at an outdoor caf\u00e9 table, [PROPS_AND_CAST], wearing [OUTFIT], salad bowl and sparkling water, chatting, casual chic, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_night_rooftop_party": {
+            "name": "Nighttime Rooftop Party",
+            "template_prompt": "A glamorous flashlight shot of [PROTAGONIST] holding a drink at a crowded rooftop party, [PROPS_AND_CAST], wearing [OUTFIT], night sky, sequins and sparkles, high energy, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_hotel_hallway": {
+            "name": "Hotel Hallway Walk",
+            "template_prompt": "A motion-blur shot of [PROTAGONIST] walking away down a luxury hotel hallway, [PROPS_AND_CAST], wearing [OUTFIT], turning back to smile, patterned carpet, elegant lighting, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_morning_bed": {
+            "name": "Morning Bed Sunlight",
+            "template_prompt": "A cozy top-down shot of [PROTAGONIST] waking up in white sheets, [PROPS_AND_CAST], wearing [OUTFIT], stretching, sunlight streaming across bed, lazy Sunday vibes, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_pool_cabana": {
+            "name": "Pool Cabana Lounging",
+            "template_prompt": "A shaded shot of [PROTAGONIST] resting inside a private pool cabana, [PROPS_AND_CAST], wearing [OUTFIT], fruit platter, reading a magazine, hidden sanctuary, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_bathroom_selfie": {
+            "name": "Bathroom Mirror Selfie (Casual)",
+            "template_prompt": "A casual mirror selfie of [PROTAGONIST] in a home bathroom, [PROPS_AND_CAST], wearing [OUTFIT], skincare products visible, getting ready, authentic vibe, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_pre_game": {
+            "name": "Pre-game Apartment Vibes",
+            "template_prompt": "A fun shot of [PROTAGONIST] and friends taking shots in an apartment kitchen, [PROPS_AND_CAST], wearing [OUTFIT], music playing, hype energy, before the club, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_balcony_champagne": {
+            "name": "Balcony Champagne Moment",
+            "template_prompt": "A celebratory shot of [PROTAGONIST] raising a champagne glass on a high-rise balcony, [PROPS_AND_CAST], wearing [OUTFIT], city view below, celebrating a milestone, luxury lifestyle, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_sidewalk_coffee": {
+            "name": "City Sidewalk Coffee Break",
+            "template_prompt": "A candid shot of [PROTAGONIST] sitting on a city bench or steps, [PROPS_AND_CAST], wearing [OUTFIT], coffee cup in hand, people walking by, urban pause, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_uber_wait": {
+            "name": "Waiting for Uber Outside Club",
+            "template_prompt": "A flash photography street shot of [PROTAGONIST] leaning against a wall outside a club, [PROPS_AND_CAST], wearing [OUTFIT], checking phone, neon lights reflection, city night aesthetic, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_morning_stretch": {
+            "name": "Morning Stretch at Home",
+            "template_prompt": "A peaceful shot of [PROTAGONIST] doing a yoga stretch on a living room rug, [PROPS_AND_CAST], wearing [OUTFIT], plants in background, soft morning light, wellness routine, [LOCATION] background",
+            "required_slots": []
+        },
+        "ig_resort_checkin": {
+            "name": "Vacation Resort Check-in",
+            "template_prompt": "A wide shot of [PROTAGONIST] walking into a grand resort lobby, [PROPS_AND_CAST], wearing [OUTFIT], high ceilings, ocean view through windows, arrival excitement, [LOCATION] background",
+            "required_slots": []
+        },
+        "rooftop_brunch_with_friends": {
+            "name": "Rooftop Brunch with Friends",
+            "template_prompt": "High-end rooftop restaurant, sunny morning, mimosas on table, city skyline background, vibrant brunch aesthetic, soft diffused lighting.",
+            "category": "Lifestyle"
+        },
+        "poolside_hotel_afternoon": {
+            "name": "Poolside Hotel Afternoon",
+            "template_prompt": "Luxury hotel pool deck, turquoise water, lounge chair, oversized sunglasses, tropical drink, vacation relax mood, golden sunlight.",
+            "category": "Lifestyle"
+        },
+        "getting_ready_in_luxury_bathroom": {
+            "name": "Getting Ready in Luxury Bathroom",
+            "template_prompt": "White marble bathroom, vanity mirror, makeup products spread out, bathrobe, soft cosmetic lighting, clean aesthetic.",
+            "category": "Lifestyle"
+        },
+        "sunset_balcony_chill": {
+            "name": "Sunset Balcony Chill",
+            "template_prompt": "Private apartment balcony, golden hour sunset, city view, holding wine glass, warm orange glow, relaxed evening vibe.",
+            "category": "Lifestyle"
+        },
+        "coffee_run_in_matching_athleisure": {
+            "name": "Coffee Run in Matching Athleisure",
+            "template_prompt": "City street sidewalk, holding iced coffee cup, wearing matching athletic set, busy street bokeh, morning errand energy.",
+            "category": "Lifestyle"
+        },
+        "gym_mirror_moment": {
+            "name": "Gym Mirror Moment",
+            "template_prompt": "Upscale gym interior, full length mirror, fitness equipment background, harsh gym lighting, workout glow.",
+            "category": "Lifestyle"
+        },
+        "post_workout_smoothie_stop": {
+            "name": "Post-Workout Smoothie Stop",
+            "template_prompt": "Juice bar interior, colorful fruit display, holding green smoothie, athletic wear, clean health aesthetic.",
+            "category": "Lifestyle"
+        },
+        "dressing_room_try_on": {
+            "name": "Dressing Room Try-On",
+            "template_prompt": "Boutique dressing room, multiple outfits hanging, mirror selfie angle, soft fitting room lighting, fashion indecision.",
+            "category": "Lifestyle"
+        },
+        "airport_terminal_fit_check": {
+            "name": "Airport Terminal Fit Check",
+            "template_prompt": "Modern airport terminal, large windows with planes, luggage cart, comfy travel outfit, travel anticipation vibe.",
+            "category": "Lifestyle"
+        },
+        "late_night_city_drive": {
+            "name": "Late-Night City Drive",
+            "template_prompt": "Car interior, dashboard lights, city streetlights blurring outside, night mood, moody cinematic lighting.",
+            "category": "Lifestyle"
+        },
+        "casual_lunch_caf\u00e9": {
+            "name": "Casual Lunch Caf\u00e9",
+            "template_prompt": "Trendy outdoor caf\u00e9 seating, salad bowl, sparkling water, dappled sunlight through trees, casual dining vibe.",
+            "category": "Lifestyle"
+        },
+        "hotel_hallway_walk": {
+            "name": "Hotel Hallway Walk",
+            "template_prompt": "Long luxury hotel corridor, patterned carpet, wall sconces, walking away from camera, depth of field.",
+            "category": "Lifestyle"
+        },
+        "morning_bed_sunlight": {
+            "name": "Morning Bed Sunlight",
+            "template_prompt": "White hotel bedding, messy sheets, bright morning window light, coffee mug on nightstand, cozy wake-up mood.",
+            "category": "Lifestyle"
+        },
+        "bathroom_mirror_selfie": {
+            "name": "Bathroom Mirror Selfie",
+            "template_prompt": "Clean bathroom mirror reflection, phone covering face slightly, casual home outfit, ring light reflection.",
+            "category": "Lifestyle"
+        },
+        "pre_game_apartment_vibes": {
+            "name": "Pre-Game Apartment Vibes",
+            "template_prompt": "Living room, music playing vibe, drinks on table, getting hyped, pre-party energy, warm indoor lighting.",
+            "category": "Lifestyle"
+        },
+        "morning_stretch_at_home": {
+            "name": "Morning Stretch at Home",
+            "template_prompt": "Yoga mat in living room, sunlight streaming in, stretching pose, plants in background, wellness aesthetic.",
+            "category": "Lifestyle"
+        },
+        "journaling_in_sunlight": {
+            "name": "Journaling in Sunlight",
+            "template_prompt": "Cozy nook, leather journal, pen in hand, sunbeam hitting paper, peaceful mindfulness vibe, dust motes in air.",
+            "category": "Lifestyle"
+        },
+        "late_night_kitchen_conversation": {
+            "name": "Late-Night Kitchen Conversation",
+            "template_prompt": "Kitchen island, midnight snack, dim under-cabinet lighting, leaning on counter, intimate talk vibe.",
+            "category": "Lifestyle"
+        },
+        "sitting_in_parked_car_thinking": {
+            "name": "Sitting in Parked Car Thinking",
+            "template_prompt": "Driver's seat, parked car, rain on window or streetlights, contemplative mood, staring out, moody lighting.",
+            "category": "Lifestyle"
+        },
+        "sunday_reset_at_home": {
+            "name": "Sunday Reset at Home",
+            "template_prompt": "Tidying up living space, fresh flowers, vacuum cleaner or laundry basket, clean home aesthetic, bright airy light.",
+            "category": "Lifestyle"
+        },
+        "recording_podcast_in_home_studio": {
+            "name": "Recording Podcast in Home Studio",
+            "template_prompt": "Home studio setup, Shure SM7B microphone, boom arm, headphones on, sound foam on walls, focused speaking vibe.",
+            "category": "Podcast"
+        },
+        "podcast_mic_setup_in_hotel": {
+            "name": "Podcast Mic Setup in Hotel",
+            "template_prompt": "Hotel desk, portable podcast mic setup, laptop open, window view, working on the go aesthetic.",
+            "category": "Podcast"
+        },
+        "caf\u00e9_podcast_recording_overseas": {
+            "name": "Caf\u00e9 Podcast Recording Overseas",
+            "template_prompt": "Outdoor European caf\u00e9, portable recorder on table, espresso cup, ambient street background, digital nomad vibe.",
+            "category": "Podcast"
+        },
+        "late_night_editing_podcast_episode": {
+            "name": "Late-Night Editing Podcast Episode",
+            "template_prompt": "Dark room, monitor screen glow, timeline visible on screen, coffee cup, focused work mode, blue light.",
+            "category": "Podcast"
+        },
+        "recording_voice_notes_while_traveling": {
+            "name": "Recording Voice Notes while Traveling",
+            "template_prompt": "Walking down foreign street, holding phone like mic, speaking intently, travel vlog style, dynamic background.",
+            "category": "Podcast"
+        },
+        "planning_goals_on_laptop": {
+            "name": "Planning Goals on Laptop",
+            "template_prompt": "Cozy workspace, laptop open to spreadsheet/notion, notebook, focused planning, ambitious mood.",
+            "category": "Podcast"
+        },
+        "working_at_caf\u00e9_solo": {
+            "name": "Working at Caf\u00e9 Solo",
+            "template_prompt": "Busy coffee shop, laptop open, noise cancelling headphones, deep work focus, blurred background customers.",
+            "category": "Podcast"
+        },
+        "evening_balcony_reflection": {
+            "name": "Evening Balcony Reflection",
+            "template_prompt": "Balcony railing, city lights at night, looking out, contemplative thinker pose, cinematic night lighting.",
+            "category": "Podcast"
+        },
+        "luxury_hotel_lobby_arrival": {
+            "name": "Luxury Hotel Lobby Arrival",
+            "template_prompt": "Grand hotel lobby, chandeliers, marble floors, bellhop with luggage, grand entrance moment, expensive architecture.",
+            "category": "Travel"
+        },
+        "checking_into_five_star_hotel": {
+            "name": "Checking Into Five-Star Hotel",
+            "template_prompt": "Hotel reception desk, handing over credit card, passport on counter, concierge smiling, premium service vibe.",
+            "category": "Travel"
+        },
+        "airport_lounge_business_moment": {
+            "name": "Airport Lounge Business Moment",
+            "template_prompt": "Exclusive airport lounge, glass of champagne, laptop open, runway view, business class travel aesthetic.",
+            "category": "Travel"
+        },
+        "international_flight_window_seat": {
+            "name": "International Flight Window Seat",
+            "template_prompt": "Airplane window view, clouds and wing, champagne glass on tray table, first class seat, luxury travel.",
+            "category": "Travel"
+        },
+        "packing_luxury_carry_on_suitcase": {
+            "name": "Packing Luxury Carry-On Suitcase",
+            "template_prompt": "Open Rimowa suitcase on bed, organized packing cubes, designer items, travel prep, clean layout.",
+            "category": "Travel"
+        },
+        "taxi_ride_through_new_city": {
+            "name": "Taxi Ride Through New City",
+            "template_prompt": "Backseat of black car, city blur outside window, looking out, motion blur, arrival excitement.",
+            "category": "Travel"
+        },
+        "balcony_view_overlooking_city": {
+            "name": "Balcony View Overlooking City",
+            "template_prompt": "High-rise balcony, sprawling city view below, day or night, feeling on top of the world, wide shot.",
+            "category": "Travel"
+        },
+        "rooftop_dinner_in_foreign_city": {
+            "name": "Rooftop Dinner in Foreign City",
+            "template_prompt": "Rooftop dining table, exotic city skyline, candlelit dinner, white tablecloth, romantic luxury vibes.",
+            "category": "Travel"
+        },
+        "morning_espresso_abroad": {
+            "name": "Morning Espresso Abroad",
+            "template_prompt": "Small italian street table, single espresso cup, newspaper, cobblestone street, slow morning travel vibe.",
+            "category": "Travel"
+        },
+        "private_villa_morning": {
+            "name": "Private Villa Morning",
+            "template_prompt": "Infinity pool edge, ocean horizon, breakfast floating tray, tropical villa architecture, paradise morning.",
+            "category": "Travel"
+        },
+        "vacation_resort_check_in": {
+            "name": "Vacation Resort Check-In",
+            "template_prompt": "Open-air resort lobby, welcome drink, ocean breeze, palm trees visible, tropical arrival mood.",
+            "category": "Travel"
+        },
+        "shopping_designer_boutique_abroad": {
+            "name": "Shopping Designer Boutique Abroad",
+            "template_prompt": "High-end boutique interior, minimalist racks, designer bags display, shopping in Paris/Milan vibe.",
+            "category": "Fashion"
+        },
+        "private_shopping_appointment": {
+            "name": "Private Shopping Appointment",
+            "template_prompt": "VIP room, champagne, fashion assistant holding items, exclusive shopping experience, luxury velvet seating.",
+            "category": "Fashion"
+        },
+        "window_shopping_luxury_district": {
+            "name": "Window Shopping Luxury District",
+            "template_prompt": "Street view, looking into luxury store window, reflection visible, holding shopping bags, high fashion street style.",
+            "category": "Fashion"
+        },
+        "reviewing_outfits_in_hotel_mirror": {
+            "name": "Reviewing Outfits in Hotel Mirror",
+            "template_prompt": "Full length hotel mirror, checking fit, multiple outfit options on bed, getting ready sequence.",
+            "category": "Fashion"
+        },
+        "luxury_mall_shopping_spree": {
+            "name": "Luxury Mall Shopping Spree",
+            "template_prompt": "Grand mall atrium, holding multiple designer bags, walking confidently, marble floors, consumerism pop.",
+            "category": "Fashion"
+        },
+        "fashion_week_street_style_moment": {
+            "name": "Fashion Week Street Style Moment",
+            "template_prompt": "Busy street, paparazzi background (blurred), wearing statement outfit, walking like runway, editorial street shot.",
+            "category": "Fashion"
+        },
+        "golden_hour_street_photos": {
+            "name": "Golden Hour Street Photos",
+            "template_prompt": "City street, warm golden sunlight, casting long shadows, influencer posing, sun flare, warm aesthetic.",
+            "category": "Fashion"
+        },
+        "courtside_nba_game_night": {
+            "name": "Courtside NBA Game Night",
+            "template_prompt": "Courtside seats, bright arena lights, basketball court floor visible, energetic crowd background, expensive seat view.",
+            "category": "Sports"
+        },
+        "walking_into_arena_tunnel": {
+            "name": "Walking Into Arena Tunnel",
+            "template_prompt": "Concrete arena tunnel, walking confidently, security guards in background, VIP entrance vibe.",
+            "category": "Sports"
+        },
+        "watching_warmups_courtside": {
+            "name": "Watching Warmups Courtside",
+            "template_prompt": "Leaning on courtside railing, players warming up in background, holding drink, pre-game anticipation.",
+            "category": "Sports"
+        },
+        "celebrating_big_play_courtside": {
+            "name": "Celebrating Big Play Courtside",
+            "template_prompt": "Standing up clapping, excited expression, blurry crowd cheering, high energy sports moment.",
+            "category": "Sports"
+        },
+        "sitting_floor_seats_confidently": {
+            "name": "Sitting Floor Seats Confidently",
+            "template_prompt": "Sitting leg crossed, floor seat view, court lines very close, 'seen at the game' vibe.",
+            "category": "Sports"
+        },
+        "arena_concourse_halftime_walk": {
+            "name": "Arena Concourse Halftime Walk",
+            "template_prompt": "Wide arena concourse, buying snacks or walking to lounge, bright lights, bustling crowd.",
+            "category": "Sports"
+        },
+        "post_game_arena_exit": {
+            "name": "Post-Game Arena Exit",
+            "template_prompt": "Walking out of arena, night time, crowd dispersing, city lights, post-event buzz.",
+            "category": "Sports"
+        },
+        "watching_game_from_luxury_suite": {
+            "name": "Watching Game From Luxury Suite",
+            "template_prompt": "Glass window view of court, high angle, lounge seating, catering food, private suite luxury.",
+            "category": "Sports"
+        },
+        "eiffel_tower_sunset_paris": {
+            "name": "Eiffel Tower Sunset Paris",
+            "template_prompt": "Parisian balcony or Trocadero, Eiffel Tower in background, pink and orange sunset sky, romantic travel clich\u00e9.",
+            "category": "Travel"
+        },
+        "louvre_courtyard_afternoon": {
+            "name": "Louvre Courtyard Afternoon",
+            "template_prompt": "Louvre glass pyramid, sunny day, beige stone architecture, touristy but chic location.",
+            "category": "Travel"
+        },
+        "colosseum_rome_daylight": {
+            "name": "Colosseum Rome Daylight",
+            "template_prompt": "Ancient Rome Colosseum arches in background, sunny blue sky, cobblestone path, history meets fashion.",
+            "category": "Travel"
+        },
+        "trevi_fountain_evening_stroll": {
+            "name": "Trevi Fountain Evening Stroll",
+            "template_prompt": "Trevi Fountain lit up at night, turquoise water, crowds blurred, coin toss moment, magical evening.",
+            "category": "Travel"
+        },
+        "big_ben_london_walk": {
+            "name": "Big Ben London Walk",
+            "template_prompt": "Westminster Bridge, Big Ben and Parliament in background, red bus passing, overcast London light.",
+            "category": "Travel"
+        },
+        "tower_bridge_golden_hour": {
+            "name": "Tower Bridge Golden Hour",
+            "template_prompt": "Tower Bridge structure, river Thames, warm sunset light, iconic London landmark.",
+            "category": "Travel"
+        },
+        "times_square_night_lights": {
+            "name": "Times Square Night Lights",
+            "template_prompt": "Neon billboards everywhere, bright chaotic lights, yellow taxis blurred, NYC energy, night shot.",
+            "category": "Travel"
+        },
+        "brooklyn_bridge_morning_walk": {
+            "name": "Brooklyn Bridge Morning Walk",
+            "template_prompt": "Wooden walkway of Brooklyn Bridge, cables leading up, Manhattan skyline in distance, morning mist.",
+            "category": "Travel"
+        },
+        "hollywood_hills_overlook": {
+            "name": "Hollywood Hills Overlook",
+            "template_prompt": "Hiking trail or overlook, Hollywood sign distant, LA basin view, sunny hazy California vibe.",
+            "category": "Travel"
+        },
+        "santa_monica_pier_sunset": {
+            "name": "Santa Monica Pier Sunset",
+            "template_prompt": "Ferris wheel funfair background, beach sand, purple sunset, pier pilings, west coast vibe.",
+            "category": "Travel"
+        },
+        "burj_khalifa_observation_deck": {
+            "name": "Burj Khalifa Observation Deck",
+            "template_prompt": "Glass floor observation deck, incredibly high view of Dubai, futuristic skyline, luxury travel.",
+            "category": "Travel"
+        },
+        "dubai_mall_luxury_stroll": {
+            "name": "Dubai Mall Luxury Stroll",
+            "template_prompt": "Massive aquarium or waterfall background, polished expansive mall, luxury brands, Dubai wealth.",
+            "category": "Travel"
+        },
+        "santorini_cliffside_view": {
+            "name": "Santorini Cliffside View",
+            "template_prompt": "White buildings with blue domes, Aegean sea below, bright harsh white sunlight, greek island aesthetic.",
+            "category": "Travel"
+        },
+        "mykonos_seaside_walk": {
+            "name": "Mykonos Seaside Walk",
+            "template_prompt": "Windmills in background, white stone path, ocean spray, windy island vibe, chic summer outfit.",
+            "category": "Travel"
+        },
+        "tokyo_shibuya_crossing": {
+            "name": "Tokyo Shibuya Crossing",
+            "template_prompt": "Massive crosswalk, neon signs, thousands of people (blurred), rain or night, cyberpunk city energy.",
+            "category": "Travel"
+        },
+        "kyoto_temple_pathway": {
+            "name": "Kyoto Temple Pathway",
+            "template_prompt": "Red Torii gates tunnel or bamboo forest, green dappled light, peaceful spiritual path, japan travel.",
+            "category": "Travel"
+        },
+        "bali_jungle_resort": {
+            "name": "Bali Jungle Resort",
+            "template_prompt": "Lush green jungle, infinity pool, wooden architecture, rice terraces, tropical zen paradise.",
+            "category": "Travel"
+        },
+        "tulum_beach_ruins": {
+            "name": "Tulum Beach Ruins",
+            "template_prompt": "Mayan ruins on cliff, white sand beach below, turquoise caribbean sea, boho chic vibe.",
+            "category": "Travel"
+        },
+        "rio_de_janeiro_overlook": {
+            "name": "Rio de Janeiro Overlook",
+            "template_prompt": "Sugarloaf mountain view, ocean bay, green mountains, sunny vibrant Brazil weather.",
+            "category": "Travel"
+        },
+        "cape_town_table_mountain_view": {
+            "name": "Cape Town Table Mountain View",
+            "template_prompt": "Table Mountain flat top background, blue sky, waterfront or beach foreground, scenic nature.",
+            "category": "Travel"
+        }
+    }
+}

@@ -1,0 +1,9 @@
+streamlit
+openai
+google-generativeai
+python-dotenv
+requests
+Pillow
+PyJWT
+watchdog
+boto3
