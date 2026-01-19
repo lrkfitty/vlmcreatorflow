@@ -61,6 +61,7 @@ def generate_motion_prompt(image_path, movement_type="Auto", physics_focus="stan
     - Vibe: {emotion}
     - Context: {additional_context}
     
+    
     STRUCTURE YOUR PROMPT AS A SINGLE, FLOWING NARRATIVE INCORPORATING:
     1. **The Core Action**: What is happening? (e.g., "She turns her head slowly...")
     2. **Micromovements (CRITICAL)**: Describe the twitch of a muscle, the flutter of an eyelash, the shift of weight, the breathing pattern. 
@@ -68,10 +69,41 @@ def generate_motion_prompt(image_path, movement_type="Auto", physics_focus="stan
     4. **Cinematography**: {movement_type}. Lens flares, depth of field rack focus, film grain, exposure.
     5. **Humanity**: If a person is present, describe their thought process through micro-expressions.
     
+    ## THE REALISM BIBLE (STRICT ADHERENCE REQUIRED):
+    Prioritize human realism above all else. This is observational realism, not animation.
+    
+    [HUMAN BODY]
+    - Subtlety: Breath visible in chest/clavicle. Posture shifts due to fatigue/balance.
+    - Timing: Imperfect synchronization between limbs.
+    - Eyes: Micro-saccades, focus drift, re-locking. No rhythmic blinking.
+    - Face: Jaw relaxation. Emotion registers in eyes/tension, not just mouth.
+    
+    [PHYSICS]
+    - Momentum: Bodies accelerate/decelerate naturally. No floatiness. No instant stops.
+    - Materials: Hair lags behind head. Fabric has weight/delay. 
+    - Interactions: Objects react with correct mass/rebound.
+    
+    [LIGHT]
+    - Specular highlights slide across skin.
+    - Subsurface scattering visible in motion.
+    - Shadows soften/sharpen based on distance.
+    - Skin must show pores, texture, sheen. NEVER plastic.
+    
+    [CAMERA]
+    - {movement_type}.
+    - Handheld = micro-jitter. Focus breathing feels optical. 
+    - Stillness is powerful.
+    
+    [BEHAVIOR]
+    - Reaction speed: Eyes move, then head, then body.
+    - Thoughts vary micro-expressions before macro actions.
+    
+    [ABSOLUTE CONSTRAINTS]
+    - No animation artifacts. No looped motion. No "AI Smoothness".
+    - Result must be indistinguishable from live-action 8K footage.
+    
     REQUIREMENTS:
-    - LENGTH: **STRICTLY between 1500 and 2500 characters.**
-      - Under 1500 is too short (lacks detail).
-      - Over 2500 will be rejected by the API.
+    - LENGTH: **STRICTLY between 1000 and 2000 characters.** (Optimized for Kling)
     - TONE: Professional, Artistic, Technical.
     - NO: "Here is the prompt", just give me the raw prompt text.
     """
