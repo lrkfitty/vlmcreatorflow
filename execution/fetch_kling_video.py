@@ -40,58 +40,69 @@ def fetch_video(task_id):
         "Content-Type": "application/json"
     }
 
-    print(f"🔍 Checking Status for Task: {task_id} (using List Strategy)")
-    # Direct endpoint gives 404, must list recent
-    url = "https://api.klingai.com/v1/videos/image2video"
-    params = {"page": 1, "page_size": 20}
+    print(f"🔍 Checking Status for Task: {task_id} (Checking Standard & Motion endpoints)")
     
-    try:
-        resp = requests.get(url, headers=headers, params=params)
-        if resp.status_code != 200:
-            print(f"API Error: {resp.text}")
-            return
-            
-        data = resp.json()
+    endpoints = [
+        "https://api.klingai.com/v1/videos/image2video",
+        "https://api.klingai.com/v1/videos/motion-control"
+    ]
+    
+    target_task = None
+    
+    for url in endpoints:
+        print(f"   Checking: {url}...")
+        params = {"page": 1, "page_size": 20}
         
-        # Robust Parsing
-        tasks = []
-        if isinstance(data, dict):
-            if "data" in data and isinstance(data["data"], dict) and "tasks" in data["data"]:
-                tasks = data["data"]["tasks"]
-            elif "data" in data and isinstance(data["data"], list):
-                tasks = data["data"]
-            elif "tasks" in data:
-                tasks = data["tasks"]
+        try:
+            resp = requests.get(url, headers=headers, params=params)
+            if resp.status_code != 200: continue
                 
-        # Find Target
-        target_task = None
-        for t in tasks:
-            if t.get("task_id") == task_id:
-                target_task = t
-                break
-                
-        if not target_task:
-            print(f"⚠️ Task {task_id} not found in recent 20 videos.")
-            print("Try checking older pages? (Script defaults to page 1)")
-            return
+            data = resp.json()
             
-        status = target_task.get("task_status") or target_task.get("status")
-        print(f"Status: {status}")
+            # Robust Parsing
+            tasks = []
+            if isinstance(data, dict):
+                if "data" in data and isinstance(data["data"], dict) and "tasks" in data["data"]:
+                    tasks = data["data"]["tasks"]
+                elif "data" in data and isinstance(data["data"], list):
+                    tasks = data["data"]
+                elif "tasks" in data:
+                    tasks = data["tasks"]
+            
+            # Find Target
+            for t in tasks:
+                if t.get("task_id") == task_id:
+                    target_task = t
+                    print(f"   ✅ Found in {url}!")
+                    break
+            
+            if target_task: break
+            
+        except Exception as e:
+            print(f"   Error: {e}")
+            
+    if not target_task:
+        print(f"⚠️ Task {task_id} not found in recent lists.")
+        return
+            
+    status = target_task.get("task_status") or target_task.get("status")
+    print(f"Status: {status}")
+    
+    if status == "succeed":
+        result = target_task.get("task_result")
+        video_url = None
+        if result and "videos" in result and len(result["videos"]) > 0:
+            video_url = result["videos"][0].get("url")
         
-        if status == "succeed":
-            result = target_task.get("task_result")
-            video_url = None
-            if result and "videos" in result and len(result["videos"]) > 0:
-                video_url = result["videos"][0].get("url")
+        if video_url:
+            print(f"🎥 Video URL Found: {video_url}")
             
-            if video_url:
-                print(f"🎥 Video URL Found: {video_url}")
-                
-                # Download
-                filename = f"output/manual_kling_{task_id}.mp4"
-                if not os.path.exists("output"): os.makedirs("output")
-                
-                print(f"⬇️ Downloading to {filename}...")
+            # Download
+            filename = f"output/manual_kling_{task_id}.mp4"
+            if not os.path.exists("output"): os.makedirs("output")
+            
+            print(f"⬇️ Downloading to {filename}...")
+            try:
                 v_resp = requests.get(video_url, stream=True)
                 if v_resp.status_code == 200:
                     with open(filename, 'wb') as f:
@@ -100,14 +111,12 @@ def fetch_video(task_id):
                     print("✅ Download Complete!")
                 else:
                     print(f"❌ Download Failed: {v_resp.status_code}")
-            else:
-                print("⚠️ No video URL in result payload.")
-                print(data)
+            except Exception as e:
+                print(f"Download Exception: {e}")
         else:
-            print(f"Task result payload: {data}")
-
-    except Exception as e:
-        print(f"Error: {e}")
+            print("⚠️ No video URL in result payload.")
+    else:
+        print(f"Task result payload: {target_task}")
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

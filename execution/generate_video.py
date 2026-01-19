@@ -150,8 +150,12 @@ def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", qu
         for i in range(240): # 240 * 5s = 20 mins
             time.sleep(5)
             
-            # POLL STRATEGY: List recent tasks (since /tasks/{id} gives 404)
+            # POLL STRATEGY: List recent tasks
+            # If using Motion Control, we MUST poll the motion-control list endpoint
             check_url = "https://api.klingai.com/v1/videos/image2video"
+            if "motion-control" in url:
+                check_url = "https://api.klingai.com/v1/videos/motion-control"
+
             params = {"page": 1, "page_size": 20} 
             
             try:
@@ -160,22 +164,23 @@ def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", qu
                      logs.append(f"⚠️ Polling Error: {status_resp.status_code}")
                      continue
                      
-                status_data_list = status_resp.json()
+                status_data = status_resp.json()
+             
+                # Extract Tasks: Handle Both Formats
+                # Standard: data['data']['tasks'] (List)
+                # Motion: data['data'] (List)
+                tasks = []
+                response_data = status_data.get("data", {})
                 
+                if isinstance(response_data, list):
+                    tasks = response_data
+                elif isinstance(response_data, dict):
+                    tasks = response_data.get("tasks", [])
+
                 # Find our task definition in the list
                 target_task = None
                 
-                # Robust parsing of list (same as recovery script)
-                all_tasks = []
-                if isinstance(status_data_list, dict):
-                    if "data" in status_data_list and isinstance(status_data_list["data"], dict) and "tasks" in status_data_list["data"]:
-                        all_tasks = status_data_list["data"]["tasks"]
-                    elif "data" in status_data_list and isinstance(status_data_list["data"], list):
-                        all_tasks = status_data_list["data"]
-                    elif "tasks" in status_data_list:
-                        all_tasks = status_data_list["tasks"]
-                        
-                for t in all_tasks:
+                for t in tasks:
                      if t.get("task_id") == task_id:
                           target_task = t
                           break
