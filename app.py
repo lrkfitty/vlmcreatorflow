@@ -19,7 +19,7 @@ except ImportError as e:
     st.error(f"Error importing scripts: {e}")
     st.stop()
 
-st.set_page_config(page_title="CreateFlow | Viral Lens Media", layout="wide", page_icon=None)
+st.set_page_config(page_title="CreateFlow | Viral Lense Media", layout="wide", page_icon=None)
 
 # --- AUTHENTICATION GATE MOVED AFTER THEME LOADING ---
 if "authenticated" not in st.session_state:
@@ -191,7 +191,7 @@ if not st.session_state.authenticated:
     c1, c2, c3 = st.columns([1, 1.5, 1])
     with c2:
         st.markdown("<div style='text-align: center; color: #64748B; font-size: 1rem; font-weight: 500; margin-bottom: 0.5rem;'>Welcome to an all new tool brought to you by</div>", unsafe_allow_html=True)
-        st.markdown("<div style='text-align: center; color: #1E293B; font-size: 1.8rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0px;'>VIRAL LENS MEDIA</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; color: #1E293B; font-size: 1.8rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0px;'>VIRAL LENSE MEDIA</div>", unsafe_allow_html=True)
         st.markdown("<h1 style='text-align: center; font-size: 4.5rem; margin-top: -10px; margin-bottom: 2rem;'>CreateFlow</h1>", unsafe_allow_html=True)
         
         st.text_input("Enter Access Code", type="password", key="auth_input", on_change=check_app_password, label_visibility="collapsed", placeholder="Enter Password")
@@ -200,7 +200,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # HEADER
-st.markdown("<div class='brand-overline'>Viral Lens Media</div>", unsafe_allow_html=True)
+st.markdown("<div class='brand-overline'>Viral Lense Media</div>", unsafe_allow_html=True)
 st.markdown("<h1 style='text-align: center'>CreateFlow</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #64748B; margin-bottom: 3rem;'>Enterprise-Grade Content Workflow</p>", unsafe_allow_html=True)
 
