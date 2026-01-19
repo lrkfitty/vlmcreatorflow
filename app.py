@@ -21,23 +21,9 @@ except ImportError as e:
 
 st.set_page_config(page_title="CreateFlow | Viral Lens Media", layout="wide", page_icon=None)
 
-# --- AUTHENTICATION GATE ---
+# --- AUTHENTICATION GATE MOVED AFTER THEME LOADING ---
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-
-def check_app_password():
-    pwd = st.session_state.get("auth_input", "")
-    # Default password is 'admin' if env not set
-    if pwd == os.getenv("APP_PASSWORD", "admin"): 
-        st.session_state.authenticated = True
-    else:
-        st.error("⛔ Incorrect Password")
-
-if not st.session_state.authenticated:
-    st.markdown("## 🔒 Access Restricted")
-    st.text_input("Enter Access Code", type="password", key="auth_input", on_change=check_app_password)
-    st.info("Default code: `admin` (Set APP_PASSWORD in .env to change)")
-    st.stop()
 
 # --- THEME INJECTION ---
 def apply_custom_theme():
@@ -191,6 +177,27 @@ def apply_custom_theme():
     """, unsafe_allow_html=True)
 
 apply_custom_theme()
+
+# --- NEW AUTHENTICATION UI ---
+def check_app_password():
+    pwd = st.session_state.get("auth_input", "")
+    if pwd == os.getenv("APP_PASSWORD", "admin"): 
+        st.session_state.authenticated = True
+    else:
+        st.error("⛔ Incorrect Password")
+
+if not st.session_state.authenticated:
+    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    c1, c2, c3 = st.columns([1, 1.5, 1])
+    with c2:
+        st.markdown("<div style='text-align: center; color: #64748B; font-size: 1rem; font-weight: 500; margin-bottom: 0.5rem;'>Welcome to an all new tool brought to you by</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; color: #1E293B; font-size: 1.8rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0px;'>VIRAL LENS MEDIA</div>", unsafe_allow_html=True)
+        st.markdown("<h1 style='text-align: center; font-size: 4.5rem; margin-top: -10px; margin-bottom: 2rem;'>CreateFlow</h1>", unsafe_allow_html=True)
+        
+        st.text_input("Enter Access Code", type="password", key="auth_input", on_change=check_app_password, label_visibility="collapsed", placeholder="Enter Password")
+        st.button("LOGIN", on_click=check_app_password, use_container_width=True, type="primary")
+        
+    st.stop()
 
 # HEADER
 st.markdown("<div class='brand-overline'>Viral Lens Media</div>", unsafe_allow_html=True)
