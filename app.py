@@ -249,25 +249,32 @@ with tab_wizard:
     st.markdown("### Step-by-Step Content Creator")
     
     # --- UI Inputs ---
+    # --- UI Inputs ---
     col_vibe, col_outfit, col_char = st.columns(3)
     
     with col_vibe:
-        st.markdown("**1. Select Vibe**")
-        selected_vibe_name = st.selectbox("Choose Aesthetic", vibes_list)
+        st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+        st.markdown("#### 1. Vibe")
+        selected_vibe_name = st.selectbox("Choose Aesthetic", vibes_list, label_visibility="collapsed")
         if selected_vibe_name:
             st.image(vibes_data[selected_vibe_name], use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
             
     with col_outfit:
-        st.markdown("**2. Select Outfit**")
-        selected_outfit_name = st.selectbox("Choose Outfit", outfits_list)
+        st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+        st.markdown("#### 2. Outfit")
+        selected_outfit_name = st.selectbox("Choose Outfit", outfits_list, label_visibility="collapsed")
         if selected_outfit_name:
             st.image(outfits_data[selected_outfit_name], use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     with col_char:
-        st.markdown("**3. Select Character**")
-        selected_character_name = st.selectbox("Choose Model", characters_list)
+        st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+        st.markdown("#### 3. Character")
+        selected_character_name = st.selectbox("Choose Model", characters_list, label_visibility="collapsed")
         if selected_character_name:
             st.image(characters_data[selected_character_name], use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     st.divider()
 
@@ -299,26 +306,18 @@ with tab_wizard:
     custom_scenario = st.text_input("Scenario / Context", placeholder="e.g. At a luxury coffee shop in Paris...")
     custom_notes = st.text_area("Specific Details", placeholder="Enter any extra details here...")
     
-    col_imgs, col_model, col_like = st.columns(3)
+    # Advanced Settings & Variants
+    col_adv, col_count = st.columns([3, 1])
     
-    with col_model:
-        prompt_engine = st.selectbox("Brain (Prompt Engine)", ["gpt-4o", "gemini-1.5-pro"], key="wiz_brain")
-        # New: Render Engine Selector
-        st.info("🧠 Brain: " + prompt_engine)
-        render_engine = "nano" # Force Cloud Engine
-        # render_engine = st.selectbox("Painter (Image Engine)", ["nano", "sd_local"], index=0, help="Use 'sd_local' for unrestricted generation.", key="wiz_painter")
-        
-    with col_like:
-        likeness = 0.5 
-        # Hidden for Nano
-        pass
-
-    with col_imgs:
-        # This slider is ONLY for the immediate Wizard Generation button
-        num_images = st.slider("Test Count (Wizard Only)", min_value=1, max_value=4, value=1, key="wiz_test_count")
-        
-        selected_checkpoint = None
-        # SD Local Checkpoint Logic Removed for Cloud Deployment
+    with col_adv:
+        with st.expander("⚙️ Advanced Brain Settings"):
+             prompt_engine = st.selectbox("Prompt Engine", ["gpt-4o", "gemini-1.5-pro"], key="wiz_brain")
+             render_engine = "nano" 
+             likeness = 0.5
+             selected_checkpoint = None
+             
+    with col_count:
+        num_images = st.slider("Generate Count", 1, 4, 1, key="wiz_test_count")
 
     # --- CAMPAIGN BUTTON ---
     col_c_btn, col_c_batch = st.columns([3, 1])
