@@ -12,3 +12,7 @@ __pycache__/
 # Credentials
 credentials.json
 token.json
+
+# Outputs
+output/
+sd_local/
