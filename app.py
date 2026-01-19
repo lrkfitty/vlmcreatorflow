@@ -928,6 +928,8 @@ with tab_world:
                          
                      if res["status"] == "success":
                          st.image(res["image_path"])
+                         with open(res["image_path"], "rb") as f:
+                             st.download_button("⬇️ Download Image", f, file_name=os.path.basename(res["image_path"]), mime="image/png")
         
         with col_act2:
             st.markdown("#### 🎞️ Storyboard Generator")
@@ -958,8 +960,7 @@ with tab_world:
                              res = generate_image_from_prompt(wb_payload, "output")
                              if res["status"] == "success":
                                  st.toast(f"Shot {i+1} Generated!")
-                                 # Save to session (simplified for now, just show it)
-                                 # We need a proper store for results if we want persistence
+                                 st.session_state[f"sb_img_{i}"] = res["image_path"] # Saved!
                              else:
                                  st.error(f"Shot {i+1} Failed")
 
@@ -989,7 +990,17 @@ with tab_world:
                     
                     with col_sb_img:
                         if f"sb_img_{i}" in st.session_state:
-                             st.image(st.session_state[f"sb_img_{i}"])
+                             img_path = st.session_state[f"sb_img_{i}"]
+                             st.image(img_path)
+                             if os.path.exists(img_path):
+                                 with open(img_path, "rb") as f:
+                                     st.download_button(
+                                         "⬇️ Save", 
+                                         f, 
+                                         file_name=os.path.basename(img_path),
+                                         mime="image/png",
+                                         key=f"dl_sb_{i}"
+                                     )
                 
                 st.divider()
                 if st.button("🚀 Add Storyboard to Campaign Queue", type="primary"):
@@ -1140,7 +1151,42 @@ with tab_video:
     st.markdown("### AI Video Generator (Kling 2.6 / Veo 2.0)")
     st.info("Transform your generated images into high-motion video clips using the latest 2026 models.")
     
-    col_v_in, col_v_set = st.columns([1, 1])
+    # Sub-tabs for Creation vs Gallery
+    v_tab_create, v_tab_gallery = st.tabs(["✨ Generate Video", "📚 Video Gallery (Recover)"])
+    
+    with v_tab_gallery:
+        st.markdown("#### Generated Videos (Cloud Container)")
+        if not os.path.exists("output"):
+             st.warning("No output folder found.")
+        else:
+             # Find MP4s
+             videos = [f for f in os.listdir("output") if f.endswith(".mp4")]
+             videos.sort(key=lambda x: os.path.getmtime(os.path.join("output", x)), reverse=True)
+             
+             if not videos:
+                 st.info("No videos found yet.")
+             else:
+                 for vid in videos:
+                     vid_path = os.path.join("output", vid)
+                     
+                     with st.expander(f"🎬 {vid}", expanded=True):
+                         c1, c2 = st.columns([3, 1])
+                         with c1:
+                             st.video(vid_path)
+                         with c2:
+                             st.markdown("**Actions**")
+                             with open(vid_path, "rb") as vf:
+                                 st.download_button(
+                                     f"⬇️ Download",
+                                     data=vf,
+                                     file_name=vid,
+                                     mime="video/mp4",
+                                     key=f"dl_{vid}"
+                                 )
+                             st.caption(f"Size: {os.path.getsize(vid_path)/1024/1024:.1f}MB")
+
+    with v_tab_create:
+        col_v_in, col_v_set = st.columns([1, 1])
     
     with col_v_in:
         st.markdown("**1. Select Input Image**")
@@ -1321,6 +1367,16 @@ with tab_video:
                         if result.get('video_url'):
                             st.write(f"**Direct Link:** [Click to Open]({result.get('video_url')})")
                             st.video(result.get('video_url'))
+                            
+                            # Add Download Button using local container file
+                            if result.get('video_path') and os.path.exists(result['video_path']):
+                                with open(result['video_path'], "rb") as v_file:
+                                    st.download_button(
+                                        label="⬇️ Download MP4",
+                                        data=v_file,
+                                        file_name=os.path.basename(result['video_path']),
+                                        mime="video/mp4"
+                                    )
                         else:
                             st.warning(f"Video URL not found. Use Task ID {result.get('task_id')} to fetch manually.")
                             
