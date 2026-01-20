@@ -59,6 +59,10 @@ def _generate_gemini(prompt):
         res_json = response.json()
         
         # Extract text
+        if 'candidates' not in res_json:
+            print(f"❌ Storyboard Gen Error: {res_json.get('promptFeedback', res_json)}")
+            return []
+            
         text = res_json['candidates'][0]['content']['parts'][0]['text']
         
         # Clean markdown

@@ -144,31 +144,6 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         headers = { "Content-Type": "application/json" }
 
-        # Construct Payload
-        parts = []
-        
-        # 1. Add Text Prompt with Explicit Aspect Ratio and Likeness Instruction
-        # 1. Add Text Prompt with Explicit Aspect Ratio and Likeness Instruction
-        # We inject it at the start to ensure adherence
-        instruction = f"""
-        Generate a {aspect_ratio} aspect ratio image.
-        
-        CRITICAL REFERENCE RULES:
-        1. **IDENTITY LOCK (HIGHEST PRIORITY):** You will be provided with a reference image labeled "Main Character" (and optionally "Cast"). You MUST generate these EXACT people. Copy their facial features, bone structure, skin tone, and hair style 1:1.
-        2. **OUTFIT SWAP RULE:** If an image is labeled "Outfit", you must DRESS the character in that specific outfit. IGNORE the clothes the character is wearing in their "Identity" reference photo. The "Outfit" image takes 100% precedence for clothing.
-        3. **RELATIONS:** If "Cast" or "Friend" images are provided, include them in the scene interacting with the Main Character. Apply the same Identity Lock and Outfit Swap rules to them.
-        
-        STYLE GUIDE:
-        - 8k Resolution, RAW Photo, Ultra-Realistic.
-        - TEXTURES: Skin pores, individual hair strands, iris details, fabric threads must be visible. 
-        - LIGHTING: Ray-traced lighting, soft shadows, subsurface scattering on skin.
-        - NO: Cartoonish, smooth, plastic, blur, or oversaturated looks.
-        
-        PROMPT SCENE DESCRIPTION: 
-        {positive_prompt}
-        """
-        parts.append({ "text": instruction })
-        
         # Helper to attach image or text context to payload
         def add_image_part(img_path, label):
             import base64
@@ -198,9 +173,9 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
 
             # Add to Payload if we have data
             if b64_data:
-                # INJECT LABEL AS TEXT CONTEXT BEFORE IMAGE
+                # FIX: STRONG BINDING - Explicitly tag the image for the model
                 parts.append({
-                    "text": f"Reference Image for: {label}"
+                    "text": f"\n[VISUAL ID: {label}]\n"
                 })
                     
                 parts.append({
@@ -217,7 +192,10 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                  })
                  logs.append(f"multimodal: Included text context: {label}")
 
-        # 2. Add Reference Images
+        # 1. Initialize Parts
+        parts = []
+
+        # 2. Add Reference Images (VISUAL CONTEXT FIRST)
         # Check for new 'assets' list (World Builder) or fallback to legacy args
         if prompt_data.get("assets"):
              for asset in prompt_data["assets"]:
@@ -227,6 +205,41 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
              add_image_part(reference_image_path, "Character")
              add_image_part(outfit_path, "Outfit")
              add_image_part(vibe_path, "Vibe")
+        
+        # 3. Add Master Instruction with Prompt (COMMAND LAST)
+        instruction = f"""
+        Generate a {aspect_ratio} aspect ratio image.
+        
+        --------------------------------------------------
+        ⚠️ PROTOCOL: STYLE REPLACEMENT MODE
+        --------------------------------------------------
+        
+        INPUTS:
+        1. REFERENCE IMAGES = "CASTING PHOTOS" (Raw, Unstyled, Identity Source)
+        2. TEXT PROMPT = "DIRECTOR'S SHOT LIST" (Lighting, Camera, Mood, Action)
+        
+        INSTRUCTION:
+        You are a Cinematographer. Your job is to take the ACTOR from the "Casting Photo" and COSTUME from the "Outfit" reference, and place them on a NEW FILM SET described in the "Director's Shot List".
+        
+        RULES:
+        1. **IDENTITY MAPPING**: Match `[VISUAL ID: Cast: NAME]` to the character in the text prompt.
+        2. **WARDROBE MAPPING**: Match `[VISUAL ID: Outfit for NAME: ...]` *strictly* to that specific character.
+           - DO NOT PUT Character A's outfit on Character B.
+           - If a character has a specific outfit ID, ignore general text descriptions of their clothes. The IMAGE is the authority.
+        3. **NO BLEEDING**: Keep visual assets segregated. Character A gets Image A. Character B gets Image B.
+        4. **CINEMATIC STYLE**: Discard the "Selfie" or "Catalog" style of the reference images. Apply the lighting/camera from the prompt.
+        
+        EXAMPLE:
+        - Input: `[VISUAL ID: Cast: Shay]`, `[VISUAL ID: Cast: Bob]`, `[VISUAL ID: Outfit for Shay: Yellow]`, `[VISUAL ID: Outfit for Bob: Black]`
+        - Prompt: "Shay and Bob talking."
+        - Output: Shay (Face A) wearing Yellow (Outfit A). Bob (Face B) wearing Black (Outfit B).
+        
+        ---------------------
+        **DIRECTOR'S SHOT LIST (EXECUTE THIS):**
+        {positive_prompt}
+        ---------------------
+        """
+        parts.append({ "text": instruction })
         
         # Log the full prompt for debugging
         logs.append(f"Prompt sent to Nano: 'Generate a {aspect_ratio} aspect ratio image of: {positive_prompt}'")
