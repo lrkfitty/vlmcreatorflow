@@ -88,6 +88,7 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
        - 'composition': E.g. "Center Framed", "Rule of Thirds", "Symmetrical".
        - 'depth_of_field': E.g. "Shallow depth of field", "Deep focus", "Bokeh".
        - 'lighting_type': E.g. "Rembrandt", "Soft Box", "Neon", "Golden Hour Hard Light".
+       - 'time_of_day': E.g. "Morning", "Day", "Golden Hour", "Blue Hour", "Night".
        - 'subject_position': E.g. "Seated at bar", "Walking towards camera".
        - 'action_description': What is happening.
        - 'characters': List of characters present.
@@ -95,7 +96,7 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
          * MUST BE AT LEAST 800 CHARACTERS LONG.
          * Combine ALL parameters into a massive, highly descriptive block.
          * You must describe EVERY texture, light source, background element, and micro-expression.
-         * Structure: "[Shot Size], [Camera Angle]. [Subject Position], [Action Description]. [Lighting Type], [Depth of Field]. [Camera/Lens Specs for Texture]. Ultra-detailed, 8k film still. [Detailed Background]. [Detailed Outfit]. [Detailed Lighting]."
+         * Structure: "[Shot Size], [Camera Angle]. [Subject Position], [Action Description]. [Time of Day], [Lighting Type], [Depth of Field]. [Camera/Lens Specs for Texture]. Ultra-detailed, 8k film still. [Detailed Background]. [Detailed Outfit]. [Detailed Lighting]."
     
     OUTPUT FORMAT:
     Return ONLY valid JSON.
@@ -112,6 +113,7 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
                "composition": "...",
                "depth_of_field": "...",
                "lighting_type": "...",
+               "time_of_day": "...",
                "subject_position": "...",
                "action_description": "...",
                "characters": ["Name1"],

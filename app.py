@@ -798,6 +798,29 @@ with tab_series:
                         # UPDATE SHOT DATA so Generator uses this
                         shot['characters'] = selected_chars
                         
+                        # V3.8: Time of Day Selector
+                        time_opts = ["Morning", "Noon", "Afternoon", "Golden Hour", "Blue Hour", "Night", "Midnight"]
+                        # AI might have provided a time, otherwise default to Day
+                        ai_time = shot.get('time_of_day', 'Day')
+                        
+                        # Normalize AI output to title case for matching
+                        ai_time_norm = ai_time.title() if ai_time else "Day"
+                        # Find closest match or default
+                        def_idx = 0
+                        for idx, opt in enumerate(time_opts):
+                            if opt.lower() in ai_time_norm.lower():
+                                def_idx = idx
+                                break
+                                
+                        selected_time = st.selectbox(
+                            "Time of Day", 
+                            time_opts, 
+                            index=def_idx,
+                            key=f"time_{key_base}",
+                            label_visibility="collapsed"
+                        )
+                        shot['time_of_day'] = selected_time
+                        
                         # Editable Prompt
                         shot_prompt = st.text_area("Visual Prompt", value=shot.get('visual_prompt'), height=250, key=f"p_{key_base}", label_visibility="collapsed")
                         st.caption(f"Length: {len(shot_prompt) if shot_prompt else 0} chars (Target: 800+)")
@@ -892,7 +915,9 @@ with tab_series:
                                     # Generate Prompt Data
                                     
                                     # SAFETY CHECK: Ensure prompt is not empty
-                                    final_shot_prompt = shot_prompt
+                                    # V3.8: Inject Time of Day
+                                    time_setting = shot.get('time_of_day', 'Day')
+                                    final_shot_prompt = f"Time of Day: {time_setting}. {shot_prompt}"
                                     if not final_shot_prompt or len(final_shot_prompt.strip()) < 5:
                                         st.warning("⚠️ Prompt was empty! Using fallback.")
                                         final_shot_prompt = f"Cinematic shot of {char_ref} in {target_env}, high quality, 8k, detailed."
@@ -986,14 +1011,33 @@ with tab_series:
                     # SAFETY GUARD: Ensure Prompt Exists
                     if not p_text or len(p_text.strip()) < 5:
                          st.warning(f"⚠️ Shot {s_id}-{sh_id} prompt empty! Using fallback.")
-                         # Minimal fallback if we can't get character names easily here (though we could from shot_data)
                          p_text = f"Cinematic shot of scene {s_id} shot {sh_id}, high quality, 8k"
+
+                    # V3.8: Inject Time of Day (Batch)
+                    t_day = shot_data.get('time_of_day', 'Day')
+                    p_text = f"Time of Day: {t_day}. {p_text}"
                     
                     st.write(f"Processing Scene {s_id} Shot {sh_id} ({m_type})...")
                     
                     # 1. Image Generation (Always needed as base)
                     # Resolve Assets for JSON Injection (Mirroring World Builder)
                     assets_payload = []
+                    
+                    # Environment Injection (V3 Update)
+                    # Define B-Roll status
+                    is_broll = sh_id in [3, 6, 9, 12]
+                    
+                    # Determine env
+                    target_env = sec_env if is_broll and sec_env != "None" else series_env
+                    if 'location' in shot_data: target_env = shot_data['location'] # Override if specific
+                    
+                    env_path = vibes_data.get(target_env) or assets.get('locations', {}).get(target_env)
+                    if isinstance(env_path, dict): env_path = env_path.get('default_img')
+                    if env_path:
+                        assets_payload.append({
+                            "path": env_path,
+                            "label": f"Location: {target_env}"
+                        })
                     
                     # A. Character Assets
                     char_names = shot_data.get('characters', [])
@@ -1007,12 +1051,12 @@ with tab_series:
                         asset_path = None
                         
                         # 1. Clean Name Lookup
-                        c_key = c_name.split(' ')[0]
+                        c_key = c_name.strip().split(' ')[0]
                         asset_path = st.session_state.cast_lookup_map.get(c_key)
                         
                         # FIX: Handle Gemini Snake Case ("Shays_boyfriend" -> "Shays")
                         if not asset_path and '_' in c_name:
-                             norm_key = c_name.replace('_', ' ').split(' ')[0]
+                             norm_key = c_name.replace('_', ' ').strip().split(' ')[0]
                              fallback_path = st.session_state.cast_lookup_map.get(norm_key)
                              if fallback_path:
                                  c_key = norm_key # Update key for Outfit lookup too
@@ -1053,13 +1097,16 @@ with tab_series:
                     is_broll = sh_id in [3, 6, 9, 12]
                     
                     if not assets_payload and cast_selection and not is_broll:
-                        # Use first selected cast member
-                         first_key = cast_selection[0]
-                         # Resolve path
-                         c_data = all_cast_opts.get(first_key)
-                         path = c_data.get('default_img') if isinstance(c_data, dict) else c_data
-                         
-                         if path:
+                        # Use first selected cast member (Fallback)
+                        # Fix: Don't use 'all_cast_opts' which might be unbound if cache hit
+                        first_key = cast_selection[0]
+                        # Convert Full Key to Clean Key logic
+                        base = first_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                        c_key = base.split(' ')[0]
+                        
+                        path = st.session_state.cast_lookup_map.get(c_key)
+                        
+                        if path:
                              assets_payload.append({
                                  "path": path,
                                  "label": "Main Character"
