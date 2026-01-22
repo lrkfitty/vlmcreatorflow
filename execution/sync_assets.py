@@ -62,7 +62,7 @@ def sync_assets():
                         s3.upload_file(
                             full_path, 
                             BUCKET_NAME, 
-                            rel_path, # S3 Key matches manifest path
+                            f"assets/{rel_path}", # S3 Key matches manifest path + assets prefix for cloud
                             ExtraArgs={'ContentType': content_type}
                         )
                         print(f"   ☁️ Uploaded to S3")

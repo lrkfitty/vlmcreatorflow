@@ -234,7 +234,6 @@ except FileNotFoundError:
 campaign_mgr = CampaignManager()
 
 # Helper: Scan Models - DEPRECATED for Cloud
-# def scan_models(): ...
 
 # --- TABS LAYOUT# TABS
 tab_wizard, tab_series, tab_world, tab_campaign, tab_video = st.tabs([
@@ -317,7 +316,7 @@ with tab_wizard:
              prompt_engine = st.selectbox("Prompt Engine", ["gpt-4o", "gemini-1.5-pro"], key="wiz_brain")
              render_engine = "nano" 
              likeness = 0.5
-             selected_checkpoint = None
+             # selected_checkpoint removed
              
     with col_count:
         num_images = st.slider("Generate Count", 1, 4, 1, key="wiz_test_count")
@@ -357,12 +356,12 @@ with tab_wizard:
             prompt_data["likeness_strength"] = likeness # Pass to generator
             
             prompt_data["model_type"] = render_engine 
-            prompt_data["checkpoint"] = selected_checkpoint # Pass the model file 
+            # prompt_data["checkpoint"] removed
             
             job_name = f"{selected_outfit_name} - {clean_val(selected_vibe_name)}"
             campaign_mgr.add_job(
                 name=job_name,
-                description=f"Engine: {render_engine} | Checked: {selected_checkpoint if render_engine=='sd_local' else 'N/A'}",
+                description=f"Engine: {render_engine}",
                 prompt_data=prompt_data,
                 settings={ "batch_count": campaign_batch },
                 output_folder="output",
@@ -372,8 +371,6 @@ with tab_wizard:
             )
             msg = f"Added '{job_name}'! (Engine: {render_engine}, Batch: {campaign_batch})"
             st.success(msg)
-            if render_engine == 'sd_local':
-                st.toast(f"Checkpoint: {selected_checkpoint}")
 
     st.divider()
 
@@ -420,8 +417,7 @@ with tab_wizard:
             with ThreadPoolExecutor() as executor:
                 # Correctly pass the model via the data dict
                 prompt_data["model_type"] = render_engine 
-                prompt_data["checkpoint"] = selected_checkpoint 
-                # CRITICAL: Pass the image paths so SD Local can see them
+                # CRITICAL: Pass the image paths so Generation Logic can see them
                 futures = [executor.submit(generate_image_from_prompt, prompt_data, "output", char_path, outfit_path, vibe_path) for i in range(num_images)]
                 for future in futures:
                     results.append(future.result())
