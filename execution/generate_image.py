@@ -42,14 +42,38 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
             b64_data = None
             mime_type = "image/jpeg"
             
+            # Helper to resize and encode
+            def process_and_encode(img_bytes, mime_type):
+                from PIL import Image
+                from io import BytesIO
+                
+                try:
+                    img = Image.open(BytesIO(img_bytes))
+                    
+                    # Resize if too large (Max 1536px long edge)
+                    max_dim = 1536
+                    if max(img.width, img.height) > max_dim:
+                        img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+                        logs.append(f"multimodal: Resized {label} to {img.width}x{img.height}")
+                        
+                    # Convert to RGB (Strip Alpha) for JPEG optimization
+                    if img.mode in ('RGBA', 'P'): img = img.convert('RGB')
+                    
+                    # Save to Buffer as JPEG 85%
+                    buffer = BytesIO()
+                    img.save(buffer, format="JPEG", quality=85)
+                    return base64.b64encode(buffer.getvalue()).decode('utf-8'), "image/jpeg"
+                    
+                except Exception as e:
+                    logs.append(f"⚠️ Resize Warning for {label}: {e}. Using raw bytes.")
+                    return base64.b64encode(img_bytes).decode('utf-8'), mime_type
+
             # Case A: URL
             if img_path and img_path.startswith(('http://', 'https://')):
                 try:
-                    resp = requests.get(img_path)
+                    resp = requests.get(img_path, timeout=10)
                     resp.raise_for_status()
-                    b64_data = base64.b64encode(resp.content).decode('utf-8')
-                    if img_path.lower().endswith(".png"): mime_type = "image/png"
-                    elif img_path.lower().endswith(".webp"): mime_type = "image/webp"
+                    b64_data, mime_type = process_and_encode(resp.content, "image/jpeg") 
                     logs.append(f"multimodal: Downloaded {label} from URL")
                 except Exception as e:
                     logs.append(f"⚠️ Failed to downoad {label}: {e}")
@@ -57,9 +81,8 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
             # Case B: Local File
             elif img_path and os.path.exists(img_path) and img_path.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
                 with open(img_path, "rb") as image_file:
-                    b64_data = base64.b64encode(image_file.read()).decode('utf-8')
-                    if img_path.lower().endswith(".png"): mime_type = "image/png"
-                    elif img_path.lower().endswith(".webp"): mime_type = "image/webp"
+                    raw_bytes = image_file.read()
+                    b64_data, mime_type = process_and_encode(raw_bytes, "image/jpeg")
                 logs.append(f"multimodal: Included {label} reference (Local)")
 
             # Add to Payload if we have data
