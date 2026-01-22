@@ -83,6 +83,10 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                  })
                  logs.append(f"multimodal: Included text context: {label}")
 
+            # Case D: Failure / Skip
+            elif not b64_data:
+                 logs.append(f"⚠️ SKIPPED ASSET: {label}. Path/URL invalid or inaccessible: '{img_path}'")
+
         # 1. Initialize Parts
         parts = []
 
