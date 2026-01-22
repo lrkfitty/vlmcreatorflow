@@ -201,15 +201,15 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                     
                     # SAFETY CHECK
                     if finish_reason == "SAFETY":
-                        if attempt < max_retries:
                             safety_ratings = candidates[0].get("safetyRatings", [])
-                            logs.append(f"⚠️ Blocked by Safety Filters (Attempt {attempt+1}/{max_retries}). Retrying in {retry_delay}s...")
+                            logs.append(f"⚠️ Blocked by Safety Filters (Attempt {attempt+1}/{max_retries}). Ratings: {json.dumps(safety_ratings)}")
                             time.sleep(retry_delay)
                             retry_delay = min(retry_delay * 1.5, 10)
                             continue
                         else:
                             safety_ratings = candidates[0].get("safetyRatings", [])
-                            raise Exception(f"Blocked by Safety Filters after {max_retries} retries. Ratings: {safety_ratings}")
+                            logs.append(f"❌ FINAL BLOCK. Safety Ratings: {json.dumps(safety_ratings)}")
+                            raise Exception(f"Blocked by Safety Filters. Ratings: {safety_ratings}")
                     
                     # SUCCESS - EXTRACT AND RETURN
                     content = candidates[0].get("content", {})

@@ -16,6 +16,7 @@ try:
     from generate_video_prompt import generate_motion_prompt
     from world_manager import load_world_db, get_assets_by_category, get_scenarios
     from execution.kling_client import KlingClient
+    from execution.sora_client import SoraClient
     from execution.series_processor import parse_script_to_scenes
 except ImportError as e:
     st.error(f"Error importing scripts: {e}")
@@ -945,7 +946,7 @@ with tab_series:
                                             st.error(f"Generation Failed: {err_msg}")
                         
                         with c_type:
-                            motion_type = st.radio("Media", ["Still", "Kling Video", "Mocap"], key=f"m_{key_base}", horizontal=True, label_visibility="collapsed")
+                            motion_type = st.radio("Media", ["Still", "Kling Video", "Sora 2 Video", "Mocap"], key=f"m_{key_base}", horizontal=True, label_visibility="collapsed")
                             mocap_file = None
                             if motion_type == "Mocap":
                                 mocap_file = st.file_uploader("Ref", type=['mp4'], key=f"up_{key_base}", label_visibility="collapsed")
@@ -1147,6 +1148,28 @@ with tab_series:
                                     st.info("Check 'Video Studio' tab later for results.")
                                 else:
                                     st.error("Failed to upload image to S3. Skipping video.")
+                                    
+                        elif m_type == "Sora 2 Video":
+                            st.write("✨ Sending to Sora 2 (OpenAI)...")
+                            try:
+                                sora_client = SoraClient()
+                                # Reuse Image Upload logic
+                                with open(img_path, "rb") as f_img:
+                                    sanitized_series = series_title.replace(" ", "_")
+                                    s3_name = f"series_assets/{sanitized_series}/{ep_title}/sc{s_id}_sh{sh_id}.png"
+                                    img_url = upload_file_obj(f_img, object_name=s3_name)
+                                    
+                                if img_url:
+                                    res_url = sora_client.create_video_from_image(img_url, p_text)
+                                    if isinstance(res_url, dict) and "error" in res_url:
+                                        st.error(f"Sora Error: {res_url['error']}")
+                                    else:
+                                        st.success(f"Video Generated! [Link]({res_url})")
+                                        st.video(res_url)
+                                else: 
+                                    st.error("S3 Upload Failed")
+                            except Exception as e:
+                                st.error(f"Sora Error: {e}")
 
                             except Exception as e:
                                 st.error(f"Kling Error: {e}")
