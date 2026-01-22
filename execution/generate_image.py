@@ -31,7 +31,8 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
 
     try:
         # Switching to explicit Image Generation model from list (Nano/1.5 aliases are unstable)
-        model_name = 'gemini-3-pro-image-preview'
+        # Use known stable version
+        model_name = 'gemini-1.5-pro'
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         headers = { "Content-Type": "application/json" }
 
