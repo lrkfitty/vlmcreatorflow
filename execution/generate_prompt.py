@@ -283,7 +283,13 @@ def generate_prompt_content(vibe, outfit, character,
             messages=messages,
             response_format={"type": "json_object"}
         )
-        return json.loads(response.choices[0].message.content)
+        
+        content = response.choices[0].message.content
+        if not content:
+            refusal = getattr(response.choices[0].message, 'refusal', None)
+            raise ValueError(f"GPT-4o returned empty content. Refusal: {refusal}")
+            
+        return json.loads(content)
         
     except Exception as e:
         return {"positive_prompt": f"GPT-4o Error: {str(e)}", "aspect_ratio": "9:16"}
