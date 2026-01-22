@@ -170,7 +170,8 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                     candidates = result.get("candidates", [])
                     
                     if not candidates:
-                         raise Exception("No Content Candidates Returned.")
+                         logs.append(f"❌ RAW RESPONSE: {json.dumps(result, indent=2)}")
+                         raise Exception("No Content Candidates Returned. See Logs for Raw Response.")
                          
                     finish_reason = candidates[0].get("finishReason", "UNKNOWN")
                     
