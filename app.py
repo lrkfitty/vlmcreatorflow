@@ -1148,6 +1148,8 @@ with tab_series:
                                     st.info("Check 'Video Studio' tab later for results.")
                                 else:
                                     st.error("Failed to upload image to S3. Skipping video.")
+                            except Exception as e:
+                                st.error(f"Kling Error: {e}")
                                     
                         elif m_type == "Sora 2 Video":
                             st.write("✨ Sending to Sora 2 (OpenAI)...")
@@ -1170,9 +1172,6 @@ with tab_series:
                                     st.error("S3 Upload Failed")
                             except Exception as e:
                                 st.error(f"Sora Error: {e}")
-
-                            except Exception as e:
-                                st.error(f"Kling Error: {e}")
                                 
                     else:
                         st.error(f"Failed to render shot {sh_id}")
