@@ -290,9 +290,21 @@ user_asset_path = None
 if st.session_state.get("authenticated"):
     username = st.session_state.current_user.get("username", "guest")
     user_asset_path = os.path.join("output", "users", username, "Assets")
+    
+    # Debug
+    with st.sidebar.expander("🔍 Asset Debug"):
+        st.write(f"Path: `{user_asset_path}`")
+        if os.path.exists(user_asset_path):
+             st.write("✅ Path Exists")
+             st.write("Files:", os.listdir(user_asset_path))
+        else:
+             st.write("❌ Path Missing")
 
 try:
     assets = load_assets(user_assets_dir=user_asset_path) # Pass user path
+    
+    # Debug
+    # st.sidebar.write(f"User Assets Found: {len(assets.get('characters', {}))}")
     vibes_data = assets.get('vibes', {})
     outfits_data = assets.get('outfits', {})
 
