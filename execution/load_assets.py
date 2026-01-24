@@ -134,6 +134,29 @@ def load_assets(base_path="assets", user_assets_dir=None):
         # Fallback: If Vibes empty, use Locations
         if not data["vibes"]:
             data["vibes"] = data["locations"]
+
+        # --- User Assets (Cloud Mode Injection) ---
+        if user_assets_dir and os.path.exists(user_assets_dir):
+            user_cats = {
+                "Characters": "characters",
+                "Environments": "locations",
+                "Outfits": "outfits",
+                "Vibes": "vibes",
+                "Friends": "relations",
+                "Pets": "pets",
+                "Props": "props",
+                "Vehicles": "vehicles",
+                "Foods": "foods"
+            }
+            
+            for folder_name, data_key in user_cats.items():
+                u_path = os.path.join(user_assets_dir, folder_name)
+                if os.path.exists(u_path):
+                    user_items = scan_directory(u_path)
+                    for name, path in user_items.items():
+                        final_key = f"(My) {name}"
+                        data[data_key][final_key] = path
+                        print(f"✅ Loaded User Asset (Cloud Mode): {final_key} -> {path}")
             
         return data
 
