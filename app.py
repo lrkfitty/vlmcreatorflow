@@ -8,6 +8,9 @@ import time
 sys.path.append(os.path.join(os.path.dirname(__file__), 'execution'))
 
 try:
+    import importlib
+    import load_assets as la_module
+    importlib.reload(la_module)
     from load_assets import load_assets
     from generate_prompt import generate_prompt_content
     from generate_image import generate_image_from_prompt
