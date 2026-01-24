@@ -188,10 +188,31 @@ apply_custom_theme()
 # --- NEW AUTHENTICATION UI (MULTI-USER) ---
 # --- NEW AUTHENTICATION UI (MULTI-USER) ---
 from execution.auth import auth_mgr
+import extra_streamlit_components as stx
+import datetime
+
+# Cookie Manager Init
+@st.cache_resource(experimental_allow_widgets=True)
+def get_manager():
+    return stx.CookieManager()
+
+cookie_manager = get_manager()
 
 # Session State Initialization
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
+
+# Check Cookie
+if not st.session_state.authenticated:
+    try:
+        auth_token = cookie_manager.get(cookie="auth_token")
+        if auth_token:
+             user_payload = auth_mgr.verify_token(auth_token)
+             if user_payload:
+                 st.session_state.authenticated = True
+                 st.session_state.current_user = user_payload
+    except Exception:
+        pass
 
 def handle_login():
     user = st.session_state.get("auth_user", "")
@@ -202,6 +223,8 @@ def handle_login():
     if token:
         st.session_state.authenticated = True
         st.session_state.current_user = auth_mgr.verify_token(token)
+        # Set Cookie (Expires in 7 days)
+        cookie_manager.set("auth_token", token, expires_at=datetime.datetime.now() + datetime.timedelta(days=7))
     else:
         st.error(f"⛔ {msg}")
 
@@ -221,6 +244,8 @@ def handle_signup():
         token, _ = auth_mgr.login(new_user, new_pass)
         st.session_state.authenticated = True
         st.session_state.current_user = auth_mgr.verify_token(token)
+        # Set Cookie
+        cookie_manager.set("auth_token", token, expires_at=datetime.datetime.now() + datetime.timedelta(days=7))
     else:
         st.error(f"Error: {msg}")
 
@@ -254,6 +279,7 @@ with st.sidebar:
         u_info = st.session_state.get("current_user", {"username": "Ghost"})
         st.write(f"👤 **{u_info.get('username')}** ({u_info.get('role', 'Viewer')})")
         if st.button("Logout"):
+            cookie_manager.delete("auth_token")
             st.session_state.authenticated = False
             st.rerun()
     st.divider()
@@ -435,6 +461,11 @@ with tab_assets:
                         f.write(uploaded_file.getbuffer())
                         
                     st.success(f"Saved **{final_name}** to {target_cat}!")
+                    
+                    # Clear Cache to allow new asset to show
+                    st.cache_data.clear()
+                    st.cache_resource.clear()
+                    
                     time.sleep(1)
                     st.rerun()
 

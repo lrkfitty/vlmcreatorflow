@@ -8,3 +8,4 @@ PyJWT
 watchdog
 boto3
 replicate
+extra-streamlit-components
