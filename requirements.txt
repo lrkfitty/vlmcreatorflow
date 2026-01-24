@@ -7,3 +7,4 @@ Pillow
 PyJWT
 watchdog
 boto3
+replicate

@@ -21,13 +21,15 @@ def get_kling_token(access_key, secret_key):
     token = jwt.encode(payload, secret_key, algorithm="HS256", headers=headers)
     return token
 
-def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", quality_mode="pro", camera_control=None, ref_video_path=None, ref_orientation="image"):
+def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", quality_mode="pro", camera_control=None, ref_video_path=None, ref_orientation="image", output_folder="output"):
     """
     Generates video using Kling AI API.
     camera_control: Optional dict for 'type' and 'config'.
     ref_video_path: Optional path/URL to a REFERENCE VIDEO for 'Motion Control'.
     ref_orientation: 'image' (max 10s) or 'video' (max 30s) for Motion Control.
+    output_folder: Path to save result.
     """
+
     ak = os.getenv("KLING_ACCESS_KEY")
     sk = os.getenv("KLING_SECRET_KEY")
     
@@ -223,10 +225,9 @@ def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", qu
                     try:
                         import uuid
                         filename = f"kling_video_{int(time.time())}_{str(uuid.uuid4())[:8]}.mp4"
-                        output_dir = "output"
-                        if not os.path.exists(output_dir):
-                            os.makedirs(output_dir)
-                        local_video_path = os.path.join(output_dir, filename)
+                        if not os.path.exists(output_folder):
+                            os.makedirs(output_folder)
+                        local_video_path = os.path.join(output_folder, filename)
                         
                         logs.append(f"⬇️ Downloading video from {video_url}...")
                         print(logs[-1])
@@ -261,3 +262,120 @@ def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", qu
 
     except Exception as e:
         return {"status": "failed", "error": str(e)}
+
+def generate_video_humo(image_path, prompt, audio_path=None, num_frames=49, num_inference_steps=50, guidance_scale=5.0, audio_guidance_scale=5.5, output_folder="output"):
+    """
+    Generates a video using the HuMo model via Replicate.
+    """
+    import replicate
+    import time
+    import requests
+    from datetime import datetime
+    
+    # Ensure output folder exists
+    os.makedirs(output_folder, exist_ok=True)
+    
+    logs = []
+    
+    try:
+        if not os.environ.get("REPLICATE_API_TOKEN"):
+             return {"status": "failed", "error": "Missing REPLICATE_API_TOKEN", "logs": logs}
+             
+        # Prepare inputs
+        logs.append(f"Debug - Image Input Type: {type(image_path)}, Value: {image_path}")
+        
+        # Ensure primitive types
+        prompt = str(prompt)
+        image_path = str(image_path)
+        
+        input_data = {"prompt": prompt}
+        if image_path.startswith(("http://", "https://")):
+            input_data["reference_image"] = image_path
+        else:
+            input_data["reference_image"] = open(image_path, "rb")
+            
+        input_data["num_frames"] = num_frames
+        input_data["num_inference_steps"] = num_inference_steps
+        input_data["guidance_scale"] = guidance_scale
+        input_data["seed"] = int(time.time())
+
+        
+        if audio_path:
+            audio_path = str(audio_path)
+            if audio_path.startswith(("http://", "https://")):
+                 input_data["audio"] = audio_path
+                 input_data["audio_guidance_scale"] = audio_guidance_scale
+            elif os.path.exists(audio_path):
+                 input_data["audio"] = open(audio_path, "rb")
+                 input_data["audio_guidance_scale"] = audio_guidance_scale
+
+        logs.append(f"Starting HuMo generation with prompt: {prompt}")
+        
+        # Create prediction (async) instead of running blockingly
+        model = replicate.models.get("zsxkib/humo")
+        version = model.versions.get("d9b5555b1e87f11ef46b96834ecc379fabdaff97006b48564fe3d841561ab4ef")
+        prediction = replicate.predictions.create(
+            version=version,
+            input=input_data
+        )
+        
+        logs.append(f"Prediction started. ID: {prediction.id}")
+        
+        # Polling loop
+        max_retries = 100 # Approx 5 mins (3s * 100)
+        
+        for _ in range(max_retries):
+            prediction.reload()
+            current_status = prediction.status
+            
+            if current_status == "succeeded":
+                output = prediction.output
+                video_url = output
+                if isinstance(output, list):
+                    video_url = output[0]
+                logs.append(f"Generation succeeded! URL: {video_url}")
+                break
+            elif current_status == "failed":
+                return {"status": "failed", "error": f"Replicate task failed: {prediction.error}", "logs": logs}
+            elif current_status == "canceled":
+                return {"status": "failed", "error": "Replicate task canceled.", "logs": logs}
+            else:
+                # status is 'starting' or 'processing'
+                time.sleep(3)
+        
+        if prediction.status != "succeeded":
+             return {"status": "failed", "error": "Timeout waiting for generation.", "logs": logs}
+
+        # Download video
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"humo_{timestamp}.mp4"
+        local_path = os.path.join(output_folder, filename)
+        
+        response = requests.get(video_url, stream=True)
+        if response.status_code == 200:
+            with open(local_path, "wb") as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            logs.append(f"Video saved to {local_path}")
+            
+            return {
+                "status": "success",
+                "video_path": local_path,
+                "video_url": video_url,
+                "task_id": prediction.id,
+                "logs": logs
+            }
+        else:
+            return {
+                "status": "failed",
+                "error": f"Failed to download video: {response.status_code}",
+                "logs": logs
+            }
+
+    except Exception as e:
+        return {
+            "status": "failed",
+            "error": str(e),
+            "logs": logs
+        }
+

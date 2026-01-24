@@ -2,6 +2,7 @@ import streamlit as st
 import sys
 import os
 import json
+import time
 
 # Add execution directory to path to import scripts
 sys.path.append(os.path.join(os.path.dirname(__file__), 'execution'))
@@ -11,7 +12,7 @@ try:
     from generate_prompt import generate_prompt_content
     from generate_image import generate_image_from_prompt
     from campaign_runner import CampaignManager
-    from execution.generate_video import generate_video_kling
+    from execution.generate_video import generate_video_kling, generate_video_humo
     from execution.s3_uploader import upload_file_obj
     from generate_video_prompt import generate_motion_prompt
     from world_manager import load_world_db, get_assets_by_category, get_scenarios
@@ -181,13 +182,76 @@ def apply_custom_theme():
 
 apply_custom_theme()
 
-# --- NEW AUTHENTICATION UI ---
-def check_app_password():
-    pwd = st.session_state.get("auth_input", "")
-    if pwd == os.getenv("APP_PASSWORD", "admin"): 
+# --- NEW AUTHENTICATION UI (MULTI-USER) ---
+from execution.auth import auth_mgr
+
+def check_persistent_auth():
+    """Checks for a local auth token file."""
+    if os.path.exists(".auth_token"):
+        try:
+            with open(".auth_token", "r") as f:
+                token = f.read().strip()
+            
+            # Verify JWT
+            user_payload = auth_mgr.verify_token(token)
+            if user_payload:
+                st.session_state.authenticated = True
+                st.session_state.current_user = user_payload
+                return True
+        except Exception:
+            pass
+    return False
+
+# Auto-login if token exists
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+if not st.session_state.authenticated:
+    if check_persistent_auth():
         st.session_state.authenticated = True
+
+def handle_login():
+    user = st.session_state.get("auth_user", "")
+    pwd = st.session_state.get("auth_pass", "")
+    
+    token, msg = auth_mgr.login(user, pwd)
+    
+    if token:
+        st.session_state.authenticated = True
+        st.session_state.current_user = auth_mgr.verify_token(token)
+        
+        # Always persist session
+        with open(".auth_token", "w") as f:
+            f.write(token)
+            
+        # st.rerun() handled by callback completion
     else:
-        st.error("⛔ Incorrect Password")
+        st.error(f"⛔ {msg}")
+
+def handle_signup():
+    new_user = st.session_state.get("reg_user", "")
+    new_pass = st.session_state.get("reg_pass", "")
+    
+    if not new_user or not new_pass:
+        st.error("Please fill in all fields.")
+        return
+
+    success, msg = auth_mgr.create_user(new_user, new_pass, role="viewer")
+    
+    if success:
+        st.success("Account Created! Logging in...")
+        # Auto Login & Persist
+        token, _ = auth_mgr.login(new_user, new_pass)
+        st.session_state.authenticated = True
+        st.session_state.current_user = auth_mgr.verify_token(token)
+        
+        # Save token
+        with open(".auth_token", "w") as f:
+            f.write(token)
+            
+        # st.rerun() handled by callback completion
+    else:
+        st.error(f"Error: {msg}")
 
 if not st.session_state.authenticated:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
@@ -197,10 +261,33 @@ if not st.session_state.authenticated:
         st.markdown("<div style='text-align: center; color: #1E293B; font-size: 1.8rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0px;'>VIRAL LENSE MEDIA</div>", unsafe_allow_html=True)
         st.markdown("<h1 style='text-align: center; font-size: 4.5rem; margin-top: -10px; margin-bottom: 2rem;'>CreateFlow</h1>", unsafe_allow_html=True)
         
-        st.text_input("Enter Access Code", type="password", key="auth_input", on_change=check_app_password, label_visibility="collapsed", placeholder="Enter Password")
-        st.button("LOGIN", on_click=check_app_password, use_container_width=True, type="primary")
+        # Auth Tabs
+        tab_login, tab_signup = st.tabs(["Login", "Create Account"])
+        
+        with tab_login:
+            st.text_input("Username", key="auth_user", placeholder="admin")
+            st.text_input("Password", type="password", key="auth_pass", on_change=handle_login, placeholder="Password")
+            # Remember Me removed (Default behavior now)
+            st.button("LOGIN", on_click=handle_login, use_container_width=True, type="primary")
+
+        with tab_signup:
+            st.text_input("New Username", key="reg_user")
+            st.text_input("New Password", type="password", key="reg_pass")
+            st.button("SIGN UP", on_click=handle_signup, use_container_width=True)
         
     st.stop()
+
+# --- LOGOUT & SIDEBAR INFO ---
+with st.sidebar:
+    if st.session_state.get("authenticated"):
+        u_info = st.session_state.get("current_user", {"username": "Ghost"})
+        st.write(f"👤 **{u_info.get('username')}** ({u_info.get('role', 'Viewer')})")
+        if st.button("Logout"):
+            if os.path.exists(".auth_token"):
+                os.remove(".auth_token")
+            st.session_state.authenticated = False
+            st.rerun()
+    st.divider()
 
 # HEADER
 st.markdown("<div class='brand-overline'>Viral Lense Media</div>", unsafe_allow_html=True)
@@ -212,6 +299,7 @@ try:
     assets = load_assets()
     vibes_data = assets.get('vibes', {})
     outfits_data = assets.get('outfits', {})
+
     characters_data = assets.get('characters', {})
     
     vibes_list = list(vibes_data.keys())
@@ -237,13 +325,77 @@ campaign_mgr = CampaignManager()
 # Helper: Scan Models - DEPRECATED for Cloud
 
 # --- TABS LAYOUT# TABS
-tab_wizard, tab_series, tab_world, tab_campaign, tab_video = st.tabs([
+# --- HELPER: FILE ISOLATION ---
+def get_user_out_dir(category="General"):
+    """Returns a user-isolated output path."""
+    if st.session_state.get("authenticated"):
+        username = st.session_state.current_user.get("username", "guest")
+    else:
+        username = "guest"
+    
+    # Path: output/users/{username}/{category}
+    path = os.path.join("output", "users", username, category)
+    os.makedirs(path, exist_ok=True)
+    return path
+
+# --- TABS LAYOUT ---
+tab_wizard, tab_gallery, tab_series, tab_world, tab_campaign, tab_video = st.tabs([
     "Workflow Wizard", 
+    "My Gallery",
     "🎬 Mini Series",
     "World Builder",
     "Campaign Queue", 
     "Video Studio"
 ])
+
+# ==========================================
+# TAB: MY GALLERY
+# ==========================================
+with tab_gallery:
+    st.markdown("### 🖼️ personal Gallery")
+    
+    if not st.session_state.get("authenticated"):
+        st.warning("Please login to see your gallery.")
+    else:
+        username = st.session_state.current_user.get("username")
+        user_root = os.path.join("output", "users", username)
+        abs_root = os.path.abspath(user_root)
+        
+        col_gal_head, col_gal_ref = st.columns([3, 1])
+        with col_gal_head:
+             st.caption(f"📂 Gallery Path: `{abs_root}`")
+        with col_gal_ref:
+             if st.button("🔄 Refresh"):
+                 st.rerun()
+        
+        # Scan for images
+        my_images = []
+        if os.path.exists(user_root):
+            for root, dirs, files in os.walk(user_root):
+                for file in files:
+                    if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                        my_images.append(os.path.join(root, file))
+        
+        # Sort by Modified Time (Newest First)
+        my_images.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        
+        if not my_images:
+            st.info(f"No images found in `{username}`'s folder yet. Go to 'Workflow Wizard' to create something!")
+            st.warning(f"Debug: Folder `{abs_root}` exists? {os.path.exists(user_root)}")
+        else:
+            st.write(f"Found {len(my_images)} images.")
+            # Display Grid
+            cols = st.columns(4)
+            for idx, img_path in enumerate(my_images):
+                with cols[idx % 4]:
+                    with st.container(border=True):
+                        st.image(img_path, use_container_width=True)
+                        st.text(os.path.basename(img_path))
+                        
+                        # Download
+                        with open(img_path, "rb") as f:
+                            st.download_button("⬇️", f, file_name=os.path.basename(img_path), key=f"gal_dl_{idx}")
+
 
 # ==========================================
 # TAB 1: WORKFLOW WIZARD (Existing Logic)
@@ -365,7 +517,7 @@ with tab_wizard:
                 description=f"Engine: {render_engine}",
                 prompt_data=prompt_data,
                 settings={ "batch_count": campaign_batch },
-                output_folder="output",
+                output_folder=get_user_out_dir("Campaign"),
                 char_path=char_path,
                 outfit_path=outfit_path,
                 vibe_path=vibe_path
@@ -375,66 +527,117 @@ with tab_wizard:
 
     st.divider()
 
-    if st.button("Generate Content (Wizard)", type="primary", use_container_width=True):
-        with st.status(f"Running workflow ({prompt_engine} + {render_engine})...", expanded=True) as status:
-            st.write("🧠 **Step 1:** Generating Master Prompt...")
-            
-            # Get path for Vision
-            char_path = characters_data.get(selected_character_name, selected_character_name)
-            outfit_path = outfits_data.get(selected_outfit_name)
-            vibe_path = vibes_data.get(selected_vibe_name)
-            
-            # Filter "Auto" values (pass None if Auto)
-            def clean_val(val): return None if val == "Auto" else val
-            
-            prompt_data = generate_prompt_content(
-                vibe=selected_vibe_name, 
-                outfit=selected_outfit_name, 
-                character=char_path,
-                outfit_path=outfit_path,
-                vibe_path=vibe_path,
-                additional_notes=f"{custom_notes} . Context: {custom_scenario} . Emotion: {clean_val(sel_emotion)} . Style: {clean_val(sel_style) or ''}", 
-                camera=clean_val(sel_camera),
-                lens=clean_val(sel_lens),
-                shot_type=clean_val(sel_shot),
-                angle=clean_val(sel_angle),
-                lighting=clean_val(sel_lighting),
-                weather=clean_val(sel_weather),
-                action=clean_val(sel_action),
-                emotion=clean_val(sel_emotion), # Added Emotion
-                aspect_ratio=sel_ar.split(" ")[0], 
-                model_engine=prompt_engine 
-            )
-            
-            prompt_data["likeness_strength"] = likeness # Pass to generator
-            
-            st.json(prompt_data, expanded=False)
-            st.write(f"Step 2: Generating {num_images} Image(s)...")
-            
-            # Parallel Execution
-            from concurrent.futures import ThreadPoolExecutor
-            results = []
-            
-            with ThreadPoolExecutor() as executor:
-                # Correctly pass the model via the data dict
-                prompt_data["model_type"] = render_engine 
-                # CRITICAL: Pass the image paths so Generation Logic can see them
-                futures = [executor.submit(generate_image_from_prompt, prompt_data, "output", char_path, outfit_path, vibe_path) for i in range(num_images)]
-                for future in futures:
-                    results.append(future.result())
-            
-            # Display Results
-            cols = st.columns(num_images)
-            for i, result in enumerate(results):
-                with cols[i]:
-                    if result and result.get("status") == "success":
-                        st.image(result["image_path"], caption=f"Variant {i+1}")
-                        st.success("Saved")
-                    else:
-                        st.error("Failed")
-                        if result: st.write(result)
-            
-            status.update(label="Workflow Complete!", state="complete", expanded=True)
+    # --- TWO STEP GENERATION ---
+    col_wiz_btn1, col_wiz_btn2 = st.columns(2)
+    
+    # Session State for Wizard Prompt
+    if "wiz_generated_prompt" not in st.session_state:
+        st.session_state.wiz_generated_prompt = None
+
+    with col_wiz_btn1:
+        if st.button("✨ Director Vision AI (Generate Prompt)", type="primary", use_container_width=True):
+             with st.spinner("Director is writing master prompt..."):
+                # Get path for Vision
+                char_path = characters_data.get(selected_character_name, selected_character_name)
+                outfit_path = outfits_data.get(selected_outfit_name)
+                vibe_path = vibes_data.get(selected_vibe_name)
+                
+                # Filter "Auto" values (pass None if Auto)
+                def clean_val(val): return None if val == "Auto" else val
+                
+                prompt_data = generate_prompt_content(
+                    vibe=selected_vibe_name, 
+                    outfit=selected_outfit_name, 
+                    character=char_path,
+                    outfit_path=outfit_path,
+                    vibe_path=vibe_path,
+                    additional_notes=f"{custom_notes} . Context: {custom_scenario} . Emotion: {clean_val(sel_emotion)} . Style: {clean_val(sel_style) or ''}", 
+                    camera=clean_val(sel_camera),
+                    lens=clean_val(sel_lens),
+                    shot_type=clean_val(sel_shot),
+                    angle=clean_val(sel_angle),
+                    lighting=clean_val(sel_lighting),
+                    weather=clean_val(sel_weather),
+                    action=clean_val(sel_action),
+                    emotion=clean_val(sel_emotion), # Added Emotion
+                    aspect_ratio=sel_ar.split(" ")[0], 
+                    model_engine=prompt_engine 
+                )
+                
+                st.session_state.wiz_generated_prompt = prompt_data
+                st.toast("Prompt Generated! Review below.")
+
+    # Show Editable Prompt if generated
+    if st.session_state.wiz_generated_prompt:
+        st.markdown("##### 📝 Review & Edit Prompt")
+        
+        # We bind this to a separate key to allow editing
+        # If the generated prompt changes or is new, we might want to reset? 
+        # For simple flow, we default value to what's in session state
+        
+        wiz_prompt_text = st.text_area(
+            "Master Prompt", 
+            value=st.session_state.wiz_generated_prompt.get("positive_prompt", ""),
+            height=200,
+            key="wiz_manual_edit"
+        )
+        
+        with col_wiz_btn2:
+             if st.button("🎨 Generate Images", type="primary", use_container_width=True):
+                 with st.status(f"Running workflow ({prompt_engine} + {render_engine})...", expanded=True) as status:
+                    st.write(f"Generating {num_images} Image(s)...")
+                    
+                    # Update prompt data with edited text
+                    # We need a deep copy or just modify the dict
+                    final_prompt_data = st.session_state.wiz_generated_prompt.copy()
+                    final_prompt_data["positive_prompt"] = wiz_prompt_text
+                    final_prompt_data["likeness_strength"] = likeness
+                    final_prompt_data["model_type"] = render_engine 
+                    
+                    # Re-resolve paths for execution
+                    char_path = characters_data.get(selected_character_name, selected_character_name)
+                    outfit_path = outfits_data.get(selected_outfit_name)
+                    vibe_path = vibes_data.get(selected_vibe_name)
+                    
+                    # OUTPUT SETUP - User Isolated
+                    wiz_out_dir = get_user_out_dir("Wizard")
+                    
+                    st.write(f"DEBUG: Saving to {os.path.abspath(wiz_out_dir)}")
+
+                    # Parallel Execution
+                    from concurrent.futures import ThreadPoolExecutor
+                    results = []
+                    
+                    with ThreadPoolExecutor() as executor:
+                        # CRITICAL: Pass the image paths so Generation Logic can see them
+                        futures = [executor.submit(generate_image_from_prompt, final_prompt_data, wiz_out_dir, char_path, outfit_path, vibe_path) for i in range(num_images)]
+                        for future in futures:
+                            results.append(future.result())
+                    
+                    # Display Results
+                    # Create a container for results
+                    st.divider()
+                    st.markdown("#### 📸 Results")
+                    cols = st.columns(num_images)
+                    for i, result in enumerate(results):
+                        with cols[i]:
+                            if result and result.get("status") == "success":
+                                img_path = result["image_path"]
+                                st.image(img_path, caption=f"Variant {i+1}", use_container_width=True)
+                                
+                                # Show explicit path
+                                abs_path = os.path.abspath(img_path)
+                                st.success(f"Saved: {os.path.basename(img_path)}")
+                                st.caption(f"📁 {abs_path}")
+                                
+                                # Add download button
+                                with open(img_path, "rb") as f:
+                                    st.download_button("⬇️ Download", f, file_name=os.path.basename(img_path), mime="image/png", key=f"dw_{i}")
+                            else:
+                                st.error("Failed")
+                                if result: st.write(result)
+                    
+                    status.update(label="Workflow Complete!", state="complete", expanded=True)
 
 
 
@@ -931,7 +1134,7 @@ with tab_series:
                                     with st.expander(f"🛠️ Debug: Shot {shot_idx+1} Payload", expanded=False):
                                         st.write(final_assets_payload)
                                     
-                                    res = generate_image_from_prompt(p_data, "output/Series/_Stills_")
+                                    res = generate_image_from_prompt(p_data, get_user_out_dir("Series"))
                                     if res["status"] == "success":
                                         st.session_state[f"img_{key_base}"] = res["image_path"]
                                         st.success("Shot Captured!")
@@ -996,7 +1199,7 @@ with tab_series:
                 
                 # Output Setup
                 ep_title = st.session_state.series_storyboard.get('title', 'Untitled_Ep').replace(" ", "_")
-                base_out = os.path.join("output", "Series", series_title.replace(" ", "_"), ep_title)
+                base_out = os.path.join(get_user_out_dir("Series"), series_title.replace(" ", "_"), ep_title)
                 os.makedirs(base_out, exist_ok=True)
                 
                 for shot_data in generated_shots_data:
@@ -1668,15 +1871,20 @@ with tab_world:
                          "model_type": "nano", 
                          "assets": assets_to_inject
                      }
-                     res = generate_image_from_prompt(wb_payload, "output")
+                     res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"))
                      
                      with st.expander("Generation Logs", expanded=False):
                          st.code(res.get("logs", "No logs"))
                          
                      if res["status"] == "success":
-                         st.image(res["image_path"])
-                         with open(res["image_path"], "rb") as f:
-                             st.download_button("⬇️ Download Image", f, file_name=os.path.basename(res["image_path"]), mime="image/png")
+                         st.session_state['wb_last_img'] = res["image_path"]
+
+            if 'wb_last_img' in st.session_state and os.path.exists(st.session_state['wb_last_img']):
+                last_img = st.session_state['wb_last_img']
+                st.image(last_img, caption="World Build Result", use_container_width=True)
+                
+                with open(last_img, "rb") as f:
+                    st.download_button("⬇️ Download Image", f, file_name=os.path.basename(last_img), mime="image/png")
         
         with col_act2:
             st.markdown("#### 🎞️ Storyboard Generator")
@@ -1704,7 +1912,7 @@ with tab_world:
                                  "model_type": "nano", 
                                  "assets": assets_to_inject
                              }
-                             res = generate_image_from_prompt(wb_payload, "output")
+                             res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"))
                              if res["status"] == "success":
                                  st.toast(f"Shot {i+1} Generated!")
                                  st.session_state[f"sb_img_{i}"] = res["image_path"] # Saved!
@@ -1726,7 +1934,7 @@ with tab_world:
                                      "model_type": "nano", 
                                      "assets": assets_to_inject
                                  }
-                                res = generate_image_from_prompt(wb_payload, "output")
+                                res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"))
                                 with st.expander(f"Logs Shot {i+1}", expanded=False):
                                      st.code(res.get("logs", "No logs"))
                                      
@@ -1738,7 +1946,7 @@ with tab_world:
                     with col_sb_img:
                         if f"sb_img_{i}" in st.session_state:
                              img_path = st.session_state[f"sb_img_{i}"]
-                             st.image(img_path)
+                             st.image(img_path, use_container_width=True)
                              if os.path.exists(img_path):
                                  with open(img_path, "rb") as f:
                                      st.download_button(
@@ -1751,25 +1959,30 @@ with tab_world:
                 
                 st.divider()
                 if st.button("🚀 Add Storyboard to Campaign Queue", type="primary"):
-                    if 'campaign_queue' not in st.session_state:
-                        st.session_state['campaign_queue'] = []
-                    
                     # Capture current assets state
-                    # Must use deepcopy or list to avoid reference issues
                     import copy
                     current_assets = copy.deepcopy(assets_to_inject)
                     
-                    for p in edited_prompts:
-                        job = {
-                            "prompt": p,
+                    count = 0
+                    for i, p in enumerate(edited_prompts):
+                        # Construct Prompt Data (New Schema)
+                        p_data = {
+                            "positive_prompt": p + f", {final_prompt}",
                             "aspect_ratio": sel_ar,
-                            "model": "nano", 
-                            "count": 1,
-                            "assets": current_assets # Use fixed assets
+                            "model_type": "nano",
+                            "assets": current_assets
                         }
-                        st.session_state['campaign_queue'].append(job)
+                        
+                        campaign_mgr.add_job(
+                            name=f"Storyboard Shot {i+1}",
+                            description=f"Scene: {scenario.get('name', 'Custom')}",
+                            prompt_data=p_data,
+                            settings={"batch_count": 1},
+                            output_folder=get_user_out_dir("Campaign")
+                        )
+                        count += 1
                     
-                    st.success(f"Added {len(edited_prompts)} shots to Campaign Queue! Go to 'Campaign Queue' tab to run them.")
+                    st.success(f"Added {count} shots to Campaign Queue! Go to 'Campaign Queue' tab to run them.")
 
             # Check prompt preview
             final_prompt = scenario['template_prompt']
@@ -1802,7 +2015,7 @@ with tab_world:
                          "assets": assets_to_inject # New Field
                      }
                      
-                     res = generate_image_from_prompt(wb_payload, "output")
+                     res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"))
                      
                      if res["status"] == "success":
                          st.image(res["image_path"], caption="World Build Result")
@@ -1902,19 +2115,23 @@ with tab_video:
     v_tab_create, v_tab_gallery = st.tabs(["✨ Generate Video", "📚 Video Gallery (Recover)"])
     
     with v_tab_gallery:
-        st.markdown("#### Generated Videos (Cloud Container)")
-        if not os.path.exists("output"):
-             st.warning("No output folder found.")
+        # Use User Isolated Directory
+        vid_dir = get_user_out_dir("Videos")
+        
+        st.markdown(f"#### Generated Videos (Folder: `{os.path.basename(vid_dir)}`)")
+        
+        if not os.path.exists(vid_dir):
+             st.warning(f"No video folder found at {vid_dir}")
         else:
              # Find MP4s
-             videos = [f for f in os.listdir("output") if f.endswith(".mp4")]
-             videos.sort(key=lambda x: os.path.getmtime(os.path.join("output", x)), reverse=True)
+             videos = [f for f in os.listdir(vid_dir) if f.endswith(".mp4")]
+             videos.sort(key=lambda x: os.path.getmtime(os.path.join(vid_dir, x)), reverse=True)
              
              if not videos:
                  st.info("No videos found yet.")
              else:
                  for vid in videos:
-                     vid_path = os.path.join("output", vid)
+                     vid_path = os.path.join(vid_dir, vid)
                      
                      with st.expander(f"🎬 {vid}", expanded=True):
                          c1, c2 = st.columns([3, 1])
@@ -1933,204 +2150,260 @@ with tab_video:
                              st.caption(f"Size: {os.path.getsize(vid_path)/1024/1024:.1f}MB")
 
     with v_tab_create:
+        # Model Selection
+        st.markdown("**Select Video Engine**")
+        video_model = st.selectbox("Engine", ["Kling AI 2.6 (Professional)", "HuMo AI (Human Motion Premium)"], key="vid_model_select")
+        
         col_v_in, col_v_set = st.columns([1, 1])
     
-    with col_v_in:
-        st.markdown("**1. Select Input Image**")
-        # Allow uploading OR selecting from recent outputs (mockup for now)
-        video_source_img = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
-        
-        if video_source_img:
-            st.image(video_source_img, caption="Input Preview", use_container_width=True)
-        
-        st.markdown("**2. Motion Settings**")
-        col_mv, col_phy = st.columns(2)
-        with col_mv:
-            vid_movement = st.selectbox("Camera Move", ["Auto", "Pan Left", "Pan Right", "Zoom In", "Zoom Out", "Handheld", "Drone Orbit"], key="vid_move")
-        with col_phy:
-            vid_physics = st.selectbox("Physics Focus", ["Standard", "High Physics", "Jiggle Physics", "Water/Liquids"], help="Enforce specific physics simulations.")
+        with col_v_in:
+            st.markdown("**1. Select Input Image**")
+            # Allow uploading OR selecting from recent outputs (mockup for now)
+            video_source_img = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="vid_in_img")
             
-        motion_prompt = st.text_area("Motion Prompt", height=100, placeholder="Describe the movement...")
-        
-        if st.button("Auto-Generate with Vision AI"):
-            if not video_source_img:
-                st.error("Upload an image to analyze.")
-            elif not os.getenv("GOOGLE_API_KEY"):
-                st.error("Missing GOOGLE_API_KEY for Vision Analysis.")
-            else:
-                with st.spinner("Analyzing Image Context & Physics..."):
-                    # Save temp for analysis
-                    temp_path = os.path.join("output", "temp_vision_input.png")
-                    with open(temp_path, "wb") as f:
-                        f.write(video_source_img.getbuffer())
-                        
-                    suggestion = generate_motion_prompt(temp_path, movement_type=vid_movement, physics_focus=vid_physics)
-                    st.session_state["motion_suggestion"] = suggestion
-                    st.rerun()
+            if video_source_img:
+                st.image(video_source_img, caption="Input Preview", use_container_width=True)
             
-        if "motion_suggestion" in st.session_state:
-            st.caption(f"Suggested: {st.session_state['motion_suggestion']}")
-            if st.button("Use Suggestion"):
-                motion_prompt = st.session_state['motion_suggestion'] 
-                # Note: streamlit text_area update is tricky without key, but user can copy paste for now
-                st.code(motion_prompt)
+            st.markdown("**2. Motion Settings**")
+            col_mv, col_phy = st.columns(2)
+            with col_mv:
+                vid_movement = st.selectbox("Camera Move", ["Auto", "Pan Left", "Pan Right", "Zoom In", "Zoom Out", "Handheld", "Drone Orbit"], key="vid_move")
+            with col_phy:
+                vid_physics = st.selectbox("Physics Focus", ["Standard", "High Physics", "Jiggle Physics", "Water/Liquids"], help="Enforce specific physics simulations.")
+                
+            motion_prompt = st.text_area("Motion Prompt", height=100, placeholder="Describe the movement...", key="vid_prompt_text")
+            
+            if st.button("Auto-Generate with Vision AI"):
+                if not video_source_img:
+                    st.error("Upload an image to analyze.")
+                elif not os.getenv("GOOGLE_API_KEY"):
+                    st.error("Missing GOOGLE_API_KEY for Vision Analysis.")
+                else:
+                    with st.spinner("Analyzing Image Context & Physics..."):
+                        # Save temp for analysis
+                        temp_path = os.path.join("output", "temp_vision_input.png")
+                        with open(temp_path, "wb") as f:
+                            f.write(video_source_img.getbuffer())
+                            
+                        suggestion = generate_motion_prompt(temp_path, movement_type=vid_movement, physics_focus=vid_physics)
+                        st.session_state["motion_suggestion"] = suggestion
+                        st.rerun()
+                
+            if "motion_suggestion" in st.session_state:
+                st.caption(f"Suggested: {st.session_state['motion_suggestion']}")
+                
+                def apply_suggestion():
+                    st.session_state["vid_prompt_text"] = st.session_state["motion_suggestion"]
+                
+                st.button("Use Suggestion", on_click=apply_suggestion)
 
-    with col_v_set:
-        st.info("⚡ Engine: **Kling AI 2.6** (Professional)")
-        
-        col_dur, col_qual = st.columns(2)
-        with col_dur:
-            duration = st.selectbox("Duration", ["5s", "10s"])
-        with col_qual:
-            quality = st.selectbox("Quality Mode", ["Professional (High Quality, Slower)", "Standard (Fast, Efficient)"])
-            
-        # Advanced Model Override
-        with st.expander("⚙️ Advanced Model Settings (Override)", expanded=False):
-             model_version_input = st.text_input("Kling Model Version", value="2.6", help="Code auto-converts '2.6' to 'kling-v2-6'.")
-             st.caption("Available: `2.6` (Latest), `1.6` (Stable), `1.5`.")
-        
-        mode_val = "pro" if "Professional" in quality else "std"
-        
-        # Camera Controls
-        camera_data = None
-        with st.expander("🎥 Camera & Motion Control", expanded=False):
-             enable_camera = st.checkbox("Enable Camera Control", value=False)
-             if enable_camera:
-                 st.caption("Values range from -10 to 10.")
-                 c1, c2 = st.columns(2)
-                 with c1:
-                      h_val = st.slider("Horizontal (X)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Left, Pos: Right")
-                      v_val = st.slider("Vertical (Y)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Down, Pos: Up")
-                      z_val = st.slider("Zoom", -10.0, 10.0, 0.0, step=0.5, help="Neg: In, Pos: Out")
-                 with c2:
-                      pan_val = st.slider("Pan (Rotate V)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Down, Pos: Up")
-                      tilt_val = st.slider("Tilt (Rotate H)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Left, Pos: Right")
-                      roll_val = st.slider("Roll", -10.0, 10.0, 0.0, step=0.5, help="Neg: CCW, Pos: CW")
-                 
-                 camera_data = {
-                     "type": "simple",
-                     "config": {
-                         "horizontal": h_val,
-                         "vertical": v_val,
-                         "pan": pan_val,
-                         "tilt": tilt_val,
-                         "roll": roll_val,
-                         "zoom": z_val
-                     }
-                 }
+        # Settings Column (Dynamic)
+        with col_v_set:
+            if "Kling" in video_model:
+                st.info("⚡ Engine: **Kling AI 2.6** (Professional)")
+                
+                col_dur, col_qual = st.columns(2)
+                with col_dur:
+                    duration = st.selectbox("Duration", ["5s", "10s"])
+                with col_qual:
+                    quality = st.selectbox("Quality Mode", ["Professional (High Quality, Slower)", "Standard (Fast, Efficient)"])
+                    
+                # Advanced Model Override
+                with st.expander("⚙️ Advanced Model Settings (Override)", expanded=False):
+                     model_version_input = st.text_input("Kling Model Version", value="2.6", help="Code auto-converts '2.6' to 'kling-v2-6'.")
+                     st.caption("Available: `2.6` (Latest), `1.6` (Stable), `1.5`.")
+                
+                mode_val = "pro" if "Professional" in quality else "std"
+                
+                # Camera Controls
+                camera_data = None
+                with st.expander("🎥 Camera & Motion Control", expanded=False):
+                     enable_camera = st.checkbox("Enable Camera Control", value=False)
+                     if enable_camera:
+                         st.caption("Values range from -10 to 10.")
+                         c1, c2 = st.columns(2)
+                         with c1:
+                              h_val = st.slider("Horizontal (X)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Left, Pos: Right")
+                              v_val = st.slider("Vertical (Y)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Down, Pos: Up")
+                              z_val = st.slider("Zoom", -10.0, 10.0, 0.0, step=0.5, help="Neg: In, Pos: Out")
+                         with c2:
+                              pan_val = st.slider("Pan (Rotate V)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Down, Pos: Up")
+                              tilt_val = st.slider("Tilt (Rotate H)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Left, Pos: Right")
+                              roll_val = st.slider("Roll", -10.0, 10.0, 0.0, step=0.5, help="Neg: CCW, Pos: CW")
+                         
+                         camera_data = {
+                             "type": "simple",
+                             "config": {
+                                 "horizontal": h_val,
+                                 "vertical": v_val,
+                                 "pan": pan_val,
+                                 "tilt": tilt_val,
+                                 "roll": roll_val,
+                                 "zoom": z_val
+                             }
+                         }
 
-        audio_enabled = st.checkbox("Enable Audio (Sound FX)", value=False)
-        
-        # Motion Transfer (Video Reference)
-        st.divider()
-        st.markdown("**🕺 Video Driven Motion**")
-        
-        m_tab1, m_tab2 = st.tabs(["🔗 URL Input", "📤 Upload Video"])
-        
-        ref_video_url = None
-        ref_orientation = "image"
-        
-        with m_tab1:
-            url_input = st.text_input("Reference Video URL (S3/Public)", help="Paste an `http` URL to a video. Overrides Camera Control.")
-            if url_input: ref_video_url = url_input
-            
-        with m_tab2:
-            st.info("⚠️ **Constraint:** Video must be **≤ 30 seconds** and **< 100MB**.")
-            uploaded_vid = st.file_uploader("Upload Reference Video", type=['mp4', 'mov'])
-            if uploaded_vid:
-                 # Size Check
-                 if uploaded_vid.size > 100 * 1024 * 1024:
-                      st.error(f"File too large ({uploaded_vid.size / 1024 / 1024:.1f}MB). Max 100MB.")
-                 else:
-                      with st.spinner("Uploading to S3..."):
-                           # Check if already uploaded in session to avoid re-upload
-                           if 'last_uploaded_vid_name' not in st.session_state or st.session_state['last_uploaded_vid_name'] != uploaded_vid.name:
-                                s3_url = upload_file_obj(uploaded_vid, f"user_uploads/{uploaded_vid.name}")
-                                if s3_url:
-                                     st.session_state['last_uploaded_vid_url'] = s3_url
-                                     st.session_state['last_uploaded_vid_name'] = uploaded_vid.name
-                                     st.success("✅ Uploaded!")
-                                else:
-                                     st.error("Upload failed.")
-                           
-                           if 'last_uploaded_vid_url' in st.session_state:
-                                ref_video_url = st.session_state['last_uploaded_vid_url']
-                                st.caption(f"Using: `{ref_video_url}`")
-        
-        if ref_video_url:
-             st.warning("⚠️ Motion Control Mode Active: Camera settings will be ignored.")
-             # Orientation Logic
-             st.markdown("##### 📐 Match Orientation To:")
-             orient_choice = st.radio(
-                 "Orientation Source",
-                 ["Image (Best for Style, Max 10s)", "Video (Best for Action, Max 30s)"],
-                 help="If your video is >10s, you MUST select 'Video'.",
-                 label_visibility="collapsed"
-             )
-             ref_orientation = "video" if "Video" in orient_choice else "image"
-        
+                # Motion Transfer (Video Reference)
+                st.divider()
+                st.markdown("**🕺 Video Driven Motion**")
+                
+                m_tab1, m_tab2 = st.tabs(["🔗 URL Input", "📤 Upload Video"])
+                
+                ref_video_url = None
+                ref_orientation = "image"
+                
+                with m_tab1:
+                    url_input = st.text_input("Reference Video URL (S3/Public)", help="Paste an `http` URL to a video. Overrides Camera Control.")
+                    if url_input: ref_video_url = url_input
+                    
+                with m_tab2:
+                    st.info("⚠️ **Constraint:** Video must be **≤ 30 seconds** and **< 100MB**.")
+                    uploaded_vid = st.file_uploader("Upload Reference Video", type=['mp4', 'mov'])
+                    if uploaded_vid:
+                         # Size Check (100MB)
+                         if uploaded_vid.size > 100 * 1024 * 1024:
+                              st.error(f"File too large ({uploaded_vid.size / 1024 / 1024:.1f}MB). Max 100MB.")
+                         else:
+                              with st.spinner("Uploading to S3..."):
+                                   # Check if already uploaded in session to avoid re-upload
+                                   if 'last_uploaded_vid_name' not in st.session_state or st.session_state['last_uploaded_vid_name'] != uploaded_vid.name:
+                                        s3_url = upload_file_obj(uploaded_vid, f"user_uploads/{uploaded_vid.name}")
+                                        if s3_url:
+                                             st.session_state['last_uploaded_vid_url'] = s3_url
+                                             st.session_state['last_uploaded_vid_name'] = uploaded_vid.name
+                                             st.success("✅ Uploaded!")
+                                        else:
+                                             st.error("Upload failed.")
+                                   
+                                   if 'last_uploaded_vid_url' in st.session_state:
+                                        ref_video_url = st.session_state['last_uploaded_vid_url']
+                                        st.caption(f"Using: `{ref_video_url}`")
+                
+                if ref_video_url:
+                     st.warning("⚠️ Motion Control Mode Active: Camera settings will be ignored.")
+                     # Orientation Logic
+                     st.markdown("##### 📐 Match Orientation To:")
+                     orient_choice = st.radio(
+                         "Orientation Source",
+                         ["Image (Best for Style, Max 10s)", "Video (Best for Action, Max 30s)"],
+                         help="If your video is >10s, you MUST select 'Video'.",
+                         label_visibility="collapsed"
+                     )
+                     ref_orientation = "video" if "Video" in orient_choice else "image"
+
+            elif "HuMo" in video_model:
+                st.info("⚡ Engine: **HuMo AI** (Human Motion)")
+                st.warning("Requires REPLICATE_API_TOKEN. High cost per second (~$0.01/s).")
+                
+                st.markdown("**3. Audio Control (Lip Sync)**")
+                humo_audio = st.file_uploader("Upload Audio (Optional)", type=["mp3", "wav"], help="Add audio to sync motion or lips.")
+                
+                st.markdown("**4. Advanced Settings**")
+                h_steps = st.slider("Inference Steps", 10, 100, 50, help="More steps = higher quality (and cost).")
+                h_guidance = st.slider("Text Guidance", 2.0, 15.0, 5.0)
+                h_audio_guidance = st.slider("Audio Guidance", 2.0, 15.0, 5.5)
+
         st.divider()
         
         if st.button("Generate Video", type="primary"):
             if not video_source_img:
                 st.error("Please upload an image first.")
-            elif not (os.getenv("KLING_ACCESS_KEY") and os.getenv("KLING_SECRET_KEY")):
-                st.error("Missing KLING_ACCESS_KEY or KLING_SECRET_KEY in .env file.")
             else:
                 with st.status("Generating Video...", expanded=True) as status:
-                    st.write(f"Sending to Kling AI 2.6 API ({mode_val.upper()} Mode)...")
-                    
                     # Save uploaded file momentarily
                     temp_path = os.path.join("output", "temp_video_input.png")
                     with open(temp_path, "wb") as f:
                         f.write(video_source_img.getbuffer())
-                        
-                    st.write("Processing... (Standard: ~2-5m, Pro: ~5-10m)")
-                    # Pass the selected mode
-                    result = generate_video_kling(
-                        temp_path, 
-                        motion_prompt, 
-                        duration=5, 
-                        model_version=model_version_input, 
-                        quality_mode=mode_val, 
-                        camera_control=camera_data,
-                        ref_video_path=ref_video_url,
-                        ref_orientation=ref_orientation
-                    )
+                    
+                    result = None
+                    
+                    if "Kling" in video_model:
+                        if not (os.getenv("KLING_ACCESS_KEY") and os.getenv("KLING_SECRET_KEY")):
+                             st.error("Missing KLING_ACCESS_KEY/SECRET.")
+                             status.update(label="Failed", state="error")
+                        else:
+                             st.write(f"Sending to Kling AI 2.6 API ({mode_val.upper()} Mode)...")
+                             st.write("Processing... (Standard: ~2-5m, Pro: ~5-10m)")
+                             
+                             result = generate_video_kling(
+                                 temp_path, 
+                                 motion_prompt, 
+                                 duration=5, 
+                                 model_version=model_version_input, 
+                                 quality_mode=mode_val, 
+                                 camera_control=camera_data,
+                                 ref_video_path=ref_video_url,
+                                 ref_orientation=ref_orientation,
+                                 output_folder=get_user_out_dir("Videos")
+                             )
+                    
+                    elif "HuMo" in video_model:
+                         if not os.getenv("REPLICATE_API_TOKEN"):
+                              st.error("Missing REPLICATE_API_TOKEN.")
+                              status.update(label="Failed", state="error")
+                         else:
+                              st.write("Sending to Replicate (HuMo)...")
+                              st.write("Processing on 8x H100 GPU (Est ~1-2 mins)...")
+
+                              # Use local temp path - generate_video_humo will upload it securely via Replicate client
+                              humo_img_input = temp_path
+                              
+                              # Handle Audio
+                              humo_audio_input = None
+                              if humo_audio:
+                                  # Save audio locally
+                                  audio_path = os.path.join("output", "temp_audio_input.mp3")
+                                  with open(audio_path, "wb") as fa:
+                                      fa.write(humo_audio.getbuffer())
+                                  humo_audio_input = audio_path
+                              
+                              result = generate_video_humo(
+                                  humo_img_input,
+                                  motion_prompt,
+                                  audio_path=humo_audio_input,
+                                  num_inference_steps=h_steps,
+                                  guidance_scale=h_guidance,
+                                  audio_guidance_scale=h_audio_guidance,
+                                  output_folder=get_user_out_dir("Videos")
+                              )
 
                     # Common Result Handling
-                    if result["status"] == "success":
-                        status.update(label="Complete!", state="complete")
-                        
-                        if result.get("warning"):
-                             st.warning(result["warning"])
-                             st.caption(f"Task ID: {result.get('task_id')}")
-                        else:
-                             st.success(f"Video Generated! (Task ID: {result.get('task_id')})")
-                        
-                        if result.get('video_path'):
-                             st.success(f"💾 Saved to: {result['video_path']}")
-                             
-                        if result.get('video_url'):
-                            st.write(f"**Direct Link:** [Click to Open]({result.get('video_url')})")
-                            st.video(result.get('video_url'))
+                    if result:
+                        if result["status"] == "success":
+                            status.update(label="Complete!", state="complete")
                             
-                            # Add Download Button using local container file
-                            if result.get('video_path') and os.path.exists(result['video_path']):
-                                with open(result['video_path'], "rb") as v_file:
-                                    st.download_button(
-                                        label="⬇️ Download MP4",
-                                        data=v_file,
-                                        file_name=os.path.basename(result['video_path']),
-                                        mime="video/mp4"
-                                    )
-                        else:
-                            st.warning(f"Video URL not found. Use Task ID {result.get('task_id')} to fetch manually.")
+                            if result.get("warning"):
+                                 st.warning(result["warning"])
+                            else:
+                                 st.success(f"Video Generated! (Task ID: {result.get('task_id', 'N/A')})")
                             
-                        with st.expander("Process Logs", expanded=False):
-                            st.write(result.get("logs", []))
-                    else:
-                        status.update(label="Failed", state="error")
-                        st.error(f"Error: {result.get('error')}")
-                        with st.expander("Error Logs", expanded=True):
-                             st.write(result.get("logs", []))
+                            if result.get('video_path'):
+                                 st.success(f"💾 Saved to: {result['video_path']}")
+                                 
+                            if result.get('video_url'):
+                                st.write(f"**Direct Link:** [Click to Open]({result.get('video_url')})")
+                                st.video(result.get('video_url'))
+                                
+                                if result.get('video_path') and os.path.exists(result['video_path']):
+                                    with open(result['video_path'], "rb") as v_file:
+                                        st.download_button(
+                                            label="⬇️ Download MP4",
+                                            data=v_file,
+                                            file_name=os.path.basename(result['video_path']),
+                                            mime="video/mp4"
+                                        )
+                            else:
+                                if "video_path" in result and result["video_path"]:
+                                     # Local file existed but no URL?
+                                     st.video(result["video_path"])
+                                else:
+                                     st.warning("Video URL/Path not found.")
+                                
+                            with st.expander("Process Logs", expanded=False):
+                                st.write(result.get("logs", []))
+                        else:
+                            status.update(label="Failed", state="error")
+                            st.error(f"Error: {result.get('error')}")
+                            with st.expander("Error Logs", expanded=True):
+                                 st.write(result.get("logs", []))
+

@@ -15,8 +15,13 @@ def generate_storyboard_prompts(scenario_name, context, model="gemini"):
     You are an award-winning Film & Creative Director.
     Create a 4-step storyboard (4 sequential image prompts) based on the following scenario.
     
-    SCENARIO: {scenario_name}
-    CONTEXT/DETAILS: {context}
+    SCENARIO NAME: {scenario_name}
+    CONTEXT/DETAILS (AUTHORITATIVE SCRIPT): {context}
+    
+    CRITICAL INSTRUCTION:
+    - The "CONTEXT/DETAILS" provided above is the AUTHORITATIVE SCRIPT. It contains the specific characters, setting, and vibe. 
+    - You MUST follow the "CONTEXT/DETAILS" exactly. If it contradicts the generic "SCENARIO NAME", the CONTEXT wins.
+    - Example: If Scenario is "Coffee Shop" but Context says "On Mars", the scene IS ON MARS.
     
     CRITICAL DIRECTION:
     - If there are "Friends" or "Cast" mentioned (e.g., Jess, best friend), they are CO-STARS, not extras.
