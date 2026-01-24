@@ -226,6 +226,9 @@ def load_assets(base_path="assets", user_assets_dir=None):
                     # Using a subtle prefix helps grouping in dropdowns
                     final_key = f"(My) {name}"
                     data[data_key][final_key] = path
+                    print(f"✅ Loaded User Asset: {final_key} -> {path}")
+            else:
+                print(f"⚠️ User Asset Folder Missing: {u_path}")
 
     return data
 

@@ -293,10 +293,23 @@ if st.session_state.get("authenticated"):
     
     # Debug
     with st.sidebar.expander("🔍 Asset Debug"):
+        st.write(f"User: `{username}`")
         st.write(f"Path: `{user_asset_path}`")
+        
         if os.path.exists(user_asset_path):
              st.write("✅ Path Exists")
-             st.write("Files:", os.listdir(user_asset_path))
+             # Recursive walk to see actual files
+             all_files = []
+             for root, dirs, files in os.walk(user_asset_path):
+                 for name in files:
+                     if not name.startswith('.'):
+                         rel_path = os.path.relpath(os.path.join(root, name), user_asset_path)
+                         all_files.append(rel_path)
+             
+             if all_files:
+                 st.write("Found Files:", all_files)
+             else:
+                 st.write("⚠️ Directory exists but is empty.")
         else:
              st.write("❌ Path Missing")
 
