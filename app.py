@@ -276,6 +276,10 @@ try:
 
     characters_data = assets.get('characters', {})
     
+    # Merge Friends/Relations into Characters options
+    relations_data = assets.get('relations', {})
+    characters_data.update(relations_data)
+    
     vibes_list = list(vibes_data.keys())
     outfits_list = list(outfits_data.keys())
     characters_list = list(characters_data.keys())
