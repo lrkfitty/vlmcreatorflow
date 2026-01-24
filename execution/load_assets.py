@@ -37,7 +37,7 @@ def scan_directory(directory):
 # --- CLOUD MANIFEST LOGIC ---
 # (scan_manifest function removed - logic moved to Single Pass loop below)
 
-def load_assets(base_path="assets"):
+def load_assets(base_path="assets", user_assets_dir=None):
     """
     Dynamically loads assets.
     If 'assets_manifest.json' exists, uses S3 URLs (Cloud Mode).
@@ -194,13 +194,39 @@ def load_assets(base_path="assets"):
                     if full_key not in data["characters"]:
                          data["characters"][full_key] = full_path
             
-    # --- 4. Others ---
+    # --- 4. Others (Standard) ---
     data["relations"] = scan_directory(os.path.join(base_path, "Friends"))
     data["pets"] = scan_directory(os.path.join(base_path, "Pets"))
     data["props"] = scan_directory(os.path.join(base_path, "Props"))
     data["vehicles"] = scan_directory(os.path.join(base_path, "Vehicles"))
     data["foods"] = scan_directory(os.path.join(base_path, "Foods"))
-            
+
+    # --- 5. User Assets (If Logged In) ---
+    if user_assets_dir and os.path.exists(user_assets_dir):
+        # Scan standard folders in user directory
+        user_cats = {
+            "Characters": "characters",
+            "Environments": "locations",
+            "Outfits": "outfits",
+            "Vibes": "vibes",
+            "Friends": "relations",
+            "Pets": "pets",
+            "Props": "props",
+            "Vehicles": "vehicles",
+            "Foods": "foods"
+        }
+        
+        for folder_name, data_key in user_cats.items():
+            u_path = os.path.join(user_assets_dir, folder_name)
+            if os.path.exists(u_path):
+                user_items = scan_directory(u_path)
+                # Merge with prefix to identify them easily
+                for name, path in user_items.items():
+                    # Prefix with (User) or similar if desired, or just list them.
+                    # Using a subtle prefix helps grouping in dropdowns
+                    final_key = f"(My) {name}"
+                    data[data_key][final_key] = path
+
     return data
 
 if __name__ == "__main__":

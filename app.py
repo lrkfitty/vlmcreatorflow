@@ -261,8 +261,13 @@ st.markdown("<h1 style='text-align: center'>CreateFlow</h1>", unsafe_allow_html=
 st.markdown("<p style='text-align: center; color: #64748B; margin-bottom: 3rem;'>Enterprise-Grade Content Workflow</p>", unsafe_allow_html=True)
 
 # Load Assets
+user_asset_path = None
+if st.session_state.get("authenticated"):
+    username = st.session_state.current_user.get("username", "guest")
+    user_asset_path = os.path.join("output", "users", username, "Assets")
+
 try:
-    assets = load_assets()
+    assets = load_assets(user_assets_dir=user_asset_path) # Pass user path
     vibes_data = assets.get('vibes', {})
     outfits_data = assets.get('outfits', {})
 
@@ -305,9 +310,10 @@ def get_user_out_dir(category="General"):
     return path
 
 # --- TABS LAYOUT ---
-tab_wizard, tab_gallery, tab_series, tab_world, tab_campaign, tab_video = st.tabs([
+tab_wizard, tab_gallery, tab_assets, tab_series, tab_world, tab_campaign, tab_video = st.tabs([
     "Workflow Wizard", 
     "My Gallery",
+    "Asset Library",
     "🎬 Mini Series",
     "World Builder",
     "Campaign Queue", 
@@ -361,6 +367,86 @@ with tab_gallery:
                         # Download
                         with open(img_path, "rb") as f:
                             st.download_button("⬇️", f, file_name=os.path.basename(img_path), key=f"gal_dl_{idx}")
+
+
+# ==========================================
+# TAB: MY ASSETS
+# ==========================================
+with tab_assets:
+    st.markdown("### 🎨 Personal Asset Management")
+    st.markdown("Upload your own custom content here. It will automatically appear in your generation dropdowns.")
+    
+    if not st.session_state.get("authenticated"):
+        st.warning("Please login to manage assets.")
+    else:
+        username = st.session_state.current_user.get("username")
+        user_asset_root = os.path.join("output", "users", username, "Assets")
+        
+        col_up_1, col_up_2 = st.columns([1, 2])
+        
+        with col_up_1:
+            st.info("ℹ️ **How it works:**\n\n1. Select a category (e.g. Characters).\n2. Upload an image.\n3. Give it a name.\n4. It's now usable in Wizard & World Builder!")
+            
+        with col_up_2:
+            st.markdown("##### 📤 Upload New Asset")
+            
+            # Category Map
+            cat_map = {
+                "Characters": "Characters",
+                "Outfits": "Outfits",
+                "Environments": "Environments",
+                "Vibes": "Vibes",
+                "Props": "Props",
+                "Pets": "Pets",
+                "Friends": "Friends",
+                "Vehicles": "Vehicles"
+            }
+            
+            target_cat = st.selectbox("Category", list(cat_map.keys()))
+            uploaded_file = st.file_uploader("Choose Image", type=["png", "jpg", "jpeg", "webp"])
+            custom_name = st.text_input("Asset Name (Optional)", placeholder="e.g. Cyberpunk Jacket")
+            
+            if st.button("Save to Library", type="primary"):
+                if not uploaded_file:
+                    st.error("Please upload a file.")
+                else:
+                    # Determine paths
+                    save_dir = os.path.join(user_asset_root, cat_map[target_cat])
+                    os.makedirs(save_dir, exist_ok=True)
+                    
+                    # Filename logic
+                    final_name = custom_name.strip() if custom_name.strip() else os.path.splitext(uploaded_file.name)[0]
+                    # Sanitize
+                    final_name = "".join([c for c in final_name if c.isalnum() or c in (' ', '-', '_')]).strip()
+                    ext = os.path.splitext(uploaded_file.name)[1]
+                    
+                    filename = f"{final_name}{ext}"
+                    full_path = os.path.join(save_dir, filename)
+                    
+                    # Write
+                    with open(full_path, "wb") as f:
+                        f.write(uploaded_file.getbuffer())
+                        
+                    st.success(f"Saved **{final_name}** to {target_cat}!")
+                    time.sleep(1)
+                    st.rerun()
+
+        st.divider()
+        st.markdown("#### 📂 Your Library")
+        
+        # Show what they have
+        if os.path.exists(user_asset_root):
+            for cat in cat_map.values():
+                cat_path = os.path.join(user_asset_root, cat)
+                if os.path.exists(cat_path):
+                    files = [f for f in os.listdir(cat_path) if not f.startswith(".")]
+                    if files:
+                        with st.expander(f"📁 {cat} ({len(files)})", expanded=False):
+                            c_grid = st.columns(6)
+                            for i, f in enumerate(files):
+                                p = os.path.join(cat_path, f)
+                                with c_grid[i % 6]:
+                                    st.image(p, caption=f, use_container_width=True)
 
 
 # ==========================================
