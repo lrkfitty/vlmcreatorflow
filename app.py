@@ -183,32 +183,12 @@ def apply_custom_theme():
 apply_custom_theme()
 
 # --- NEW AUTHENTICATION UI (MULTI-USER) ---
+# --- NEW AUTHENTICATION UI (MULTI-USER) ---
 from execution.auth import auth_mgr
 
-def check_persistent_auth():
-    """Checks for a local auth token file."""
-    if os.path.exists(".auth_token"):
-        try:
-            with open(".auth_token", "r") as f:
-                token = f.read().strip()
-            
-            # Verify JWT
-            user_payload = auth_mgr.verify_token(token)
-            if user_payload:
-                st.session_state.authenticated = True
-                st.session_state.current_user = user_payload
-                return True
-        except Exception:
-            pass
-    return False
-
-# Auto-login if token exists
+# Session State Initialization
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
-
-if not st.session_state.authenticated:
-    if check_persistent_auth():
-        st.session_state.authenticated = True
 
 def handle_login():
     user = st.session_state.get("auth_user", "")
@@ -219,12 +199,6 @@ def handle_login():
     if token:
         st.session_state.authenticated = True
         st.session_state.current_user = auth_mgr.verify_token(token)
-        
-        # Always persist session
-        with open(".auth_token", "w") as f:
-            f.write(token)
-            
-        # st.rerun() handled by callback completion
     else:
         st.error(f"⛔ {msg}")
 
@@ -240,16 +214,10 @@ def handle_signup():
     
     if success:
         st.success("Account Created! Logging in...")
-        # Auto Login & Persist
+        # Auto Login
         token, _ = auth_mgr.login(new_user, new_pass)
         st.session_state.authenticated = True
         st.session_state.current_user = auth_mgr.verify_token(token)
-        
-        # Save token
-        with open(".auth_token", "w") as f:
-            f.write(token)
-            
-        # st.rerun() handled by callback completion
     else:
         st.error(f"Error: {msg}")
 
@@ -283,8 +251,6 @@ with st.sidebar:
         u_info = st.session_state.get("current_user", {"username": "Ghost"})
         st.write(f"👤 **{u_info.get('username')}** ({u_info.get('role', 'Viewer')})")
         if st.button("Logout"):
-            if os.path.exists(".auth_token"):
-                os.remove(".auth_token")
             st.session_state.authenticated = False
             st.rerun()
     st.divider()

@@ -16,8 +16,40 @@ class AuthManager:
         self.users = {}
         self.load_users()
 
+    def _load_from_s3(self):
+        """Attempts to download users.json from S3."""
+        try:
+            import boto3
+            from botocore.exceptions import ClientError
+            
+            bucket = os.getenv("S3_BUCKET_NAME")
+            if not bucket: return False
+            
+            s3 = boto3.client('s3', region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
+            s3.download_file(bucket, "config/users.json", self.db_path)
+            return True
+        except Exception as e:
+            # It's fine if it fails (first run or no internet)
+            # print(f"Auth S3 Download Error: {e}") 
+            return False
+
+    def _save_to_s3(self):
+        """Uploads users.json to S3."""
+        try:
+            import boto3
+            bucket = os.getenv("S3_BUCKET_NAME")
+            if not bucket: return
+            
+            s3 = boto3.client('s3', region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
+            s3.upload_file(self.db_path, bucket, "config/users.json")
+        except Exception as e:
+            print(f"Auth S3 Upload Error: {e}")
+
     def load_users(self):
-        """Loads users from JSON file."""
+        """Loads users from JSON file (and S3 if available)."""
+        # Always try to sync from S3 first to get latest state
+        self._load_from_s3()
+        
         if os.path.exists(self.db_path):
             try:
                 with open(self.db_path, "r") as f:
@@ -26,8 +58,17 @@ class AuthManager:
                 self.users = {}
         else:
             self.users = {}
-            # Initialize with Env Admin if empty
-            self._init_default_admin()
+            
+        # Initialize with Env Admin if empty (or if admin missing)
+        self._init_default_admin()
+
+    def save_users(self):
+        """Saves users to JSON file and syncs to S3."""
+        with open(self.db_path, "w") as f:
+            json.dump(self.users, f, indent=4)
+        
+        # Sync to cloud
+        self._save_to_s3()
 
     def _init_default_admin(self):
         """Creates default admin if no users exist."""
@@ -38,12 +79,19 @@ class AuthManager:
         # But specifically check for this admin user
         if env_user not in self.users:
             print(f"Auth: Initializing default admin user: {env_user}")
-            self.create_user(env_user, env_pass, role="admin")
-
-    def save_users(self):
-        """Saves users to JSON file."""
-        with open(self.db_path, "w") as f:
-            json.dump(self.users, f, indent=4)
+            # Do NOT call save_users() to avoid infinite loop with load -> init -> create -> save -> s3
+            # Just set in memory and dump locally
+            pass_hash, salt = self._hash_password(env_pass)
+            self.users[env_user] = {
+                "username": env_user,
+                "hash": pass_hash,
+                "salt": salt,
+                "role": "admin",
+                "created_at": time.time()
+            }
+            # Manually save only to disk to avoid blocking startup with S3 upload
+            with open(self.db_path, "w") as f:
+                json.dump(self.users, f, indent=4)
 
     def _hash_password(self, password, salt=None):
         """Simple SHA256 hash with salt."""
