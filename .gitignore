@@ -16,3 +16,4 @@ token.json
 # Outputs
 output/
 sd_local/
+users.json
