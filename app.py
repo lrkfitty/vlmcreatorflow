@@ -192,11 +192,7 @@ import extra_streamlit_components as stx
 import datetime
 
 # Cookie Manager Init
-@st.cache_resource
-def get_manager():
-    return stx.CookieManager()
-
-cookie_manager = get_manager()
+cookie_manager = stx.CookieManager()
 
 # Session State Initialization
 if "authenticated" not in st.session_state:
