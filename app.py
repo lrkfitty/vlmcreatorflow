@@ -785,8 +785,8 @@ with tab_series:
             st.markdown("#### 🎭 Cast Selection")
             
             # Use Unified Asset Loader (Matches World Builder)
-            char_opts = get_assets_by_category("characters")
-            rel_opts = get_assets_by_category("relations")
+            char_opts = get_assets_by_category("characters", user_asset_path)
+            rel_opts = get_assets_by_category("relations", user_asset_path)
             # Merge for selection
             all_cast_opts = {**char_opts, **rel_opts}
             
@@ -898,8 +898,8 @@ with tab_series:
                 with st.spinner("AI Director is breaking down the script..."):
                     # 1. Clean Cast Names for AI & Map for Lookup
                     # RE-LOAD ASSETS TO MIRROR WORLD BUILDER RESOLUTION
-                    char_opts = get_assets_by_category("characters")
-                    rel_opts = get_assets_by_category("relations")
+                    char_opts = get_assets_by_category("characters", user_asset_path)
+                    rel_opts = get_assets_by_category("relations", user_asset_path)
                     all_cast_opts = {**char_opts, **rel_opts}
                     
                     clean_cast_map = {} # {'Shay': '/path/to/real/shay.png'}
@@ -1016,8 +1016,8 @@ with tab_series:
         # Ensure lookup map exists (handle refresh case)
         if "cast_lookup_map" not in st.session_state:
              # Fallback rebuild if missing - MATCHING WORLD BUILDER LOGIC
-             char_opts = get_assets_by_category("characters")
-             rel_opts = get_assets_by_category("relations")
+             char_opts = get_assets_by_category("characters", user_asset_path)
+             rel_opts = get_assets_by_category("relations", user_asset_path)
              all_cast_opts = {**char_opts, **rel_opts}
              
              clean_cast_map = {}
@@ -1553,7 +1553,7 @@ with tab_world:
                 st.markdown("##### 👥 Cast & Characters")
                 # A. Protagonist (Single Select)
                 st.markdown("###### 1. Protagonist")
-                protag_opts = get_assets_by_category("characters")
+                protag_opts = get_assets_by_category("characters", user_asset_path)
                 protag_key = st.selectbox("Select Protagonist", list(protag_opts.keys()), format_func=lambda x: protag_opts[x].get('name', x) if isinstance(protag_opts[x], dict) else x)  
             
                 # Handle both World DB dicts and Filesystem paths

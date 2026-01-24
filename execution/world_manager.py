@@ -31,13 +31,14 @@ def get_scenarios():
     db = load_world_db()
     return db.get("scenarios", {})
 
-def get_assets_by_category(category):
+def get_assets_by_category(category, user_assets_dir=None):
     # 1. Load from Database (Rich Metadata)
     db = load_world_db()
     db_assets = db.get(category, {})
     
     # 2. Load from Filesystem (Raw Paths)
-    fs_data = load_assets()
+    # PASS user_assets_dir here!
+    fs_data = load_assets(user_assets_dir=user_assets_dir)
     fs_assets = fs_data.get(category, {})
     
     # 3. Merge: Database overrides Filesystem if keys conflict
