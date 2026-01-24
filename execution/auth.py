@@ -31,10 +31,14 @@ class AuthManager:
 
     def _init_default_admin(self):
         """Creates default admin if no users exist."""
+        env_user = os.getenv("APP_ADMIN_USER", "admin")
         env_pass = os.getenv("APP_PASSWORD", "admin")
-        if "admin" not in self.users:
-            print("Auth: Initializing default admin user.")
-            self.create_user("admin", env_pass, role="admin")
+        
+        # Check if ANY user exists (to prevent overwrite if DB is populated)
+        # But specifically check for this admin user
+        if env_user not in self.users:
+            print(f"Auth: Initializing default admin user: {env_user}")
+            self.create_user(env_user, env_pass, role="admin")
 
     def save_users(self):
         """Saves users to JSON file."""
