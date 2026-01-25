@@ -577,7 +577,7 @@ with tab_wizard:
     
     with col_adv:
         with st.expander("⚙️ Advanced Brain Settings"):
-             prompt_engine = st.selectbox("Prompt Engine", ["gpt-4o", "gemini-1.5-pro"], key="wiz_brain")
+             prompt_engine = st.selectbox("Prompt Engine", ["gemini-1.5-flash", "gemini-2.0-flash", "gpt-4o", "gemini-1.5-pro"], key="wiz_brain")
              render_engine = "nano" 
              likeness = 0.5
              # selected_checkpoint removed

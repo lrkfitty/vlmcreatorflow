@@ -172,13 +172,14 @@ def generate_prompt_content(vibe, outfit, character,
 
 
     # ================= GEMINI IMPLEMENTATION =================
-    if model_engine == "gemini-1.5-pro":
+    if "gemini" in model_engine:
         try:
             google_key = os.getenv("GOOGLE_API_KEY")
             if not google_key: return {"positive_prompt": "Error: GOOGLE_API_KEY missing", "aspect_ratio": "9:16"}
             
             genai.configure(api_key=google_key)
-            model = genai.GenerativeModel('gemini-1.5-pro')
+            # Use the requested engine dynamically (e.g. gemini-1.5-flash)
+            model = genai.GenerativeModel(model_engine)
             
             # Prepare Content List
             gemini_content = [system_prompt, "\n\nUSER REQUEST:\n" + user_text_content]
