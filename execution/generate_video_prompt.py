@@ -18,9 +18,9 @@ def generate_motion_prompt(image_path, movement_type="Auto", physics_focus="stan
     genai.configure(api_key=api_key)
     # Using 2.0 Flash as verified in available models list
     try:
-        model = genai.GenerativeModel('gemini-2.0-flash-001')
+        model = genai.GenerativeModel('gemini-2.0-flash')
     except:
-        model = genai.GenerativeModel('gemini-pro-latest') # Fallback
+        model = genai.GenerativeModel('gemini-1.5-flash') # Fallback to CHEAP model
 
     # Read Image Data
     import PIL.Image
