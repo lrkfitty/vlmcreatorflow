@@ -29,17 +29,47 @@ except ImportError as e:
     st.stop()
 
 # --- REMOTE CONFIG INJECTION (Secrets -> Env) ---
-# Ensure helper scripts can see secrets as env vars
+# Ensure helper scripts can see secrets as env vars, handling nested tables (e.g. [env])
+def recursive_secrets_load(secrets_obj, prefix=""):
+    for key, val in secrets_obj.items():
+        if isinstance(val, dict):
+             # Recursively dive in. Prefix optional? 
+             # Usually Streamlit users might group like [aws] bucket_name. 
+             # We want to eventually find simple keys if they exist deep down.
+             recursive_secrets_load(val, prefix)
+        else:
+            # Flatten: If key is not in env, add it.
+            # We trust the deepest key (or outer?) - First come first serve or overwrite?
+            # Let's overwrite to ensure secrets take precedence.
+            # Note: We don't prefix because scripts expect "S3_BUCKET_NAME", not "aws_S3_BUCKET_NAME"
+            if key not in os.environ:
+                 os.environ[key] = str(val)
+
 try:
     if hasattr(st, "secrets"):
-        for key, val in st.secrets.items():
-            if key not in os.environ:
-                os.environ[key] = str(val)
-except Exception:
-    # Local mode usually doesn't have secrets.toml, which is fine.
+         # Convert StreamlitSecrets to dict for recursion
+         recursive_secrets_load(dict(st.secrets))
+except Exception as e:
+    # Safe to ignore locally
     pass
 
 st.set_page_config(page_title="CreateFlow | Viral Lense Media", layout="wide", page_icon=None)
+
+# DEBUG: Inject Diagnostics if requested or if path missing
+if os.getenv("S3_BUCKET_NAME") is None and hasattr(st, "secrets"):
+     # Auto-show diagnostics if we have secrets but S3 is missing (Misconfiguration)
+     with st.sidebar.expander("🛠️ System Diagnosis (Auto)", expanded=True):
+          st.error("S3 Bucket Not Found in Env")
+          st.write("Secrets Keys Found:")
+          def elem_keys(obj, d=0):
+               if d > 2: return
+               for k, v in obj.items():
+                    st.write(f"{'-'*d} {k}")
+                    if isinstance(v, dict): elem_keys(v, d+1)
+          if hasattr(st, "secrets"):
+               elem_keys(dict(st.secrets))
+          else:
+               st.write("No 'st.secrets' object.")
 
 # --- AUTHENTICATION GATE MOVED AFTER THEME LOADING ---
 if "authenticated" not in st.session_state:
