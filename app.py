@@ -14,7 +14,7 @@ try:
     import load_assets as la_module
     importlib.reload(la_module)
     from load_assets import load_assets
-    from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end
+    from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button
     from generate_prompt import generate_prompt_content
     from generate_image import generate_image_from_prompt
     from campaign_runner import CampaignManager
@@ -388,7 +388,7 @@ with tab_gallery:
                     # Download Action (Hidden visually by CSS but accessible?)
                     # For now just standard button below until we wire up JS callbacks
                     # Using the hover_button helper for visual indicator
-                    from execution.magic_ui import hover_button
+                    # from execution.magic_ui import hover_button # Moved to top
                     # st.markdown(hover_button("Download"), unsafe_allow_html=True)  <-- Just visual
                     
                     # Actual Download (Streamlit Limitation: Must be native widget for callback)
@@ -2188,7 +2188,7 @@ with tab_world:
 
                  # Magic UI Progress
                  prog_ph = st.empty()
-                 from execution.magic_ui import circular_progress
+                 # from execution.magic_ui import circular_progress
                  with prog_ph.container():
                       circular_progress()
                       st.caption("Generating...")
@@ -2376,7 +2376,7 @@ with tab_world:
             # 3. Generate Actions
             if st.button("Generate World Scene", type="primary"):
                  prog_ph = st.empty()
-                 from execution.magic_ui import circular_progress
+                 # from execution.magic_ui import circular_progress
                  with prog_ph.container():
                       circular_progress()
                       st.caption("Generating with Nano...")
@@ -2694,7 +2694,7 @@ with tab_video:
                 st.error("Missing GOOGLE_API_KEY for Vision Analysis.")
             else:
                 prog_ph = st.empty()
-                from execution.magic_ui import circular_progress
+                # from execution.magic_ui import circular_progress
                 with prog_ph.container():
                      circular_progress()
                      st.caption("Analyzing Context...")
@@ -3103,7 +3103,7 @@ with tab_char:
                 user = st.session_state.current_user.get("username")
                 if auth_mgr.deduct_credits(user, 1):
                     prog_ph = st.empty()
-                    from execution.magic_ui import circular_progress
+                    # from execution.magic_ui import circular_progress
                     with prog_ph.container():
                          circular_progress()
                          st.caption("Creating in Studio...")
