@@ -407,14 +407,29 @@ with tab_gallery:
         
         # Scan for images
         my_images = []
-        if os.path.exists(user_root):
-            for root, dirs, files in os.walk(user_root):
-                for file in files:
-                    if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                        my_images.append(os.path.join(root, file))
         
-        # Sort by Modified Time (Newest First)
-        my_images.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        # Check if running on Streamlit Cloud
+        is_cloud = os.getenv("STREAMLIT_SHARING_MODE") or not os.path.exists("/Users")
+        
+        if is_cloud:
+            # Load from S3
+            try:
+                from execution.s3_gallery import list_user_images_from_s3
+                s3_images = list_user_images_from_s3(username)
+                my_images = [img["url"] for img in s3_images]
+                if s3_images:
+                    st.caption(f"☁️ Cloud Mode: Loaded {len(s3_images)} images from S3")
+            except Exception as e:
+                st.warning(f"⚠️ Could not load from S3: {e}")
+        else:
+            # Load from local filesystem
+            if os.path.exists(user_root):
+                for root, dirs, files in os.walk(user_root):
+                    for file in files:
+                        if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                            my_images.append(os.path.join(root, file))
+                # Sort by Modified Time (Newest First)
+                my_images.sort(key=lambda x: os.path.getmtime(x), reverse=True)
         
         if not my_images:
             st.info(f"No images found in `{username}`'s folder yet. Go to 'Workflow Wizard' to create something!")
