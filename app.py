@@ -436,38 +436,91 @@ with tab_gallery:
         
         col_gal_head, col_gal_ref = st.columns([3, 1])
         with col_gal_head:
-             st.caption(f"📂 Gallery Path: `{abs_root}`")
+             if os.getenv("S3_BUCKET_NAME"):
+                 st.caption(f"☁️ Cloud Gallery: `s3://{os.getenv('S3_BUCKET_NAME')}/users/{username}`")
+             else:
+                 st.caption(f"📂 Gallery Path: `{abs_root}`")
         with col_gal_ref:
              if st.button("🔄 Refresh"):
                  st.rerun()
         
-        # Scan for images
         my_images = []
-        if os.path.exists(user_root):
+        
+        # --- S3 CLOUD SCAN ---
+        if os.getenv("S3_BUCKET_NAME"):
+            try:
+                import boto3
+                bucket = os.getenv("S3_BUCKET_NAME")
+                s3 = boto3.client('s3', region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
+                prefix = f"users/{username}/"
+                
+                # We want images that are NOT in "Assets" folder
+                # Assets are managed in Tab 3. Gallery is for outputs.
+                
+                paginator = s3.get_paginator('list_objects_v2')
+                pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+                
+                for page in pages:
+                    for obj in page.get('Contents', []):
+                        key = obj['Key']
+                        # key: users/{user}/Series/Ep1/img.png
+                        # Filter valid images
+                        if key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                            # Exclude Assets folder
+                            if "/Assets/" not in key:
+                                # Generate URL
+                                url = s3.generate_presigned_url(
+                                    'get_object',
+                                    Params={'Bucket': bucket, 'Key': key},
+                                    ExpiresIn=3600
+                                )
+                                # Store tuple (path/url, is_cloud, name)
+                                my_images.append({
+                                    "src": url,
+                                    "name": os.path.basename(key),
+                                    "time": obj.get('LastModified').timestamp()
+                                })
+                                
+                # Sort S3 by time (Newest First)
+                my_images.sort(key=lambda x: x["time"], reverse=True)
+                
+            except Exception as e:
+                st.error(f"Gallery S3 Scan Error: {e}")
+                
+        # --- LOCAL SCAN (Fallback or Hybrid) ---
+        elif os.path.exists(user_root):
+            local_imgs = []
             for root, dirs, files in os.walk(user_root):
                 for file in files:
-                    if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                        my_images.append(os.path.join(root, file))
-        
-        # Sort by Modified Time (Newest First)
-        my_images.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+                    if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and "Assets" not in root:
+                        full_path = os.path.join(root, file)
+                        local_imgs.append({
+                            "src": full_path, # Local Path for st.image
+                            "name": file,
+                            "time": os.path.getmtime(full_path),
+                            "is_local": True
+                        })
+            
+            # Sort Local
+            local_imgs.sort(key=lambda x: x["time"], reverse=True)
+            my_images.extend(local_imgs)
+
         
         if not my_images:
-            st.info(f"No images found in `{username}`'s folder yet. Go to 'Workflow Wizard' to create something!")
-            st.warning(f"Debug: Folder `{abs_root}` exists? {os.path.exists(user_root)}")
+            st.info(f"No images found for `{username}` yet. Generate something in the Wizard or Series tab!")
         else:
             st.write(f"Found {len(my_images)} images.")
             # Display Grid
             cols = st.columns(4)
-            for idx, img_path in enumerate(my_images):
+            for idx, item in enumerate(my_images):
                 with cols[idx % 4]:
                     with st.container(border=True):
-                        st.image(img_path, use_container_width=True)
-                        st.text(os.path.basename(img_path))
+                        st.image(item["src"], use_container_width=True)
+                        st.text(item["name"])
                         
-                        # Download
-                        with open(img_path, "rb") as f:
-                            st.download_button("⬇️", f, file_name=os.path.basename(img_path), key=f"gal_dl_{idx}")
+                        # Download Button logic requires reading data
+                        # Only show if local or if we fetch (performance hit? skip for now)
+                        # st.download_button...
 
 
 # ==========================================

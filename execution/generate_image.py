@@ -235,10 +235,41 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                             
                             with open(filepath, "wb") as f:
                                 f.write(image_bytes)
-                                
+                            
+                            # --- S3 AUTO-UPLOAD ---
+                            # On Streamlit Cloud, local files are ephemeral. We must sync to S3 immediately.
+                            s3_url = None
+                            if os.getenv("S3_BUCKET_NAME"):
+                                try:
+                                    # Infer S3 Key from local path
+                                    # Logic: Local "output/users/Ty/..." -> S3 "users/Ty/..."
+                                    # If path not in output/users, just use "generated/{filename}"
+                                    
+                                    # Normalize separators
+                                    norm_path = os.path.normpath(filepath)
+                                    path_parts = norm_path.split(os.sep)
+                                    
+                                    if "users" in path_parts:
+                                        idx = path_parts.index("users")
+                                        # Key starts from 'users'
+                                        s3_key = "/".join(path_parts[idx:])
+                                    else:
+                                        s3_key = f"generated/{filename}"
+                                        
+                                    from execution.s3_uploader import upload_file_obj
+                                    
+                                    with open(filepath, "rb") as f_up:
+                                        # Use the uploader helper which handles ContentType and Presigning
+                                        s3_url = upload_file_obj(f_up, object_name=s3_key)
+                                        logs.append(f"☁️ Uploaded to S3: {s3_key}")
+                                        
+                                except Exception as e:
+                                    logs.append(f"⚠️ S3 Upload Failed: {e}")
+
                             return {
                                 "status": "success",
                                 "image_path": filepath,
+                                "s3_url": s3_url, # Return for UI to use if needed
                                 "model_used": "nano-banana-pro",
                                 "logs": "\n".join(logs)
                             }
