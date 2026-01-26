@@ -1385,11 +1385,10 @@ with tab_series:
                         if f"img_{key_base}" in st.session_state:
                             img_p = st.session_state[f"img_{key_base}"]
                             st.image(img_p, caption=f"Shot {shot_idx+1} (Ready)", use_container_width=True)
-                                                        # V3.7: Download Button
-                             if img_p.startswith("http") or os.path.exists(img_p):
-                                 safe_download_button("⬇️ Download Shot", img_p, key=f"dl_{key_base}")
-                                 st.caption(f"Location: {img_p}")
-                                st.caption(f"Saved to: {img_p}")
+                            # V3.7: Download Button
+                            if img_p.startswith("http") or os.path.exists(img_p):
+                                safe_download_button("⬇️ Download Shot", img_p, key=f"dl_{key_base}")
+                                st.caption(f"Location: {img_p}")
                         else:
                             st.info("No Image Generated")
                     
