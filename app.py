@@ -1670,283 +1670,212 @@ with tab_world:
     
     if selected_scenario_key:
         # --- SCENE COMPOSITION UI (Synced with Filesystem) ---
-        current_selections = {}
-        assets_to_inject = [] # List of {path, label}
-        
-        col_c1, col_c2 = st.columns(2)
-        
-        with col_c1:
-            with st.container():
-                card_begin()
-                st.markdown("##### Cast & Characters")
-                # A. Protagonist (Single Select)
-                # A. Protagonist (Single Select)
-                st.markdown("###### 1. Protagonist")
-                
-                # UNIFIED LIST LOGIC
-                # Merge stock + user assets (already done in characters_data if loaded, but let's be safe)
-                wb_char_opts = {**characters_data}
-                
-                # User Asset Path injection (if not already redundant)
-                if os.path.exists(user_asset_path):
-                     # Re-scan creates "duplicates" but checks for updates. 
-                     # Better to trust load_assets or just add missing.
-                     pass 
-                
-                wb_char_keys = sorted(list(wb_char_opts.keys()))
-                
-                protag_key = st.selectbox(
-                    "Select Protagonist", 
-                    wb_char_keys, 
-                    format_func=lambda x: wb_char_opts[x].get('name', x) if isinstance(wb_char_opts[x], dict) else x
-                )
-                
-                protag_opts = wb_char_opts # Alias for logic below  
+        # Fragment to prevent full reload
+        @st.fragment
+        def wb_composition_fragment():
+            temp_selections = {}
+            temp_assets = []
             
-                # Handle both World DB dicts and Filesystem paths
-                p_final_path = None
-                p_final_name = "Character"
-
-                if protag_key:
-                    p_val = protag_opts[protag_key]
-                    if isinstance(p_val, dict):
-                        # DB Asset
-                        p_final_name = p_val['name']
-                        p_final_path = p_val.get('default_img')
-                    else:
-                        # Filesystem Asset
-                        p_final_name = protag_key.split('/')[-1]
-                        p_final_path = p_val
-                
-                    current_selections["PROTAGONIST"] = p_final_name
-
-                    # --- NEW: Reference Image Selector (Variant Scanner) ---
-                    if p_final_path:
-                        # Find parent directory to show variations (FileSystem Only)
-                        # Cloud Mode: Variations logic is complex, skipping for now or need S3 scan.
-                        # For now, let's just use the selected image.
-                        
-                        # Only scan if it looks like a local path
-                        siblings = []
-                        if os.path.exists(p_final_path):
-                            char_dir = os.path.dirname(p_final_path)
-                            valid_exts = ('.png', '.jpg', '.jpeg', '.webp')
-                            siblings = [f for f in os.listdir(char_dir) if f.lower().endswith(valid_exts) and not f.startswith('.')]
-                    
-                        if siblings:
-                            # Show selector
-                            # default index is currently selected file
-                            current_file = os.path.basename(p_final_path)
-                            try:
-                                def_idx = siblings.index(current_file)
-                            except ValueError:
-                                def_idx = 0
-                            
-                            # Variation UI
-                            selected_var = st.selectbox("Select Specific Look", siblings, index=def_idx, key="protag_var")
-                            p_final_path = os.path.join(char_dir, selected_var)
-                
-                    # Update Inject List
-                    if p_final_path:
-                        assets_to_inject.append({"path": p_final_path, "label": "Main Character"})
-                        st.image(p_final_path, width=200, caption="Reference LoRA/Image")
-
-                # --- NEW: Main Character Outfit ---
-                st.caption("Main Character Outfit")
-                fit_opts = get_assets_by_category("outfits")
-                # Filter out generic keys if needed, or keep all
-                fit_key = st.selectbox("Select Outfit", ["None"] + list(fit_opts.keys()), key="main_outfit")
-                
-                if fit_key and fit_key != "None":
-                    path = fit_opts[fit_key]
-                    if isinstance(path, dict): path = path.get('default_img')
-                    
-                    # Clean name
-                    fit_name = fit_key.split('/')[-1] 
-                    if os.path.sep in fit_name: fit_name = os.path.splitext(fit_name)[0]
-                    
-                    current_selections["OUTFIT"] = fit_name
-                    
-                    # Add to prompt context + injection
-                    assets_to_inject.append({"path": path, "label": f"Outfit: {fit_name}"})
-                    if path:
-                        st.image(path, caption=fit_name)
-                    elif not path:
-                         # Text only fallback logic handled by generate_image_nano
-                         pass
-
-                # B. Cast (Relations) - Multi Select
-                # B. Cast (Relations) - Multi Select
-                st.markdown("###### 2. Friends & Cast")
-                # UNIFIED: Use same pool as Protagonist (Stock + User Chars) + Relations?
-                # Actually, user requested "Every character available".
-                # So we merge wb_char_opts (Characters) + get_assets_by_category("relations")
-                
-                rel_opts = get_assets_by_category("relations")
-                # Merge into a single "Cast Pool"
-                # If name conflict, Characters take precedence or we prefix?
-                # Simple merge:
-                cast_pool = {**wb_char_opts, **rel_opts}
-                
-                rel_keys = sorted(list(cast_pool.keys()))
-                
-                selected_rels = st.multiselect(
-                    "Include People", 
-                    rel_keys,
-                    format_func=lambda x: cast_pool[x].get('name', x) if isinstance(cast_pool[x], dict) else x
-                )
+            col_c1, col_c2 = st.columns(2)
             
-                rel_names = []
-                if selected_rels:
-                    st.caption("Selected Cast:")
-                    r_cols = st.columns(len(selected_rels))
-                    for idx, k in enumerate(selected_rels):
-                        path = cast_pool[k] # Use Unified Pool
-                        name = k 
-                        
-                         # If from DB it might be a dict
-                        if isinstance(path, dict):
-                             name = path.get('name', k)
-                             path = path.get('default_img', '')
+            with col_c1:
+                with st.container():
+                    card_begin()
+                    st.markdown("##### Cast & Characters")
+                    st.markdown("###### 1. Protagonist")
+                    
+                    wb_char_opts = {**characters_data}
+                    wb_char_keys = sorted(list(wb_char_opts.keys()))
+                    
+                    protag_key = st.selectbox(
+                        "Select Protagonist", 
+                        wb_char_keys, 
+                        format_func=lambda x: wb_char_opts[x].get('name', x) if isinstance(wb_char_opts[x], dict) else x
+                    )
+                    
+                    protag_opts = wb_char_opts  
+                    p_final_path = None
+                    p_final_name = "Character"
+    
+                    if protag_key:
+                        p_val = protag_opts[protag_key]
+                        if isinstance(p_val, dict):
+                            p_final_name = p_val['name']
+                            p_final_path = p_val.get('default_img')
                         else:
-                             # Filesystem path
-                             clean_name = os.path.splitext(k.split('/')[-1])[0]
-                             if k in wb_char_opts: name = clean_name # It's a character
-                             else: name = clean_name # It's a relation
+                            p_final_name = protag_key.split('/')[-1]
+                            p_final_path = p_val
                     
-                        rel_names.append(name)
-                        assets_to_inject.append({"path": path, "label": f"Cast: {name}"})
-                        with r_cols[idx]:
-                            if path:
-                                 st.image(path, caption=name)
-
-                if rel_names:
-                    current_selections["RELATIONS"] = " and ".join(rel_names)
-                
-                    # Friend Outfits (Phase 4)
-                    st.caption("Selected Cast Outfits:")
-                    friend_outfit_details = []
-                    f_cols = st.columns(len(selected_rels))
-                    for idx, k in enumerate(selected_rels):
-                        with f_cols[idx]:
-                             # Friend Name
-                             f_name = rel_opts[k]['name'] if isinstance(rel_opts[k], dict) else k.split('/')[-1]
-                         
-                             # Outfit Select for this friend (From Assets)
-                             # We use regular outfits_data logic
-                             f_fit_opts = get_assets_by_category("outfits")
-                             # If empty fall back
-                             if not f_fit_opts: f_fit_opts = {"Casual": "", "Chic": ""}
-                         
-                             f_outfit_key = st.selectbox(f"Outfit for {f_name.split()[0]}", list(f_fit_opts.keys()), key=f"fit_{idx}")
-                         
-                             # Get clear name and path
-                             f_outfit_path = None
-                             if isinstance(f_fit_opts[f_outfit_key], dict):
-                                 f_outfit_name = f_fit_opts[f_outfit_key]['name']
-                                 f_outfit_path = f_fit_opts[f_outfit_key].get('default_img')
-                             else:
-                                 f_outfit_name = os.path.splitext(f_outfit_key.split('/')[-1])[0]
-                                 f_outfit_path = f_fit_opts[f_outfit_key]
-
-                             # Text prompt instruction + Image Asset
-                             assets_to_inject.append({"path": f_outfit_path, "label": f"Outfit for {f_name}: {f_outfit_name}"}) 
-                             friend_outfit_details.append(f"{f_name} in {f_outfit_name}") 
-                         
-                             # VISUAL PREVIEW
-                             # VISUAL PREVIEW
-                             if f_outfit_path:
-                                 st.image(f_outfit_path, width=150, caption=f_outfit_name)
-                             else:
-                                 st.caption(f"No preview: {f_outfit_name}")
+                        temp_selections["PROTAGONIST"] = p_final_name
+    
+                        if p_final_path:
+                            siblings = []
+                            if os.path.exists(p_final_path):
+                                char_dir = os.path.dirname(p_final_path)
+                                valid_exts = ('.png', '.jpg', '.jpeg', '.webp')
+                                siblings = [f for f in os.listdir(char_dir) if f.lower().endswith(valid_exts) and not f.startswith('.')]
+                        
+                            if siblings:
+                                current_file = os.path.basename(p_final_path)
+                                try:
+                                    def_idx = siblings.index(current_file)
+                                except ValueError:
+                                    def_idx = 0
+                                
+                                selected_var = st.selectbox("Select Specific Look", siblings, index=def_idx, key="protag_var")
+                                p_final_path = os.path.join(char_dir, selected_var)
                     
-                    if friend_outfit_details:
-                        current_selections["FRIEND_OUTFITS"] = ", ".join(friend_outfit_details)
-                else:
-                    current_selections["RELATIONS"] = "nobody"
-
-
-
-                card_end()
-        # --- RIGHT COLUMN: CONTEXT ---
-        with col_c2:
-            with st.container():
-                card_begin()
-                st.markdown("##### Setting & Props")
-
-                # C. Pets
-                st.markdown("###### 3. Pets")
-                pet_opts = get_assets_by_category("pets")
-                selected_pets = st.multiselect("Include Pets", list(pet_opts.keys()))
+                        if p_final_path:
+                            temp_assets.append({"path": p_final_path, "label": "Main Character"})
+                            st.image(p_final_path, width=200, caption="Reference LoRA/Image")
+    
+                    st.caption("Main Character Outfit")
+                    fit_opts = get_assets_by_category("outfits")
+                    fit_key = st.selectbox("Select Outfit", ["None"] + list(fit_opts.keys()), key="main_outfit")
+                    
+                    if fit_key and fit_key != "None":
+                        path = fit_opts[fit_key]
+                        if isinstance(path, dict): path = path.get('default_img')
+                        
+                        fit_name = fit_key.split('/')[-1] 
+                        if os.path.sep in fit_name: fit_name = os.path.splitext(fit_name)[0]
+                        
+                        temp_selections["OUTFIT"] = fit_name
+                        temp_assets.append({"path": path, "label": f"Outfit: {fit_name}"})
+                        if path:
+                            st.image(path, caption=fit_name)
+    
+                    st.markdown("###### 2. Friends & Cast")
+                    rel_opts = get_assets_by_category("relations")
+                    cast_pool = {**wb_char_opts, **rel_opts}
+                    rel_keys = sorted(list(cast_pool.keys()))
+                    
+                    selected_rels = st.multiselect(
+                        "Include People", 
+                        rel_keys,
+                        format_func=lambda x: cast_pool[x].get('name', x) if isinstance(cast_pool[x], dict) else x
+                    )
                 
-                pet_names = []
-                if selected_pets:
-                    p_cols = st.columns(len(selected_pets))
-                    for idx, k in enumerate(selected_pets):
-                        path = pet_opts[k]
-                        name = k.split('/')[-1]
-                        pet_names.append(name)
-                        assets_to_inject.append({"path": path, "label": f"Pet: {name}"})
-                        with p_cols[idx]:
-                             if path:
-                                 st.image(path, caption=name)
-                
-                st.divider()
-                
-                # D. Props & Vehicles
-                st.markdown("###### 4. Props & Vehicles")
-                prop_opts = get_assets_by_category("props")
-                veh_opts = get_assets_by_category("vehicles")
-                all_props = {**prop_opts, **veh_opts}
-                
-                selected_props = st.multiselect("Include Items", list(all_props.keys()))
-                prop_names = []
-                if selected_props:
-                     # Limit preview columns
-                     pr_cols = st.columns(min(len(selected_props), 4))
-                     for idx, k in enumerate(selected_props):
-                         path = all_props[k]
-                         name = k.split('/')[-1]
-                         prop_names.append(name)
-                         assets_to_inject.append({"path": path, "label": f"Prop: {name}"})
-                         
-                         col_idx = idx % 4
-                         with pr_cols[col_idx]:
-                             if path:
-                                 st.image(path, caption=name)
+                    rel_names = []
+                    if selected_rels:
+                        st.caption("Selected Cast:")
+                        r_cols = st.columns(len(selected_rels))
+                        for idx, k in enumerate(selected_rels):
+                            path = cast_pool[k] 
+                            name = k 
+                            if isinstance(path, dict):
+                                 name = path.get('name', k)
+                                 path = path.get('default_img', '')
+                            else:
+                                 clean_name = os.path.splitext(k.split('/')[-1])[0]
+                                 if k in wb_char_opts: name = clean_name
+                                 else: name = clean_name
+                        
+                            rel_names.append(name)
+                            temp_assets.append({"path": path, "label": f"Cast: {name}"})
+                            with r_cols[idx]:
+                                if path: st.image(path, caption=name)
+    
+                    if rel_names:
+                        temp_selections["RELATIONS"] = " and ".join(rel_names)
+                        st.caption("Selected Cast Outfits:")
+                        friend_outfit_details = []
+                        f_cols = st.columns(len(selected_rels))
+                        for idx, k in enumerate(selected_rels):
+                            with f_cols[idx]:
+                                 f_name = rel_opts[k]['name'] if isinstance(rel_opts[k], dict) else k.split('/')[-1]
+                                 f_fit_opts = get_assets_by_category("outfits")
+                                 if not f_fit_opts: f_fit_opts = {"Casual": "", "Chic": ""}
+                                 f_outfit_key = st.selectbox(f"Outfit for {f_name.split()[0]}", list(f_fit_opts.keys()), key=f"fit_{idx}")
+                                 f_outfit_path = None
+                                 if isinstance(f_fit_opts[f_outfit_key], dict):
+                                     f_outfit_name = f_fit_opts[f_outfit_key]['name']
+                                     f_outfit_path = f_fit_opts[f_outfit_key].get('default_img')
+                                 else:
+                                     f_outfit_name = os.path.splitext(f_outfit_key.split('/')[-1])[0]
+                                     f_outfit_path = f_fit_opts[f_outfit_key]
+                                 temp_assets.append({"path": f_outfit_path, "label": f"Outfit for {f_name}: {f_outfit_name}"}) 
+                                 friend_outfit_details.append(f"{f_name} in {f_outfit_name}") 
+                                 if f_outfit_path: st.image(f_outfit_path, width=150, caption=f_outfit_name)
+                        if friend_outfit_details:
+                            temp_selections["FRIEND_OUTFITS"] = ", ".join(friend_outfit_details)
+                    else:
+                        temp_selections["RELATIONS"] = "nobody"
+                    card_end()
 
-                if prop_names:
-                    current_selections["PROPS"] = ", ".join(prop_names)
-                    current_selections["VEHICLE"] = prop_names[0]
-                else:
-                    current_selections["PROPS"] = "props"
-                    current_selections["VEHICLE"] = "vehicle"
-                
-                st.divider()
+            with col_c2:
+                with st.container():
+                    card_begin()
+                    st.markdown("##### Setting & Props")
+                    st.markdown("###### 3. Pets")
+                    pet_opts = get_assets_by_category("pets")
+                    selected_pets = st.multiselect("Include Pets", list(pet_opts.keys()))
+                    pet_names = []
+                    if selected_pets:
+                        p_cols = st.columns(len(selected_pets))
+                        for idx, k in enumerate(selected_pets):
+                            path = pet_opts[k]
+                            name = k.split('/')[-1]
+                            pet_names.append(name)
+                            temp_assets.append({"path": path, "label": f"Pet: {name}"})
+                            with p_cols[idx]:
+                                 if path: st.image(path, caption=name)
+                    st.divider()
+                    st.markdown("###### 4. Props & Vehicles")
+                    prop_opts = get_assets_by_category("props")
+                    veh_opts = get_assets_by_category("vehicles")
+                    all_props = {**prop_opts, **veh_opts}
+                    selected_props = st.multiselect("Include Items", list(all_props.keys()))
+                    prop_names = []
+                    if selected_props:
+                         pr_cols = st.columns(min(len(selected_props), 4))
+                         for idx, k in enumerate(selected_props):
+                             path = all_props[k]
+                             name = k.split('/')[-1]
+                             prop_names.append(name)
+                             temp_assets.append({"path": path, "label": f"Prop: {name}"})
+                             col_idx = idx % 4
+                             with pr_cols[col_idx]:
+                                 if path: st.image(path, caption=name)
+                    if prop_names:
+                        temp_selections["PROPS"] = ", ".join(prop_names)
+                        temp_selections["VEHICLE"] = prop_names[0]
+                    else:
+                        temp_selections["PROPS"] = "props"
+                        temp_selections["VEHICLE"] = "vehicle"
+                    st.divider()
+                    st.markdown("###### 5. Location")
+                    loc_opts = get_assets_by_category("locations")
+                    loc_key = st.selectbox("Select Location", ["None"] + list(loc_opts.keys()))
+                    if loc_key and loc_key != "None":
+                          val = loc_opts[loc_key]
+                          path = val['default_img'] if isinstance(val, dict) else val
+                          loc_name = loc_key.split('/')[-1]
+                          if os.path.sep in loc_name: loc_name = os.path.splitext(loc_name)[0]
+                          temp_selections["LOCATION"] = loc_name
+                          temp_assets.append({"path": path, "label": "Location"})
+                          if path: st.image(path, caption=loc_name, width=300)
+                    else:
+                          temp_selections["LOCATION"] = "generic location"
+                    card_end()
+            
+            # Persist to Session State (Critical for Generator outside fragment)
+            st.session_state['wb_selections'] = temp_selections
+            st.session_state['wb_assets_to_inject'] = temp_assets
+            # Store auxiliary lists (props, pets etc) if needed by prompt logic
+            st.session_state['wb_rel_names'] = rel_names
+            st.session_state['wb_pet_names'] = pet_names
+            st.session_state['wb_prop_names'] = prop_names
 
-                # E. Location
-                st.markdown("###### 5. Location")
-                loc_opts = get_assets_by_category("locations")
-                loc_key = st.selectbox("Select Location", ["None"] + list(loc_opts.keys()))
-                
-                if loc_key and loc_key != "None":
-                      val = loc_opts[loc_key]
-                      path = val['default_img'] if isinstance(val, dict) else val
-                      
-                      # Clean name
-                      loc_name = loc_key.split('/')[-1]
-                      if os.path.sep in loc_name: loc_name = os.path.splitext(loc_name)[0]
-                      
-                      current_selections["LOCATION"] = loc_name
-                      assets_to_inject.append({"path": path, "label": "Location"})
-                      
-                      
-                      if path:
-                          st.image(path, caption=loc_name, width=300) # Added Thumbnail
-                else:
-                      current_selections["LOCATION"] = "generic location"
-
-                card_end()
+        # Call the Fragment
+        wb_composition_fragment()
+        
+        # Hydrate Local Vars from storage (for downstream legacy logic)
+        current_selections = st.session_state.get('wb_selections', {})
+        assets_to_inject = st.session_state.get('wb_assets_to_inject', [])
+        rel_names = st.session_state.get('wb_rel_names', [])
+        pet_names = st.session_state.get('wb_pet_names', [])
+        prop_names = st.session_state.get('wb_prop_names', [])
         
         # V3.9: Wrapped in Form to prevent Camera Settings Reload Loop
         with st.form(key="wb_camera_form"):
