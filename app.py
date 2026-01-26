@@ -1783,7 +1783,7 @@ with tab_world:
                         f_cols = st.columns(len(selected_rels))
                         for idx, k in enumerate(selected_rels):
                             with f_cols[idx]:
-                                 f_name = rel_opts[k]['name'] if isinstance(rel_opts[k], dict) else k.split('/')[-1]
+                                 f_name = cast_pool[k]['name'] if isinstance(cast_pool[k], dict) else k.split('/')[-1]
                                  f_fit_opts = get_assets_by_category("outfits")
                                  if not f_fit_opts: f_fit_opts = {"Casual": "", "Chic": ""}
                                  f_outfit_key = st.selectbox(f"Outfit for {f_name.split()[0]}", list(f_fit_opts.keys()), key=f"fit_{idx}")
