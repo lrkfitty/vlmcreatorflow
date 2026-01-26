@@ -203,20 +203,9 @@ if st.session_state.get("authenticated"):
     user_asset_path = os.path.join("output", "users", username, "Assets")
     
     # Debug
-    with st.sidebar.expander("🔍 Asset Debug"):
-        st.write(f"User: `{username}`")
-        if os.getenv("S3_BUCKET_NAME"):
-            st.success(f"✅ Cloud Mode Active")
-            st.caption(f"Bucket: {os.getenv('S3_BUCKET_NAME')}")
-            # We can't see files on disk, so we rely on what load_assets found
-            # But load_assets hasn't run yet! It runs at line 327.
-            # We should move this debug block AFTER load_assets.
-        else:
-            st.write(f"Path: `{user_asset_path}`")
-            if os.path.exists(user_asset_path):
-                 st.write("✅ Local Path Exists")
-            else:
-                 st.write("❌ Local Path Missing")
+    # Debug Info Removed for Cleanliness
+    # if os.getenv("S3_BUCKET_NAME"):
+    #     st.toast(f"Cloud Mode: {os.getenv('S3_BUCKET_NAME')}")
 
 try:
     assets = load_assets(user_assets_dir=user_asset_path) # Pass user path
