@@ -1871,8 +1871,7 @@ with tab_world:
                 else:
                     current_selections["RELATIONS"] = "nobody"
 
-                else:
-                    current_selections["RELATIONS"] = "nobody"
+
 
                 card_end()
         # --- RIGHT COLUMN: CONTEXT ---
