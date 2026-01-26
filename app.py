@@ -1701,11 +1701,11 @@ with tab_world:
         
         with col_c1:
             with st.container():
-                 card_begin()
-                 st.markdown("##### Cast & Characters")
-                 # A. Protagonist (Single Select)
-                 # A. Protagonist (Single Select)
-                 st.markdown("###### 1. Protagonist")
+                card_begin()
+                st.markdown("##### Cast & Characters")
+                # A. Protagonist (Single Select)
+                # A. Protagonist (Single Select)
+                st.markdown("###### 1. Protagonist")
                 
                 # UNIFIED LIST LOGIC
                 # Merge stock + user assets (already done in characters_data if loaded, but let's be safe)
