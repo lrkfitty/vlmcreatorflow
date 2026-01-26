@@ -2930,8 +2930,27 @@ with tab_char:
                              "prompt": st.session_state.get('char_final_prompt', ''),
                              "created": str(datetime.datetime.now())
                          }
-                         with open(os.path.join(asset_dir, "details.json"), "w") as f:
+                         json_path = os.path.join(asset_dir, "details.json")
+                         with open(json_path, "w") as f:
                              json.dump(details, f)
+                             
+                         # --- S3 SYNC ---
+                         bucket = os.getenv("S3_BUCKET_NAME")
+                         if bucket:
+                             try:
+                                 # Upload Image
+                                 key_img = f"users/{user}/Assets/Characters/{char_name}/default.png"
+                                 with open(new_path, "rb") as f:
+                                     upload_file_obj(f, key_img)
+                                     
+                                 # Upload Details
+                                 key_json = f"users/{user}/Assets/Characters/{char_name}/details.json"
+                                 with open(json_path, "rb") as f:
+                                     upload_file_obj(f, key_json)
+                                 
+                                 st.toast("☁️ Synced to Cloud!")
+                             except Exception as e:
+                                 st.error(f"Cloud Sync Failed: {e}")
                              
                          st.success(f"Saved {char_name} to Assets!")
                          # Clear Cache

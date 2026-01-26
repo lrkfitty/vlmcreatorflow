@@ -135,29 +135,74 @@ def load_assets(base_path="assets", user_assets_dir=None):
         if not data["vibes"]:
             data["vibes"] = data["locations"]
 
-        # --- User Assets (Cloud Mode Injection) ---
-        if user_assets_dir and os.path.exists(user_assets_dir):
-            user_cats = {
-                "Characters": "characters",
-                "Environments": "locations",
-                "Outfits": "outfits",
-                "Vibes": "vibes",
-                "Friends": "relations",
-                "Pets": "pets",
-                "Props": "props",
-                "Vehicles": "vehicles",
-                "Foods": "foods"
-            }
+        if user_assets_dir:
+            # Check if this is a path like "output/users/{user}/Assets"
+            # Extract user from path or passed arg? 
+            # We need the username to build the S3 key: users/{user}/Assets
             
-            for folder_name, data_key in user_cats.items():
-                u_path = os.path.join(user_assets_dir, folder_name)
-                if os.path.exists(u_path):
-                    user_items = scan_directory(u_path)
-                    for name, path in user_items.items():
-                        final_key = f"(My) {name}"
-                        data[data_key][final_key] = path
-                        print(f"✅ Loaded User Asset (Cloud Mode): {final_key} -> {path}")
-            
+            # Use heuristic: check if "users" is in path
+            parts = user_assets_dir.split(os.sep)
+            if "users" in parts:
+                try:
+                    u_idx = parts.index("users")
+                    username = parts[u_idx + 1]
+                    
+                    bucket = os.getenv("S3_BUCKET_NAME")
+                    if bucket and username:
+                        import boto3
+                        s3 = boto3.client('s3', region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
+                        prefix = f"users/{username}/Assets/"
+                        
+                        # List all objects in user folder
+                        paginator = s3.get_paginator('list_objects_v2')
+                        pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+                        
+                        user_cats = {
+                            "Characters": "characters",
+                            "Environments": "locations",
+                            "Outfits": "outfits",
+                            "Vibes": "vibes",
+                            "Friends": "relations",
+                            "Pets": "pets",
+                            "Props": "props",
+                            "Vehicles": "vehicles",
+                            "Foods": "foods"
+                        }
+                        
+                        for page in pages:
+                            for obj in page.get('Contents', []):
+                                key = obj['Key']
+                                # key format: users/{user}/Assets/{Category}/{Asset Name...}
+                                k_parts = key.split("/")
+                                if len(k_parts) < 5: continue # Need Category + Name
+                                
+                                # k_parts[0]=users, [1]=user, [2]=Assets, [3]=Category, [4:]=Rest
+                                cat_folder = k_parts[3]
+                                target_key = user_cats.get(cat_folder)
+                                
+                                if target_key and key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                                    # Name
+                                    sub_parts = k_parts[4:-1]
+                                    filename = k_parts[-1]
+                                    name_base = os.path.splitext(filename)[0].replace('_', ' ').title()
+                                    
+                                    if not sub_parts:
+                                        final_name = f"(My) {name_base}"
+                                    else:
+                                        p_str = " / ".join([p.replace('_', ' ').title() for p in sub_parts])
+                                        final_name = f"(My) {p_str} / {name_base}"
+                                    
+                                    # Generate Signed URL (valid 1 hour)
+                                    url = s3.generate_presigned_url(
+                                        'get_object',
+                                        Params={'Bucket': bucket, 'Key': key},
+                                        ExpiresIn=3600
+                                    )
+                                    data[target_key][final_name] = url
+                        print(f"✅ Loaded User Assets from S3 for {username}")
+                except Exception as e:
+                     print(f"S3 User Asset Scan Error: {e}")
+                     
         return data
 
     # --- LOCAL FALLBACK (Existing Logic) ---
