@@ -13,6 +13,7 @@ def generate_prompt_content(vibe, outfit, character,
                             additional_notes=None, 
                             camera=None, lens=None, shot_type=None, angle=None,
                             lighting=None, weather=None, action=None, emotion=None,
+                            film_stock=None, filter_look=None, # New Inputs
                             aspect_ratio="9:16", # Default
                             extra_images=None, # New: List of {path, label} types
                             model_engine="gpt-4o"): # New: Engine Selector
@@ -85,6 +86,8 @@ def generate_prompt_content(vibe, outfit, character,
     if weather: director_context.append(f"Weather: {weather}")
     if action: director_context.append(f"Action/Pose: {action}")
     if emotion: director_context.append(f"Emotion/Expression: {emotion}")
+    if film_stock: director_context.append(f"Film Stock: {film_stock}")
+    if filter_look: director_context.append(f"Color Grading/Filter: {filter_look}")
     if aspect_ratio: director_context.append(f"Frame Aspect Ratio: {aspect_ratio}")
     
     tech_specs = "\n".join(director_context)

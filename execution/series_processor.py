@@ -5,12 +5,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def parse_script_to_scenes(script_text, cast_list, environment_name, genre="General", tone="Neutral", roles_map=None, wardrobe_map=None, ref_images=None, secondary_environment="None", camera="Auto", lens="Auto", lighting="Auto"):
+def parse_script_to_scenes(script_text, cast_list, environment_name, genre="General", tone="Neutral", roles_map=None, wardrobe_map=None, ref_images=None, secondary_environment="None", camera="Auto", lens="Auto", lighting="Auto", film_stock="Auto", filter_look="Auto", movie_style="Auto", transition_style="Auto"):
     """
     Uses Gemini to break down a raw script into structured Scenes.
     Enforces 12-Scene Structure (8 Narrative + 4 B-Roll).
     V3 Update: Added Cinematic Parameters (Camera, Lens, Lighting).
     V3.5 Update: Multimodal Support (Deep Vision).
+    V3.6 Update: Added Film Stock and Filter/Look.
     """
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
@@ -32,6 +33,10 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
     - CAMERA BODY: {camera}
     - LENS PACKAGE: {lens}
     - LIGHTING STYLE: {lighting}
+    - FILM STOCK: {film_stock}
+    - FILTER/LOOK: {filter_look}
+    - MOVIE STYLE REFERENCE: {movie_style}
+    - PREFERRED TRANSITION STYLE: {transition_style}
     """
 
     system_instruction = f"""

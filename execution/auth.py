@@ -54,9 +54,11 @@ class AuthManager:
             try:
                 with open(self.db_path, "r") as f:
                     self.users = json.load(f)
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
+                print(f"Auth Critical Error: users.json is corrupt: {e}")
                 self.users = {}
         else:
+            print(f"Auth Warning: users.json not found at {self.db_path}")
             self.users = {}
             
         # Initialize with Env Admin if empty (or if admin missing)
@@ -159,10 +161,12 @@ class AuthManager:
 
     def get_credits(self, username):
         """Returns current credit balance."""
+        self.load_users() # Force sync from disk/S3
         user = self.users.get(username)
         if user:
             return user.get("credits", 0)
         return 0
+
 
     def deduct_credits(self, username, amount=1):
         """Deducts credits if sufficient balance. Returns True/False."""

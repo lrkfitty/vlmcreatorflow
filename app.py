@@ -22,6 +22,8 @@ try:
     from execution.kling_client import KlingClient
     from execution.sora_client import SoraClient
     from execution.series_processor import parse_script_to_scenes
+    from execution.auth import auth_mgr
+    from execution.character_utils import build_character_prompt, get_character_sheet_prompt
 except ImportError as e:
     st.error(f"Error importing scripts: {e}")
     st.stop()
@@ -187,7 +189,7 @@ apply_custom_theme()
 
 # --- NEW AUTHENTICATION UI (MULTI-USER) ---
 # --- NEW AUTHENTICATION UI (MULTI-USER) ---
-from execution.auth import auth_mgr
+# from execution.auth import auth_mgr (Moved to top)
 import extra_streamlit_components as stx
 import datetime
 
@@ -275,7 +277,13 @@ with st.sidebar:
         u_info = st.session_state.get("current_user", {"username": "Ghost"})
         credits = auth_mgr.get_credits(u_info.get("username"))
         st.write(f"👤 **{u_info.get('username')}** ({u_info.get('role', 'Viewer')})")
-        st.write(f"💳 **Credits:** `{credits}`")
+        c1, c2 = st.columns([3, 1])
+        with c1:
+             st.write(f"💳 **Credits:** `{credits}`")
+        with c2:
+             if st.button("🔄", key="refresh_creds", help="Sync Credits"):
+                 st.rerun()
+
         if st.button("Logout"):
             cookie_manager.delete("auth_token")
             st.session_state.authenticated = False
@@ -366,14 +374,15 @@ def get_user_out_dir(category="General"):
     return path
 
 # --- TABS LAYOUT ---
-tab_wizard, tab_gallery, tab_assets, tab_series, tab_world, tab_campaign, tab_video = st.tabs([
+tab_wizard, tab_gallery, tab_assets, tab_series, tab_world, tab_campaign, tab_video, tab_char = st.tabs([
     "Workflow Wizard", 
     "My Gallery",
     "Asset Library",
     "🎬 Mini Series",
     "World Builder",
     "Campaign Queue", 
-    "Video Studio"
+    "Video Studio",
+    "👤 Character Studio"
 ])
 
 # ==========================================
@@ -500,14 +509,30 @@ with tab_assets:
             for cat in cat_map.values():
                 cat_path = os.path.join(user_asset_root, cat)
                 if os.path.exists(cat_path):
-                    files = [f for f in os.listdir(cat_path) if not f.startswith(".")]
-                    if files:
-                        with st.expander(f"📁 {cat} ({len(files)})", expanded=False):
+                    # Filter for valid image files recursively
+                    valid_exts = ('.png', '.jpg', '.jpeg', '.webp')
+                    found_images = []
+                    for root, dirs, files in os.walk(cat_path):
+                        for f in files:
+                            # Skip hidden files
+                            if f.startswith("."): continue
+                            if f.lower().endswith(valid_exts):
+                                found_images.append(os.path.join(root, f))
+                    
+                    if found_images:
+                        with st.expander(f"📁 {cat} ({len(found_images)})", expanded=False):
                             c_grid = st.columns(6)
-                            for i, f in enumerate(files):
-                                p = os.path.join(cat_path, f)
+                            for i, p in enumerate(found_images):
+                                f = os.path.basename(p)
+                                # If in a subfolder, show subfolder name in caption
+                                rel_p = os.path.relpath(p, cat_path)
+                                if os.sep in rel_p:
+                                    caption = f"{os.path.dirname(rel_p)} / {f}"
+                                else:
+                                    caption = f
+                                
                                 with c_grid[i % 6]:
-                                    st.image(p, caption=f, use_container_width=True)
+                                    st.image(p, caption=caption, use_container_width=True)
 
 
 # ==========================================
@@ -523,7 +548,7 @@ with tab_wizard:
     with col_vibe:
         st.markdown('<div class="hub-card">', unsafe_allow_html=True)
         st.markdown("#### 1. Vibe")
-        selected_vibe_name = st.selectbox("Choose Aesthetic", vibes_list, label_visibility="collapsed")
+        selected_vibe_name = st.selectbox("Choose Aesthetic", vibes_list, label_visibility="collapsed", key="wiz_vibe")
         if selected_vibe_name:
             st.image(vibes_data[selected_vibe_name], use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -531,7 +556,7 @@ with tab_wizard:
     with col_outfit:
         st.markdown('<div class="hub-card">', unsafe_allow_html=True)
         st.markdown("#### 2. Outfit")
-        selected_outfit_name = st.selectbox("Choose Outfit", outfits_list, label_visibility="collapsed")
+        selected_outfit_name = st.selectbox("Choose Outfit", outfits_list, label_visibility="collapsed", key="wiz_outfit")
         if selected_outfit_name:
             st.image(outfits_data[selected_outfit_name], use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
@@ -539,61 +564,67 @@ with tab_wizard:
     with col_char:
         st.markdown('<div class="hub-card">', unsafe_allow_html=True)
         st.markdown("#### 3. Character")
-        selected_character_name = st.selectbox("Choose Model", characters_list, label_visibility="collapsed")
+        selected_character_name = st.selectbox("Choose Model", characters_list, label_visibility="collapsed", key="wiz_char")
         if selected_character_name:
             st.image(characters_data[selected_character_name], use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
     st.divider()
 
-    # Expandable Camera Controls
-    with st.expander("🎥 Camera & Scene Settings", expanded=False):
-        col_cam, col_light, col_action = st.columns(3)
+    # V3.9: Wrapped in Form to Prevent Reload Loop
+    with st.form(key="wizard_form"):
+        # Expandable Camera Controls
+        with st.expander("🎥 Camera & Scene Settings", expanded=False):
+            col_cam, col_light, col_action = st.columns(3)
+            
+            with col_cam:
+                st.markdown("**Camera**")
+                sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []))
+                sel_lens = st.selectbox("Lens", ["Auto"] + knowledge_base.get("lenses", []))
+                sel_shot = st.selectbox("Shot Type", ["Auto"] + knowledge_base.get("shot_types", []))
+                sel_angle = st.selectbox("Camera Angle", ["Auto"] + knowledge_base.get("camera_angles", []))
+                sel_ar = st.selectbox("Aspect Ratio", ["9:16 (Story/Reel)", "16:9 (Cinematic)", "1:1 (Square)", "4:5 (Instagram Feed)"])
+                sel_style = st.selectbox("Photo Style", ["Auto"] + knowledge_base.get("styles", []))
+                
+            with col_light:
+                st.markdown("**Atmosphere**")
+                sel_lighting = st.selectbox("Lighting", ["Auto"] + knowledge_base.get("lighting", []))
+                sel_weather = st.selectbox("Weather", ["Auto"] + knowledge_base.get("weather", []))
+                sel_film = st.selectbox("Film Stock (Grain)", ["Auto"] + knowledge_base.get("film_stocks", []), key="wiz_film_stock")
+                
+            with col_action:
+                st.markdown("**Action & Tone**")
+                sel_action = st.selectbox("Subject Action", ["Auto"] + knowledge_base.get("actions", []), key="wiz_action")
+                sel_emotion = st.selectbox("Emotion", ["Auto"] + knowledge_base.get("emotions", []), key="wiz_emotion")
+                sel_filter = st.selectbox("Filter / Look", ["Auto"] + knowledge_base.get("filters", []), key="wiz_filter")
+
+        # Custom Direction
+        st.subheader("4. Creative Direction")
+        custom_scenario = st.text_input("Scenario / Context", placeholder="e.g. At a luxury coffee shop in Paris...")
+        custom_notes = st.text_area("Specific Details", placeholder="Enter any extra details here...")
         
-        with col_cam:
-            st.markdown("**Camera**")
-            sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []))
-            sel_lens = st.selectbox("Lens", ["Auto"] + knowledge_base.get("lenses", []))
-            sel_shot = st.selectbox("Shot Type", ["Auto"] + knowledge_base.get("shot_types", []))
-            sel_angle = st.selectbox("Camera Angle", ["Auto"] + knowledge_base.get("camera_angles", []))
-            sel_ar = st.selectbox("Aspect Ratio", ["9:16 (Story/Reel)", "16:9 (Cinematic)", "1:1 (Square)", "4:5 (Instagram Feed)"])
-            sel_style = st.selectbox("Photo Style", ["Auto"] + knowledge_base.get("styles", []))
-            
-        with col_light:
-            st.markdown("**Atmosphere**")
-            sel_lighting = st.selectbox("Lighting", ["Auto"] + knowledge_base.get("lighting", []))
-            sel_weather = st.selectbox("Weather", ["Auto"] + knowledge_base.get("weather", []))
-            
-        with col_action:
-            st.markdown("**Action**")
-            sel_action = st.selectbox("Subject Action", ["Auto"] + knowledge_base.get("actions", []))
-            sel_emotion = st.selectbox("Emotion", ["Auto"] + knowledge_base.get("emotions", []))
+        # Advanced Settings & Variants
+        col_adv, col_count = st.columns([3, 1])
+        
+        with col_adv:
+            with st.expander("⚙️ Advanced Brain Settings"):
+                 st.caption("Brain: Gemini 2.0 Flash (Optimized for Cost)")
+                 prompt_engine = "gemini-2.0-flash" 
+                 render_engine = "nano" 
+                 likeness = 0.5
+                 # selected_checkpoint removed
+                 
+        with col_count:
+            num_images = st.slider("Generate Count", 1, 4, 1, key="wiz_test_count")
 
-    # Custom Direction
-    st.subheader("4. Creative Direction")
-    custom_scenario = st.text_input("Scenario / Context", placeholder="e.g. At a luxury coffee shop in Paris...")
-    custom_notes = st.text_area("Specific Details", placeholder="Enter any extra details here...")
-    
-    # Advanced Settings & Variants
-    col_adv, col_count = st.columns([3, 1])
-    
-    with col_adv:
-        with st.expander("⚙️ Advanced Brain Settings"):
-             st.caption("Brain: Gemini 2.0 Flash (Optimized for Cost)")
-             prompt_engine = "gemini-2.0-flash" 
-             render_engine = "nano" 
-             likeness = 0.5
-             # selected_checkpoint removed
-             
-    with col_count:
-        num_images = st.slider("Generate Count", 1, 4, 1, key="wiz_test_count")
+        # --- CAMPAIGN BUTTON ---
+        col_c_btn, col_c_batch = st.columns([3, 1])
+        with col_c_batch:
+            campaign_batch = st.number_input("Queue Copies", min_value=1, max_value=10, value=1, help="How many variations to queue?")
 
-    # --- CAMPAIGN BUTTON ---
-    col_c_btn, col_c_batch = st.columns([3, 1])
-    with col_c_batch:
-        campaign_batch = st.number_input("Queue Copies", min_value=1, max_value=10, value=1, help="How many variations to queue?")
+        submit_wiz = st.form_submit_button("Add to Campaign Queue", type="primary")
 
-        if st.button("Add to Campaign Queue"):
+    if submit_wiz:
             # CHECK CREDITS
             user = st.session_state.current_user.get("username")
             if not auth_mgr.deduct_credits(user, 1):
@@ -601,47 +632,49 @@ with tab_wizard:
             else:
                 # Get path for Vision
                 char_path = characters_data.get(selected_character_name, selected_character_name)
-            outfit_path = outfits_data.get(selected_outfit_name)
-            vibe_path = vibes_data.get(selected_vibe_name)
-            
-            def clean_val(val): return None if val == "Auto" else val
-            
-            prompt_data = generate_prompt_content(
-                vibe=clean_val(selected_vibe_name), 
-                outfit=selected_outfit_name, 
-                character=char_path,
-                outfit_path=outfit_path,
-                vibe_path=vibe_path,
-                additional_notes=f"{custom_notes} . Context: {custom_scenario} . Emotion: {clean_val(sel_emotion)} . Style: {clean_val(sel_style) or ''}", 
-                camera=clean_val(sel_camera),
-                lens=clean_val(sel_lens),
-                shot_type=clean_val(sel_shot),
-                angle=clean_val(sel_angle),
-                lighting=clean_val(sel_lighting),
-                weather=clean_val(sel_weather),
-                action=clean_val(sel_action),
-                aspect_ratio=sel_ar.split(" ")[0], 
-                model_engine=prompt_engine 
-            )
-            
-            prompt_data["likeness_strength"] = likeness # Pass to generator
-            
-            prompt_data["model_type"] = render_engine 
-            # prompt_data["checkpoint"] removed
-            
-            job_name = f"{selected_outfit_name} - {clean_val(selected_vibe_name)}"
-            campaign_mgr.add_job(
-                name=job_name,
-                description=f"Engine: {render_engine}",
-                prompt_data=prompt_data,
-                settings={ "batch_count": campaign_batch },
-                output_folder=get_user_out_dir("Campaign"),
-                char_path=char_path,
-                outfit_path=outfit_path,
-                vibe_path=vibe_path
-            )
-            msg = f"Added '{job_name}'! (Engine: {render_engine}, Batch: {campaign_batch})"
-            st.success(msg)
+                outfit_path = outfits_data.get(selected_outfit_name)
+                vibe_path = vibes_data.get(selected_vibe_name)
+                
+                def clean_val(val): return None if val == "Auto" else val
+                
+                prompt_data = generate_prompt_content(
+                    vibe=clean_val(selected_vibe_name), 
+                    outfit=selected_outfit_name, 
+                    character=char_path,
+                    outfit_path=outfit_path,
+                    vibe_path=vibe_path,
+                    additional_notes=f"{custom_notes} . Context: {custom_scenario} . Emotion: {clean_val(sel_emotion)} . Style: {clean_val(sel_style) or ''}", 
+                    camera=clean_val(sel_camera),
+                    lens=clean_val(sel_lens),
+                    shot_type=clean_val(sel_shot),
+                    angle=clean_val(sel_angle),
+                    lighting=clean_val(sel_lighting),
+                    weather=clean_val(sel_weather),
+                    action=clean_val(sel_action),
+                    film_stock=clean_val(sel_film),
+                    filter_look=clean_val(sel_filter),
+                    aspect_ratio=sel_ar.split(" ")[0], 
+                    model_engine=prompt_engine 
+                )
+                
+                prompt_data["likeness_strength"] = likeness # Pass to generator
+                
+                prompt_data["model_type"] = render_engine 
+                # prompt_data["checkpoint"] removed
+                
+                job_name = f"{selected_outfit_name} - {clean_val(selected_vibe_name)}"
+                campaign_mgr.add_job(
+                    name=job_name,
+                    description=f"Engine: {render_engine}",
+                    prompt_data=prompt_data,
+                    settings={ "batch_count": campaign_batch },
+                    output_folder=get_user_out_dir("Campaign"),
+                    char_path=char_path,
+                    outfit_path=outfit_path,
+                    vibe_path=vibe_path
+                )
+                msg = f"Added '{job_name}'! (Engine: {render_engine}, Batch: {campaign_batch})"
+                st.success(msg)
 
     st.divider()
 
@@ -678,6 +711,8 @@ with tab_wizard:
                     weather=clean_val(sel_weather),
                     action=clean_val(sel_action),
                     emotion=clean_val(sel_emotion), # Added Emotion
+                    film_stock=clean_val(sel_film),
+                    filter_look=clean_val(sel_filter),
                     aspect_ratio=sel_ar.split(" ")[0], 
                     model_engine=prompt_engine 
                 )
@@ -882,21 +917,35 @@ with tab_series:
     
     c_script, c_action = st.columns([3, 1])
     with c_script:
-        series_script = st.text_area("Episode Synopsis & Dialogue Intent", height=200, placeholder="Synopsis: She finds out he's been lying, but he doesn't know she knows yet.\n\nIntent:\nALICE: Cold, distant.\nBOB: Trying too hard to be casual.")
-        
-        # V3: Hollywood Camera Controls
-        with st.expander("🎥 Cinematography Settings (Director's Toolkit)", expanded=False):
-            c_cam, c_lens, c_light = st.columns(3)
-            with c_cam:
-                s_camera = st.selectbox("Camera Body", ["Auto / Director's Choice", "Arri Alexa Mini LF", "Sony Venice 2", "Red V-Raptor", "IMAX 70mm Film", "Vintage 16mm Film Stock"])
-            with c_lens:
-                s_lens = st.selectbox("Lens Package", ["Auto / Director's Choice", "Cooke Anamorphic /i", "Vintage Canon K35 Primes", "Zeiss Master Primes", "Laowa Probe (Macro)", "Fish Eye"])
-            with c_light:
-                s_lighting = st.selectbox("Lighting Style", ["Auto / Director's Choice", "Cinematic / Moody (Chiaroscuro)", "Commercial / High Key", "Natural / Golden Hour", "Neon / Cyberpunk", "Dark / Horror"])
+        with st.form(key="director_form"):
+            series_script = st.text_area("Episode Synopsis & Dialogue Intent", height=200, placeholder="Synopsis: She finds out he's been lying, but he doesn't know she knows yet.\n\nIntent:\nALICE: Cold, distant.\nBOB: Trying too hard to be casual.")
+            
+            # V3: Hollywood Camera Controls
+            with st.expander("🎥 Cinematography Settings (Director's Toolkit)", expanded=False):
+                c_cam, c_lens, c_light = st.columns(3)
+                with c_cam:
+                    s_camera = st.selectbox("Camera Body", ["Auto / Director's Choice"] + knowledge_base.get("cameras", []))
+                with c_lens:
+                    s_lens = st.selectbox("Lens Package", ["Auto / Director's Choice"] + knowledge_base.get("lenses", []))
+                with c_light:
+                    s_lighting = st.selectbox("Lighting Style", ["Auto / Director's Choice"] + knowledge_base.get("lighting", []))
+                
+                c_stock, c_look = st.columns(2)
+                with c_stock:
+                    s_film_stock = st.selectbox("Film Stock", ["Auto"] + knowledge_base.get("film_stocks", []), key="series_stock")
+                with c_look:
+                    s_filter_look = st.selectbox("Filter / Look", ["Auto"] + knowledge_base.get("filters", []), key="series_filter")
 
-    with c_action:
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        if st.button("✨ Director Vision AI", type="primary", use_container_width=True):
+                c_style, c_trans = st.columns(2)
+                with c_style:
+                     s_movie_style = st.selectbox("Movie Aesthetic", ["Auto"] + knowledge_base.get("movie_styles", []), key="series_style")
+                with c_trans:
+                     s_transition_style = st.selectbox("Transition Style (B-Roll)", ["Auto"] + knowledge_base.get("transitions", []), key="series_trans")
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            submit_director = st.form_submit_button("✨ Director Vision AI", type="primary", use_container_width=True)
+
+    if submit_director:
             if not series_script:
                 st.error("Please enter a synopsis.")
             elif not cast_selection:
@@ -993,7 +1042,11 @@ with tab_series:
                         # V3 New Params
                         camera=s_camera,
                         lens=s_lens,
-                        lighting=s_lighting
+                        lighting=s_lighting,
+                        film_stock=s_film_stock,
+                        filter_look=s_filter_look,
+                        movie_style=s_movie_style,
+                        transition_style=s_transition_style
                     )
                     
                     if "error" in sb_data:
@@ -1137,7 +1190,19 @@ with tab_series:
                             key=f"time_{key_base}",
                             label_visibility="collapsed"
                         )
+                        selected_time = st.selectbox(
+                            "Time of Day", 
+                            time_opts, 
+                            index=def_idx,
+                            key=f"time_{key_base}",
+                            label_visibility="collapsed"
+                        )
                         shot['time_of_day'] = selected_time
+
+                        # V3.9: Transition Selector (Editable)
+                        trans_opts = ["None"] + knowledge_base.get("transitions", [])
+                        sel_trans = st.selectbox("Transition", trans_opts, key=f"trans_{key_base}", label_visibility="collapsed")
+                        shot['transition'] = sel_trans
                         
                         # Editable Prompt
                         shot_prompt = st.text_area("Visual Prompt", value=shot.get('visual_prompt'), height=250, key=f"p_{key_base}", label_visibility="collapsed")
@@ -1152,55 +1217,55 @@ with tab_series:
                                     st.error("❌ No Credits!")
                                 else:
                                     with st.spinner("Rolling camera..."):
-                                    # Resolve Character (Using Lookup Map for Robustness)
-                                    char_list = shot.get('characters', [])
-                                    # AI might say "Shay", Map has "Shay" -> Path
-                                    char_path = None
-                                    char_ref = "Unknown"
-                                    
-                                    # V3.6: Multi-Character Injection Loop
-                                    # Logic: Iterate all characters in the shot to support Two-Shots / Ensemble
-                                    final_assets_payload = []
-                                    resolved_names = []
-                                    
-                                    # A. Resolve Lead Characters
-                                    if char_list:
-                                        for raw_name in char_list:
-                                            # 1. Resolve Face
-                                            # Lookup Strategy: Exact -> 1st Word -> Normalized 1st Word
-                                            naive_key = raw_name.split(' ')[0]
-                                            c_path = st.session_state.cast_lookup_map.get(naive_key)
-                                            
-                                            if not c_path:
-                                                if '_' in raw_name:
-                                                    norm_key = raw_name.replace('_', ' ').split(' ')[0]
-                                                    c_path = st.session_state.cast_lookup_map.get(norm_key)
-                                                    if c_path: naive_key = norm_key # Update key for outfit lookup
-                                            
-                                            if c_path:
-                                                final_assets_payload.append({
-                                                    "path": c_path,
-                                                    "label": f"Cast: {raw_name}"
-                                                })
-                                                resolved_names.append(raw_name)
+                                        # Resolve Character (Using Lookup Map for Robustness)
+                                        char_list = shot.get('characters', [])
+                                        # AI might say "Shay", Map has "Shay" -> Path
+                                        char_path = None
+                                        char_ref = "Unknown"
+                                        
+                                        # V3.6: Multi-Character Injection Loop
+                                        # Logic: Iterate all characters in the shot to support Two-Shots / Ensemble
+                                        final_assets_payload = []
+                                        resolved_names = []
+                                        
+                                        # A. Resolve Lead Characters
+                                        if char_list:
+                                            for raw_name in char_list:
+                                                # 1. Resolve Face
+                                                # Lookup Strategy: Exact -> 1st Word -> Normalized 1st Word
+                                                naive_key = raw_name.split(' ')[0]
+                                                c_path = st.session_state.cast_lookup_map.get(naive_key)
                                                 
-                                                # 2. Resolve Outfit (Linked to this Character)
-                                                w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                                                # Robust Strategy: Full Name -> First Name
-                                                o_name_key = w_snapshot.get(raw_name)
+                                                if not c_path:
+                                                    if '_' in raw_name:
+                                                        norm_key = raw_name.replace('_', ' ').split(' ')[0]
+                                                        c_path = st.session_state.cast_lookup_map.get(norm_key)
+                                                        if c_path: naive_key = norm_key # Update key for outfit lookup
                                                 
-                                                if not o_name_key or o_name_key == "Default":
-                                                    o_fallback = w_snapshot.get(naive_key, "Default")
-                                                    if o_fallback != "Default": o_name_key = o_fallback
+                                                if c_path:
+                                                    final_assets_payload.append({
+                                                        "path": c_path,
+                                                        "label": f"Cast: {raw_name}"
+                                                    })
+                                                    resolved_names.append(raw_name)
                                                     
-                                                if o_name_key and o_name_key != "Default":
-                                                    o_data = outfits_data.get(o_name_key)
-                                                    if isinstance(o_data, dict): o_data = o_data.get('default_img')
-                                                    if o_data:
-                                                        final_assets_payload.append({
-                                                            "path": o_data,
-                                                            "label": f"Outfit for {raw_name}: {o_name_key}"
-                                                        })
+                                                    # 2. Resolve Outfit (Linked to this Character)
+                                                    w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                                                    # Robust Strategy: Full Name -> First Name
+                                                    o_name_key = w_snapshot.get(raw_name)
+                                                    
+                                                    if not o_name_key or o_name_key == "Default":
+                                                        o_fallback = w_snapshot.get(naive_key, "Default")
+                                                        if o_fallback != "Default": o_name_key = o_fallback
+                                                        
+                                                    if o_name_key and o_name_key != "Default":
+                                                        o_data = outfits_data.get(o_name_key)
+                                                        if isinstance(o_data, dict): o_data = o_data.get('default_img')
+                                                        if o_data:
+                                                            final_assets_payload.append({
+                                                                "path": o_data,
+                                                                "label": f"Outfit for {raw_name}: {o_name_key}"
+                                                            })
 
                                     # B. Fallback (If NO characters found, but NOT B-Roll)
                                     is_broll = (shot_idx + 1) in [3, 6, 9, 12]
@@ -1237,9 +1302,13 @@ with tab_series:
                                     # Generate Prompt Data
                                     
                                     # SAFETY CHECK: Ensure prompt is not empty
-                                    # V3.8: Inject Time of Day
+                                    # V3.8: Inject Time of Day & Transition
                                     time_setting = shot.get('time_of_day', 'Day')
-                                    final_shot_prompt = f"Time of Day: {time_setting}. {shot_prompt}"
+                                    trans_setting = shot.get('transition', 'None')
+                                    # Transitions in prompts act as style/camera guides
+                                    trans_text = f"Visual Transition Style: {trans_setting}. " if trans_setting and trans_setting != "None" else ""
+                                    
+                                    final_shot_prompt = f"Time of Day: {time_setting}. {trans_text}{shot_prompt}"
                                     if not final_shot_prompt or len(final_shot_prompt.strip()) < 5:
                                         st.warning("⚠️ Prompt was empty! Using fallback.")
                                         final_shot_prompt = f"Cinematic shot of {char_ref} in {target_env}, high quality, 8k, detailed."
@@ -1307,6 +1376,7 @@ with tab_series:
                         "mocap": mocap_file,
                         "characters": shot.get('characters'),
                         "environment": series_env,
+                        "transition": shot.get('transition'),
                         "generated_still": st.session_state.get(f"img_{key_base}") 
                     })
                         
@@ -1342,9 +1412,12 @@ with tab_series:
                          st.warning(f"⚠️ Shot {s_id}-{sh_id} prompt empty! Using fallback.")
                          p_text = f"Cinematic shot of scene {s_id} shot {sh_id}, high quality, 8k"
 
-                    # V3.8: Inject Time of Day (Batch)
+                    # V3.8: Inject Time of Day & Transition (Batch)
                     t_day = shot_data.get('time_of_day', 'Day')
-                    p_text = f"Time of Day: {t_day}. {p_text}"
+                    t_trans = shot_data.get('transition', 'None')
+                    t_text = f"Visual Transition Style: {t_trans}. " if t_trans and t_trans != "None" else ""
+                    
+                    p_text = f"Time of Day: {t_day}. {t_text}{p_text}"
                     
                     st.write(f"Processing Scene {s_id} Shot {sh_id} ({m_type})...")
                     
@@ -1799,111 +1872,122 @@ with tab_world:
 
                 st.markdown('</div>', unsafe_allow_html=True)
         
-        # --- CAMERA CONTROLS ---
-        with st.expander("🎥 Camera & Scene Settings", expanded=False):
-            col_cam, col_light, col_action = st.columns(3)
-            with col_cam:
-                st.markdown("**📸 Hardware**")
-                sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []), key="wb_cam")
-                sel_lens = st.selectbox("Lens", ["Auto"] + knowledge_base.get("lenses", []), key="wb_lens")
-                sel_shot = st.selectbox("Shot Type", ["Auto", "Close Up", "Medium Shot", "Full Body", "Wide Shot", "Extreme Close Up", "Cowboy Shot", "Overhead"], key="wb_shot") 
-                sel_ar = st.selectbox("Aspect Ratio", ["9:16", "16:9", "4:5", "1:1", "3:2"], index=0, key="wb_ar")
-
-
-            with col_light:
-                st.markdown("**💡 Lighting & Mood**")
-                sel_lighting = st.selectbox("Lighting", ["Auto"] + knowledge_base.get("lighting", []), key="wb_light")
-                sel_weather = st.selectbox("Weather", ["Auto"] + knowledge_base.get("weather", []), key="wb_weath")
-                # User Provided Emotions (30 List)
-                emotions = [
-                    "Auto", "Confident", "Carefree", "Playful", "Relaxed", "Flirty", "Happy", "Calm", "Curious", 
-                    "Focused", "Content", "Empowered", "Soft", "Radiant", "Unbothered", "Dreamy", 
-                    "Joyful", "Peaceful", "Excited", "Serene", "Bold", "Mischievous", "Warm", 
-                    "Self-assured", "Chill", "Lighthearted", "Magnetic", "Present", "Satisfied", 
-                    "Quietly happy", "Seductive", "Boss Bitch", "Hysterical", "Zen" # Kept a few custom ones too
-                ]
-                sel_emotion = st.selectbox("Emotion", emotions, key="wb_emo")
-
-            with col_action:
-                st.markdown("**🎬 Direction**")
-                sel_film = st.selectbox("Film Style", ["Auto"] + knowledge_base.get("styles", []), key="wb_film")
-                sel_angle = st.selectbox("Angle", ["Auto", "Low Angle", "High Angle (Drone)", "Dutch Angle", "Close Up", "Wide Shot", "Over-the-Shoulder", "Selfie Angle", "POV"], key="wb_ang")
-                # User Provided Actions (30 List)
-                actions = [
-                    "Auto",
-                    "Adjusting outfit strap", "Adjusting sunglasses", "Applying lip gloss", "Biting lip playfully", 
-                    "Celebrating big play courtside", "Celebrating together", "Checking phone notifications", "Clinking drink glasses",
-                    "Crossing arms confidently", "Crossing legs slowly", "Dancing subtly", "Fixing hair casually", "Fixing jacket collar",
-                    "Flipping hair back", "Group selfie moment", "Holding drink cup", "Holding sunglasses", 
-                    "Hyping each other up", "Journaling quietly", "Laughing lightly", "Laughing mid-conversation", "Laughing with friends",
-                    "Leaning against wall", "Leaning casually", "Leaning on railing", "Looking around calmly", 
-                    "Looking over shoulder", "Pausing mid-step", "Podcast Host (Speaking into Mic)", "Pointing something out", 
-                    "Posing effortlessly", "Resting hands on hips", "Scrolling phone casually", 
-                    "Sharing inside joke", "Sipping iced coffee", "Sitting close together", "Sitting poolside relaxed", 
-                    "Sitting thoughtfully", "Smiling softly", "Stepping into sunlight", "Stretching arms overhead", 
-                    "Stretching neck gently", "Taking a deep breath", "Taking mirror selfie", "Talking mid-conversation",
-                    "Tilting head slightly", "Walking confidently forward", "Walking side by side", "Walking with friends"
-                ]
-                sel_action = st.selectbox("Action", actions, key="wb_act")
-        
-        # --- CUSTOM DETAILS ---
-        st.markdown("#### 📝 Creative Direction")
-        custom_details = st.text_area("Specific Details / Custom Context", placeholder="e.g. Holding a red cup, Laughing uniquely, Cyberpunk neon colors...", help="These details will be added to the prompt.")
-
-        # --- PROMPT GENERATION LOGIC UPDATE ---
-        # Instead of generic replacement, we prepare the context for the AI
-        base_template = scenario['template_prompt']
-        for k, v in current_selections.items():
-            base_template = base_template.replace(f"[{k}]", v)
+        # V3.9: Wrapped in Form to prevent Camera Settings Reload Loop
+        with st.form(key="wb_camera_form"):
+            # --- CAMERA CONTROLS ---
+            with st.expander("🎥 Camera & Scene Settings", expanded=False):
+                col_cam, col_light, col_action = st.columns(3)
+                with col_cam:
+                    st.markdown("**📸 Hardware**")
+                    sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []), key="wb_cam")
+                    sel_lens = st.selectbox("Lens", ["Auto"] + knowledge_base.get("lenses", []), key="wb_lens")
+                    sel_shot = st.selectbox("Shot Type", ["Auto", "Close Up", "Medium Shot", "Full Body", "Wide Shot", "Extreme Close Up", "Cowboy Shot", "Overhead"], key="wb_shot") 
+                    sel_ar = st.selectbox("Aspect Ratio", ["9:16", "16:9", "4:5", "1:1", "3:2"], index=0, key="wb_ar")
+    
+    
+                with col_light:
+                    st.markdown("**💡 Lighting & Mood**")
+                    sel_lighting = st.selectbox("Lighting", ["Auto"] + knowledge_base.get("lighting", []), key="wb_light")
+                    sel_weather = st.selectbox("Weather", ["Auto"] + knowledge_base.get("weather", []), key="wb_weath")
+                    sel_film_stock = st.selectbox("Film Stock", ["Auto"] + knowledge_base.get("film_stocks", []), key="wb_stock")
+    
+                with col_action:
+                    st.markdown("**🎬 Direction**")
+                    sel_film = st.selectbox("Style", ["Auto"] + knowledge_base.get("styles", []), key="wb_film")
+                    sel_angle = st.selectbox("Angle", ["Auto"] + knowledge_base.get("camera_angles", []), key="wb_ang") # Fixed key to match KB
+                    sel_filter_look = st.selectbox("Filter / Look", ["Auto"] + knowledge_base.get("filters", []), key="wb_look")
+    
+                    # User Provided Emotions (30 List)
+                    emotions = [
+                        "Auto", "Confident", "Carefree", "Playful", "Relaxed", "Flirty", "Happy", "Calm", "Curious", 
+                        "Focused", "Content", "Empowered", "Soft", "Radiant", "Unbothered", "Dreamy", 
+                        "Joyful", "Peaceful", "Excited", "Serene", "Bold", "Mischievous", "Warm", 
+                        "Self-assured", "Chill", "Lighthearted", "Magnetic", "Present", "Satisfied", 
+                        "Quietly happy", "Seductive", "Boss Bitch", "Hysterical", "Zen" # Kept a few custom ones too
+                    ]
+                    sel_emotion = st.selectbox("Emotion", emotions, key="wb_emo")
+                    
+                    # User Provided Actions
+                    actions = [
+                         "Auto",
+                         "Adjusting outfit strap", "Adjusting sunglasses", "Applying lip gloss", "Biting lip playfully", 
+                         "Celebrating big play courtside", "Celebrating together", "Checking phone notifications", "Clinking drink glasses",
+                         "Crossing arms confidently", "Crossing legs slowly", "Dancing subtly", "Fixing hair casually", "Fixing jacket collar",
+                         "Flipping hair back", "Group selfie moment", "Holding drink cup", "Holding sunglasses", 
+                         "Hyping each other up", "Journaling quietly", "Laughing lightly", "Laughing mid-conversation", "Laughing with friends",
+                         "Leaning against wall", "Leaning casually", "Leaning on railing", "Looking around calmly", 
+                         "Looking over shoulder", "Pausing mid-step", "Podcast Host (Speaking into Mic)", "Pointing something out", 
+                         "Posing effortlessly", "Resting hands on hips", "Scrolling phone casually", 
+                         "Sharing inside joke", "Sipping iced coffee", "Sitting close together", "Sitting poolside relaxed", 
+                         "Sitting thoughtfully", "Smiling softly", "Stepping into sunlight", "Stretching arms overhead", 
+                         "Stretching neck gently", "Taking a deep breath", "Taking mirror selfie", "Talking mid-conversation",
+                         "Tilting head slightly", "Walking confidently forward", "Walking side by side", "Walking with friends"
+                     ]
+                    sel_action = st.selectbox("Action", actions, key="wb_act")
             
-        extras = rel_names + pet_names + prop_names
-        extras_str = ", ".join(extras) if extras else "background details"
-        base_template = base_template.replace("[PROPS_AND_CAST]", extras_str)
-        
-        # We pass this 'base_template' as the "Scenario Context" to the generator
-        custom_scenario = base_template # Renaming for clarity in next step pass
-        
-        st.info(f"**Base Context:** {custom_scenario[:100]}...")
-        
-        final_prompt = custom_scenario # Start with the base scenario
-        final_prompt = final_prompt.replace("[RELATION]", current_selections.get("RELATIONS", "friend"))
-        final_prompt = final_prompt.replace("[OUTFIT]", current_selections.get("OUTFIT", "casual outfit"))
-
-        # Append Custom Details
-        if custom_details:
-            final_prompt += f", {custom_details}"
-
-        # Append Friend Outfits
-        if "FRIEND_OUTFITS" in current_selections:
-             final_prompt += f", {current_selections['FRIEND_OUTFITS']}"
-
-        # Append Camera Settings
-        cam_details = []
-        if sel_camera != "Auto": cam_details.append(f"shot on {sel_camera}")
-        if sel_lens != "Auto": cam_details.append(f"{sel_lens} lens")
-        if sel_shot != "Auto": cam_details.append(sel_shot) # Restored Logic
-        # sel_shot removed in favor of AR + Angle <-- REMOVING THIS COMMENT
-        if sel_lighting != "Auto": cam_details.append(f"{sel_lighting} lighting")
-        if sel_angle != "Auto": cam_details.append(f"{sel_angle} angle")
-        if sel_film != "Auto": cam_details.append(f"{sel_film} style")
-        
-        # New Logic
-        if sel_emotion != "Auto": cam_details.append(f"Expression: {sel_emotion}")
-        if sel_action != "Auto": cam_details.append(f"Action: {sel_action}")
-        
-        if cam_details:
-            final_prompt += ", " + ", ".join(cam_details)
+            # --- CUSTOM DETAILS ---
+            st.markdown("#### 📝 Creative Direction")
+            custom_details = st.text_area("Specific Details / Custom Context", placeholder="e.g. Holding a red cup, Laughing uniquely, Cyberpunk neon colors...", help="These details will be added to the prompt.")
+    
+            # --- PROMPT GENERATION LOGIC UPDATE ---
+            # Instead of generic replacement, we prepare the context for the AI
+            base_template = scenario['template_prompt']
+            for k, v in current_selections.items():
+                base_template = base_template.replace(f"[{k}]", v)
+                
+            extras = rel_names + pet_names + prop_names
+            extras_str = ", ".join(extras) if extras else "background details"
+            base_template = base_template.replace("[PROPS_AND_CAST]", extras_str)
             
-        # Fallback for Protagonist if replacement failed (e.g. key mismatch)
-        if "[PROTAGONIST]" in final_prompt:
-             # Try to find it again or default
-             p_name = current_selections.get("PROTAGONIST", "The Influencer")
-             final_prompt = final_prompt.replace("[PROTAGONIST]", p_name)
-
-        # --- AI DIRECTOR BUTTON ---
-        col_ai_btn, col_blank = st.columns([1, 1])
-        with col_ai_btn:
-            if st.button("✨ AI Director: Rewrite & Enhance", help="Uses the World-Class Brain to rewrite this into a masterpiece."):
+            # We pass this 'base_template' as the "Scenario Context" to the generator
+            custom_scenario = base_template # Renaming for clarity in next step pass
+            
+            # st.info(f"**Base Context:** {custom_scenario[:100]}...") # Hidden inside form to reduce clutter
+            
+            final_prompt = custom_scenario # Start with the base scenario
+            final_prompt = final_prompt.replace("[RELATION]", current_selections.get("RELATIONS", "friend"))
+            final_prompt = final_prompt.replace("[OUTFIT]", current_selections.get("OUTFIT", "casual outfit"))
+    
+            # Append Custom Details
+            if custom_details:
+                final_prompt += f", {custom_details}"
+    
+            # Append Friend Outfits
+            if "FRIEND_OUTFITS" in current_selections:
+                 final_prompt += f", {current_selections['FRIEND_OUTFITS']}"
+    
+            # Append Camera Settings
+            cam_details = []
+            if sel_camera != "Auto": cam_details.append(f"shot on {sel_camera}")
+            if sel_lens != "Auto": cam_details.append(f"{sel_lens} lens")
+            if sel_shot != "Auto": cam_details.append(sel_shot) # Restored Logic
+            # sel_shot removed in favor of AR + Angle <-- REMOVING THIS COMMENT
+            if sel_lighting != "Auto": cam_details.append(f"{sel_lighting} lighting")
+            if sel_angle != "Auto": cam_details.append(f"{sel_angle} angle")
+            if sel_film != "Auto": cam_details.append(f"{sel_film} style")
+            if sel_film_stock != "Auto": cam_details.append(f"Film Stock: {sel_film_stock}")
+            if sel_filter_look != "Auto": cam_details.append(f"Look: {sel_filter_look}")
+            
+            # New Logic
+            if sel_emotion != "Auto": cam_details.append(f"Expression: {sel_emotion}")
+            if sel_action != "Auto": cam_details.append(f"Action: {sel_action}")
+            
+            if cam_details:
+                final_prompt += ", " + ", ".join(cam_details)
+                
+            # Fallback for Protagonist if replacement failed (e.g. key mismatch)
+            if "[PROTAGONIST]" in final_prompt:
+                 # Try to find it again or default
+                 p_name = current_selections.get("PROTAGONIST", "The Influencer")
+                 final_prompt = final_prompt.replace("[PROTAGONIST]", p_name)
+    
+            # --- AI DIRECTOR BUTTON ---
+            col_ai_btn, col_blank = st.columns([1, 1])
+            with col_ai_btn:
+                # FORM SUBMIT BUTTON 1
+                run_director = st.form_submit_button("✨ AI Director: Rewrite & Enhance", help="Uses the World-Class Brain to rewrite this into a masterpiece.")
+            
+            if run_director:
                 with st.spinner("Director is rewriting scene..."):
                     # 1. Identify Main Assets & Extras
                     main_char_path = None
@@ -1923,7 +2007,7 @@ with tab_world:
                              extras_payload.append(asset)
                     
                     st.toast(f"Brain Analyzing: Main + {len(extras_payload)} Extra Assets...")
-
+    
                     # 2. Call Generator with full context
                     # We treat the current draft as 'additional_notes' context
                     enhanced_res = generate_prompt_content(
@@ -1941,6 +2025,8 @@ with tab_world:
                         lighting=(sel_lighting if sel_lighting != "Auto" else None),
                         action=(sel_action if sel_action != "Auto" else None),
                         emotion=(sel_emotion if sel_emotion != "Auto" else None),
+                        film_stock=(sel_film_stock if sel_film_stock != "Auto" else None),
+                        filter_look=(sel_filter_look if sel_filter_look != "Auto" else None),
                         
                         additional_notes=f"REWRITE THIS SCENE to be cinematic, high-fashion, and detailed. Keep the character consistent: {final_prompt}",
                         model_engine="gpt-4o"
@@ -1952,51 +2038,57 @@ with tab_world:
                         st.toast("Prompt Upgraded by AI Director!")
                         # Force refresh
                         # We won't rerun, checking if session state key helps below
-
-        # --- STATE MANAGEMENT FOR PROMPT BOX ---
-        # We need the box to update when:
-        # 1. Dropdowns change (Calculated prompt changes)
-        # 2. AI Button is clicked (AI rewrites prompt)
-        # 3. User types (Manual edit)
-        
-        # Store calculated prompt to detect dropdown changes
-        if 'last_calculated_prompt' not in st.session_state:
-            st.session_state['last_calculated_prompt'] = final_prompt
-        
-        # Check for dropdown changes (Auto-update box if logic changes)
-        if final_prompt != st.session_state['last_calculated_prompt']:
-             st.session_state['wb_manual_prompt'] = final_prompt
-             st.session_state['last_calculated_prompt'] = final_prompt
-        
-        # Initialize key if needed
-        if 'wb_manual_prompt' not in st.session_state:
-             st.session_state['wb_manual_prompt'] = final_prompt
-
-        # Make Prompt Editable
-        # Binding to session state key ensures values persist and updates flow correctly
-        final_prompt_val = st.text_area("Final Prompt (Editable)", key="wb_manual_prompt", height=200)
-        
-        # Use the value from the box for everything downstream
-        final_prompt = final_prompt_val
-        
-        # --- ACTION AREA ---
-
-        # --- ACTION AREA ---
-        st.divider()
-        col_act1, col_act2 = st.columns(2)
-        
-        with col_act1:
-            st.markdown("#### 📸 Quick Shot")
+    
+            # --- STATE MANAGEMENT FOR PROMPT BOX ---
+            # We need the box to update when:
+            # 1. Dropdowns change (Calculated prompt changes)
+            # 2. AI Button is clicked (AI rewrites prompt)
+            # 3. User types (Manual edit)
             
-            # DEBUG: view payload
-            with st.expander("debug payload"):
-                st.write(assets_to_inject)
+            # Store calculated prompt to detect dropdown changes
+            if 'last_calculated_prompt' not in st.session_state:
+                st.session_state['last_calculated_prompt'] = final_prompt
             
-            if st.button("Generate Single Scene", type="primary"):
+            # Check for dropdown changes (Auto-update box if logic changes)
+            if final_prompt != st.session_state['last_calculated_prompt']:
+                 st.session_state['wb_manual_prompt'] = final_prompt
+                 st.session_state['last_calculated_prompt'] = final_prompt
+            
+            # Initialize key if needed
+            if 'wb_manual_prompt' not in st.session_state:
+                 st.session_state['wb_manual_prompt'] = final_prompt
+    
+            # Make Prompt Editable
+            final_prompt_val = st.text_area("Final Prompt (Editable)", key="wb_manual_prompt", height=200)
+            final_prompt = final_prompt_val
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+            # FORM SUBMIT BUTTON (Generate)
+            gen_world = st.form_submit_button("Generate Single Scene", type="primary", use_container_width=True)
+
+    # --- ACTION AREA (Outside Form) ---
+    st.divider()
+    col_act1, col_act2 = st.columns(2)
+    
+    with col_act1:
+        st.markdown("#### 📸 Quick Shot")
+        
+        # Generation Logic triggered by Form Submit
+        if gen_world:
+             can_proceed = True
+             if st.session_state.get("authenticated"):
+                 username = st.session_state.current_user.get("username")
+                 if not auth_mgr.deduct_credits(username, 1):
+                     st.error("❌ Not enough credits!")
+                     can_proceed = False
+                 else:
+                     st.toast("🪙 1 Credit Deducted")
+             
+             if can_proceed:
                  with st.spinner("Generating..."):
                      wb_payload = {
                          "positive_prompt": final_prompt,
-                         "aspect_ratio": sel_ar, # Use User Selection
+                         "aspect_ratio": sel_ar, 
                          "model_type": "nano", 
                          "assets": assets_to_inject
                      }
@@ -2007,15 +2099,25 @@ with tab_world:
                          
                      if res["status"] == "success":
                          st.session_state['wb_last_img'] = res["image_path"]
+                         if st.session_state.get("authenticated"):
+                             time.sleep(0.5)
+                             st.rerun()
+                     else:
+                         # Refund Logic
+                         username = st.session_state.current_user.get("username")
+                         auth_mgr.add_credits(username, 1)
+                         st.error(f"Generation Failed: {res.get('logs')}")
+                         st.toast("🪙 Credit Refunded")
 
-            if 'wb_last_img' in st.session_state and os.path.exists(st.session_state['wb_last_img']):
-                last_img = st.session_state['wb_last_img']
-                st.image(last_img, caption="World Build Result", use_container_width=True)
-                
-                with open(last_img, "rb") as f:
-                    st.download_button("⬇️ Download Image", f, file_name=os.path.basename(last_img), mime="image/png")
-        
-        with col_act2:
+        # Display Result (Persistent)
+        if 'wb_last_img' in st.session_state and os.path.exists(st.session_state['wb_last_img']):
+            last_img = st.session_state['wb_last_img']
+            st.image(last_img, caption="World Build Result", use_container_width=True)
+            
+            with open(last_img, "rb") as f:
+                st.download_button("⬇️ Download Image", f, file_name=os.path.basename(last_img), mime="image/png")
+    
+    with col_act2:
             st.markdown("#### 🎞️ Storyboard Generator")
             if st.button("Draft Storyboard (4 Shots)"):
                 with st.spinner("AI Director is writing script..."):
@@ -2034,19 +2136,34 @@ with tab_world:
                 # --- BATCH CONTROL ---
                 if st.button("🎬 Generate All 4 Shots"):
                      for i, p in enumerate(prompts):
-                         with st.spinner(f"Generating Shot {i+1}..."):
-                             wb_payload = {
-                                 "positive_prompt": p + f", {final_prompt}", # Append full context
-                                 "aspect_ratio": sel_ar, 
-                                 "model_type": "nano", 
-                                 "assets": assets_to_inject
-                             }
-                             res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"))
-                             if res["status"] == "success":
-                                 st.toast(f"Shot {i+1} Generated!")
-                                 st.session_state[f"sb_img_{i}"] = res["image_path"] # Saved!
-                             else:
-                                 st.error(f"Shot {i+1} Failed")
+                         # Credit Check Loop
+                         can_proceed = True
+                         if st.session_state.get("authenticated"):
+                             username = st.session_state.current_user.get("username")
+                             if not auth_mgr.deduct_credits(username, 1):
+                                 st.error(f"❌ Not enough credits to generate Shot {i+1}!")
+                                 can_proceed = False
+                                 break # Stop generation
+                         
+                         if can_proceed:
+                             with st.spinner(f"Generating Shot {i+1}..."):
+                                 wb_payload = {
+                                     "positive_prompt": p + f", {final_prompt}", # Append full context
+                                     "aspect_ratio": sel_ar, 
+                                     "model_type": "nano", 
+                                     "assets": assets_to_inject
+                                 }
+                                 res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"))
+                                 if res["status"] == "success":
+                                     st.toast(f"Shot {i+1} Generated! (-1 Credit)")
+                                     st.session_state[f"sb_img_{i}"] = res["image_path"] # Saved!
+                                 else:
+                                     st.error(f"Shot {i+1} Failed")
+                                     # Refund 
+                                     auth_mgr.add_credits(username, 1)
+                                     st.toast(f"Shot {i+1} Refunded")
+                     if st.session_state.get("authenticated"):
+                         st.rerun() # Verify update
 
                 for i, p in enumerate(prompts):
                     col_sb_text, col_sb_img = st.columns([2, 1])
@@ -2056,21 +2173,35 @@ with tab_world:
                         edited_prompts.append(val)
                         
                         if st.button(f"Generate Shot {i+1}", key=f"btn_sb_{i}"):
-                            with st.spinner("Rolling camera..."):
-                                wb_payload = {
-                                     "positive_prompt": val, # Use edited text
-                                     "aspect_ratio": sel_ar, 
-                                     "model_type": "nano", 
-                                     "assets": assets_to_inject
-                                 }
-                                res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"))
-                                with st.expander(f"Logs Shot {i+1}", expanded=False):
-                                     st.code(res.get("logs", "No logs"))
-                                     
-                                if res["status"] == "success":
-                                    st.session_state[f"sb_img_{i}"] = res["image_path"]
+                            # Credit Check
+                            can_proceed = True
+                            if st.session_state.get("authenticated"):
+                                username = st.session_state.current_user.get("username")
+                                if not auth_mgr.deduct_credits(username, 1):
+                                    st.error("❌ Not enough credits!")
+                                    can_proceed = False
                                 else:
-                                    st.error(res["logs"])
+                                    st.toast("🪙 1 Credit Deducted")
+                            
+                            if can_proceed:
+                                with st.spinner("Rolling camera..."):
+                                    wb_payload = {
+                                         "positive_prompt": val, # Use edited text
+                                         "aspect_ratio": sel_ar, 
+                                         "model_type": "nano", 
+                                         "assets": assets_to_inject
+                                     }
+                                    res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"))
+                                    with st.expander(f"Logs Shot {i+1}", expanded=False):
+                                         st.code(res.get("logs", "No logs"))
+                                         
+                                    if res["status"] == "success":
+                                        st.session_state[f"sb_img_{i}"] = res["image_path"]
+                                        if st.session_state.get("authenticated"):
+                                            time.sleep(1)
+                                            st.rerun()
+                                    else:
+                                        st.error(res["logs"])
                     
                     with col_sb_img:
                         if f"sb_img_{i}" in st.session_state:
@@ -2279,162 +2410,190 @@ with tab_video:
                              st.caption(f"Size: {os.path.getsize(vid_path)/1024/1024:.1f}MB")
 
     with v_tab_create:
-        # Model Selection
-        st.markdown("**Select Video Engine**")
-        video_model = st.selectbox("Engine", ["Kling AI 2.6 (Professional)", "HuMo AI (Human Motion Premium)"], key="vid_model_select")
+        with st.form(key="video_form"):
+            # Model Selection
+            st.markdown("**Select Video Engine**")
+            video_model = st.selectbox("Engine", ["Kling AI 2.6 (Professional)", "HuMo AI (Human Motion Premium)"], key="vid_model_select")
+            
+            col_v_in, col_v_set = st.columns([1, 1])
         
-        col_v_in, col_v_set = st.columns([1, 1])
-    
-        with col_v_in:
-            st.markdown("**1. Select Input Image**")
-            # Allow uploading OR selecting from recent outputs (mockup for now)
-            video_source_img = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="vid_in_img")
-            
-            if video_source_img:
-                st.image(video_source_img, caption="Input Preview", use_container_width=True)
-            
-            st.markdown("**2. Motion Settings**")
-            col_mv, col_phy = st.columns(2)
-            with col_mv:
-                vid_movement = st.selectbox("Camera Move", ["Auto", "Pan Left", "Pan Right", "Zoom In", "Zoom Out", "Handheld", "Drone Orbit"], key="vid_move")
-            with col_phy:
-                vid_physics = st.selectbox("Physics Focus", ["Standard", "High Physics", "Jiggle Physics", "Water/Liquids"], help="Enforce specific physics simulations.")
+            with col_v_in:
+                st.markdown("**1. Select Input Image**")
+                # Allow uploading OR selecting from recent outputs (mockup for now)
+                video_source_img = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"], key="vid_in_img")
                 
-            motion_prompt = st.text_area("Motion Prompt", height=100, placeholder="Describe the movement...", key="vid_prompt_text")
-            
-            if st.button("Auto-Generate with Vision AI"):
-                if not video_source_img:
-                    st.error("Upload an image to analyze.")
-                elif not os.getenv("GOOGLE_API_KEY"):
-                    st.error("Missing GOOGLE_API_KEY for Vision Analysis.")
-                else:
-                    with st.spinner("Analyzing Image Context & Physics..."):
-                        # Save temp for analysis
-                        temp_path = os.path.join("output", "temp_vision_input.png")
-                        with open(temp_path, "wb") as f:
-                            f.write(video_source_img.getbuffer())
-                            
-                        suggestion = generate_motion_prompt(temp_path, movement_type=vid_movement, physics_focus=vid_physics)
-                        st.session_state["motion_suggestion"] = suggestion
-                        st.rerun()
+                if video_source_img:
+                    st.image(video_source_img, caption="Input Preview", use_container_width=True)
                 
-            if "motion_suggestion" in st.session_state:
-                st.caption(f"Suggested: {st.session_state['motion_suggestion']}")
-                
-                def apply_suggestion():
-                    st.session_state["vid_prompt_text"] = st.session_state["motion_suggestion"]
-                
-                st.button("Use Suggestion", on_click=apply_suggestion)
-
-        # Settings Column (Dynamic)
-        with col_v_set:
-            if "Kling" in video_model:
-                st.info("⚡ Engine: **Kling AI 2.6** (Professional)")
-                
-                col_dur, col_qual = st.columns(2)
-                with col_dur:
-                    duration = st.selectbox("Duration", ["5s", "10s"])
-                with col_qual:
-                    quality = st.selectbox("Quality Mode", ["Professional (High Quality, Slower)", "Standard (Fast, Efficient)"])
+                st.markdown("**2. Motion Settings**")
+                col_mv, col_phy = st.columns(2)
+                with col_mv:
+                    vid_movement = st.selectbox("Camera Move", ["Auto", "Pan Left", "Pan Right", "Zoom In", "Zoom Out", "Handheld", "Drone Orbit"], key="vid_move")
+                with col_phy:
+                    vid_physics = st.selectbox("Physics Focus", ["Standard", "High Physics", "Jiggle Physics", "Water/Liquids"], help="Enforce specific physics simulations.")
                     
-                # Advanced Model Override
-                with st.expander("⚙️ Advanced Model Settings (Override)", expanded=False):
-                     model_version_input = st.text_input("Kling Model Version", value="2.6", help="Code auto-converts '2.6' to 'kling-v2-6'.")
-                     st.caption("Available: `2.6` (Latest), `1.6` (Stable), `1.5`.")
+                motion_prompt = st.text_area("Motion Prompt", height=100, placeholder="Describe the movement...", key="vid_prompt_text")
                 
-                mode_val = "pro" if "Professional" in quality else "std"
+                # NOTE: Auto-Generate Vision AI button inside Form acts as Submit. 
+                # This is tricky. We'll disable it or move it out if problematic.
+                # Actually, submit buttons can distinguish themselves.
+                auto_vis = st.form_submit_button("Auto-Generate with Vision AI")
                 
-                # Camera Controls
-                camera_data = None
-                with st.expander("🎥 Camera & Motion Control", expanded=False):
-                     enable_camera = st.checkbox("Enable Camera Control", value=False)
-                     if enable_camera:
-                         st.caption("Values range from -10 to 10.")
-                         c1, c2 = st.columns(2)
-                         with c1:
-                              h_val = st.slider("Horizontal (X)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Left, Pos: Right")
-                              v_val = st.slider("Vertical (Y)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Down, Pos: Up")
-                              z_val = st.slider("Zoom", -10.0, 10.0, 0.0, step=0.5, help="Neg: In, Pos: Out")
-                         with c2:
-                              pan_val = st.slider("Pan (Rotate V)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Down, Pos: Up")
-                              tilt_val = st.slider("Tilt (Rotate H)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Left, Pos: Right")
-                              roll_val = st.slider("Roll", -10.0, 10.0, 0.0, step=0.5, help="Neg: CCW, Pos: CW")
+                if auto_vis:
+                     # ... (Vision logic)
+                     # Since this is a submit, it will rerun. We need to handle logic conditionally.
+                     # However, generating video is also a submit.
+                     # We can't have both run.
+                     pass # We will handle logic below outside form? No, inside form but check bools.
+
+            # Settings Column (Dynamic)
+            with col_v_set:
+                if "Kling" in video_model:
+                    st.info("⚡ Engine: **Kling AI 2.6** (Professional)")
+                    
+                    col_dur, col_qual = st.columns(2)
+                    with col_dur:
+                        duration = st.selectbox("Duration", ["5s", "10s"])
+                    with col_qual:
+                        quality = st.selectbox("Quality Mode", ["Professional (High Quality, Slower)", "Standard (Fast, Efficient)"])
+                        
+                    # Advanced Model Override
+                    with st.expander("⚙️ Advanced Model Settings (Override)", expanded=False):
+                         model_version_input = st.text_input("Kling Model Version", value="2.6", help="Code auto-converts '2.6' to 'kling-v2-6'.")
+                         st.caption("Available: `2.6` (Latest), `1.6` (Stable), `1.5`.")
                          
-                         camera_data = {
-                             "type": "simple",
-                             "config": {
-                                 "horizontal": h_val,
-                                 "vertical": v_val,
-                                 "pan": pan_val,
-                                 "tilt": tilt_val,
-                                 "roll": roll_val,
-                                 "zoom": z_val
-                             }
-                         }
-
-                # Motion Transfer (Video Reference)
-                st.divider()
-                st.markdown("**🕺 Video Driven Motion**")
-                
-                m_tab1, m_tab2 = st.tabs(["🔗 URL Input", "📤 Upload Video"])
-                
-                ref_video_url = None
-                ref_orientation = "image"
-                
-                with m_tab1:
-                    url_input = st.text_input("Reference Video URL (S3/Public)", help="Paste an `http` URL to a video. Overrides Camera Control.")
-                    if url_input: ref_video_url = url_input
+                         st.divider()
+                         st.markdown("**Cinematic Overrides (Prompt Injection)**")
+                         v_stock = st.selectbox("Film Stock", ["None"] + knowledge_base.get("film_stocks", []), key="vid_stock")
+                         v_filter = st.selectbox("Filter / Look", ["None"] + knowledge_base.get("filters", []), key="vid_filter")
+                         v_movie_style = st.selectbox("Movie Reference", ["None"] + knowledge_base.get("movie_styles", []), key="vid_style")
+                         
+                         st.markdown("**Action & Transition**")
+                         c_act, c_trans = st.columns(2)
+                         with c_act:
+                             # Actions relevant for video
+                             vid_actions = ["None", "Slow Motion Walk", "Turning Head", "Running", "Dancing", "Talking", "Laughing", "Fighting", "Driving", "Flying", "Explosion", "Wind blowing hair"]
+                             v_action = st.selectbox("Subject Action", vid_actions, key="vid_action_override")
+                         with c_trans:
+                             v_trans = st.selectbox("Transition In", ["None"] + knowledge_base.get("transitions", []), key="vid_trans")
+    
+                    mode_val = "pro" if "Professional" in quality else "std"
                     
-                with m_tab2:
-                    st.info("⚠️ **Constraint:** Video must be **≤ 30 seconds** and **< 100MB**.")
-                    uploaded_vid = st.file_uploader("Upload Reference Video", type=['mp4', 'mov'])
-                    if uploaded_vid:
-                         # Size Check (100MB)
-                         if uploaded_vid.size > 100 * 1024 * 1024:
-                              st.error(f"File too large ({uploaded_vid.size / 1024 / 1024:.1f}MB). Max 100MB.")
-                         else:
-                              with st.spinner("Uploading to S3..."):
-                                   # Check if already uploaded in session to avoid re-upload
-                                   if 'last_uploaded_vid_name' not in st.session_state or st.session_state['last_uploaded_vid_name'] != uploaded_vid.name:
-                                        s3_url = upload_file_obj(uploaded_vid, f"user_uploads/{uploaded_vid.name}")
-                                        if s3_url:
-                                             st.session_state['last_uploaded_vid_url'] = s3_url
-                                             st.session_state['last_uploaded_vid_name'] = uploaded_vid.name
-                                             st.success("✅ Uploaded!")
-                                        else:
-                                             st.error("Upload failed.")
-                                   
-                                   if 'last_uploaded_vid_url' in st.session_state:
-                                        ref_video_url = st.session_state['last_uploaded_vid_url']
-                                        st.caption(f"Using: `{ref_video_url}`")
-                
-                if ref_video_url:
-                     st.warning("⚠️ Motion Control Mode Active: Camera settings will be ignored.")
-                     # Orientation Logic
-                     st.markdown("##### 📐 Match Orientation To:")
-                     orient_choice = st.radio(
-                         "Orientation Source",
-                         ["Image (Best for Style, Max 10s)", "Video (Best for Action, Max 30s)"],
-                         help="If your video is >10s, you MUST select 'Video'.",
-                         label_visibility="collapsed"
-                     )
-                     ref_orientation = "video" if "Video" in orient_choice else "image"
+                    # Camera Controls
+                    camera_data = None
+                    with st.expander("🎥 Camera & Motion Control", expanded=False):
+                         enable_camera = st.checkbox("Enable Camera Control", value=False)
+                         if enable_camera:
+                             st.caption("Values range from -10 to 10.")
+                             c1, c2 = st.columns(2)
+                             with c1:
+                                  h_val = st.slider("Horizontal (X)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Left, Pos: Right")
+                                  v_val = st.slider("Vertical (Y)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Down, Pos: Up")
+                                  z_val = st.slider("Zoom", -10.0, 10.0, 0.0, step=0.5, help="Neg: In, Pos: Out")
+                             with c2:
+                                  pan_val = st.slider("Pan (Rotate V)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Down, Pos: Up")
+                                  tilt_val = st.slider("Tilt (Rotate H)", -10.0, 10.0, 0.0, step=0.5, help="Neg: Left, Pos: Right")
+                                  roll_val = st.slider("Roll", -10.0, 10.0, 0.0, step=0.5, help="Neg: CCW, Pos: CW")
+                             
+                             camera_data = {
+                                 "type": "simple",
+                                 "config": {
+                                     "horizontal": h_val,
+                                     "vertical": v_val,
+                                     "pan": pan_val,
+                                     "tilt": tilt_val,
+                                     "roll": roll_val,
+                                     "zoom": z_val
+                                 }
+                             }
+    
+                    # Motion Transfer (Video Reference)
+                    st.divider()
+                    st.markdown("**🕺 Video Driven Motion**")
+                    
+                    m_tab1, m_tab2 = st.tabs(["🔗 URL Input", "📤 Upload Video"])
+                    
+                    ref_video_url = None
+                    ref_orientation = "image"
+                    
+                    with m_tab1:
+                        url_input = st.text_input("Reference Video URL (S3/Public)", help="Paste an `http` URL to a video. Overrides Camera Control.")
+                        if url_input: ref_video_url = url_input
+                        
+                    with m_tab2:
+                        st.info("⚠️ **Constraint:** Video must be **≤ 30 seconds** and **< 100MB**.")
+                        uploaded_vid = st.file_uploader("Upload Reference Video", type=['mp4', 'mov'])
+                        if uploaded_vid:
+                             # Size Check (100MB)
+                             if uploaded_vid.size > 100 * 1024 * 1024:
+                                  st.error(f"File too large ({uploaded_vid.size / 1024 / 1024:.1f}MB). Max 100MB.")
+                             else:
+                                  with st.spinner("Uploading to S3..."):
+                                       # Check if already uploaded in session to avoid re-upload
+                                       if 'last_uploaded_vid_name' not in st.session_state or st.session_state['last_uploaded_vid_name'] != uploaded_vid.name:
+                                            s3_url = upload_file_obj(uploaded_vid, f"user_uploads/{uploaded_vid.name}")
+                                            if s3_url:
+                                                 st.session_state['last_uploaded_vid_url'] = s3_url
+                                                 st.session_state['last_uploaded_vid_name'] = uploaded_vid.name
+                                                 st.success("✅ Uploaded!")
+                                            else:
+                                                 st.error("Upload failed.")
+                                       
+                                       if 'last_uploaded_vid_url' in st.session_state:
+                                            ref_video_url = st.session_state['last_uploaded_vid_url']
+                                            st.caption(f"Using: `{ref_video_url}`")
+                    
+                    if ref_video_url:
+                         st.warning("⚠️ Motion Control Mode Active: Camera settings will be ignored.")
+                         # Orientation Logic
+                         st.markdown("##### 📐 Match Orientation To:")
+                         orient_choice = st.radio(
+                             "Orientation Source",
+                             ["Image (Best for Style, Max 10s)", "Video (Best for Action, Max 30s)"],
+                             help="If your video is >10s, you MUST select 'Video'.",
+                             label_visibility="collapsed"
+                         )
+                         ref_orientation = "video" if "Video" in orient_choice else "image"
+    
+                elif "HuMo" in video_model:
+                    st.info("⚡ Engine: **HuMo AI** (Human Motion)")
+                    st.warning("Requires REPLICATE_API_TOKEN. High cost per second (~$0.01/s).")
+                    
+                    st.markdown("**3. Audio Control (Lip Sync)**")
+                    humo_audio = st.file_uploader("Upload Audio (Optional)", type=["mp3", "wav"], help="Add audio to sync motion or lips.")
+                    
+                    st.markdown("**4. Advanced Settings**")
+                    h_steps = st.slider("Inference Steps", 10, 100, 50, help="More steps = higher quality (and cost).")
+                    h_guidance = st.slider("Text Guidance", 2.0, 15.0, 5.0)
+                    h_audio_guidance = st.slider("Audio Guidance", 2.0, 15.0, 5.5)
+    
+            st.divider()
+            
+            gen_video_btn = st.form_submit_button("Generate Video", type="primary")
 
-            elif "HuMo" in video_model:
-                st.info("⚡ Engine: **HuMo AI** (Human Motion)")
-                st.warning("Requires REPLICATE_API_TOKEN. High cost per second (~$0.01/s).")
-                
-                st.markdown("**3. Audio Control (Lip Sync)**")
-                humo_audio = st.file_uploader("Upload Audio (Optional)", type=["mp3", "wav"], help="Add audio to sync motion or lips.")
-                
-                st.markdown("**4. Advanced Settings**")
-                h_steps = st.slider("Inference Steps", 10, 100, 50, help="More steps = higher quality (and cost).")
-                h_guidance = st.slider("Text Guidance", 2.0, 15.0, 5.0)
-                h_audio_guidance = st.slider("Audio Guidance", 2.0, 15.0, 5.5)
+        # LOGIC HANDLERS (Outside Form, triggered by vars)
+        if auto_vis:
+            if not video_source_img:
+                st.error("Upload an image to analyze.")
+            elif not os.getenv("GOOGLE_API_KEY"):
+                st.error("Missing GOOGLE_API_KEY for Vision Analysis.")
+            else:
+                with st.spinner("Analyzing Image Context & Physics..."):
+                    # Save temp for analysis
+                    temp_path = os.path.join("output", "temp_vision_input.png")
+                    with open(temp_path, "wb") as f:
+                        f.write(video_source_img.getbuffer())
+                        
+                    suggestion = generate_motion_prompt(temp_path, movement_type=vid_movement, physics_focus=vid_physics)
+                    st.session_state["motion_suggestion"] = suggestion
+                    st.rerun()
 
-        st.divider()
-        
-        if st.button("Generate Video", type="primary"):
+        if "motion_suggestion" in st.session_state:
+             # This part is tricky. 'Apply Suggestion' button cannot be outside form targeting inside form.
+             # We just show text.
+             st.info(f"💡 Suggestion: {st.session_state['motion_suggestion']}")
+
+        if gen_video_btn:
             user = st.session_state.current_user.get("username")
             if not auth_mgr.deduct_credits(user, 5):
                 st.error("❌ Need 5 Credits for Video!")
@@ -2447,6 +2606,28 @@ with tab_video:
                     with open(temp_path, "wb") as f:
                         f.write(video_source_img.getbuffer())
                     
+                    # INJECT STYLE PROMPT
+                    final_motion_prompt = motion_prompt
+                    
+                    # Only check these keys if they exist (which they do if Kling selected, but safe to check)
+                    v_stock_val = None
+                    v_filter_val = None
+                    
+                    # Hacky access to scoped variables? No, need to use st.session_state or re-read
+                    if "vid_stock" in st.session_state and st.session_state["vid_stock"] != "None":
+                        final_motion_prompt += f", Shot on {st.session_state['vid_stock']}"
+                    if "vid_filter" in st.session_state and st.session_state["vid_filter"] != "None":
+                        final_motion_prompt += f", {st.session_state['vid_filter']} look"
+                    if "vid_style" in st.session_state and st.session_state["vid_style"] != "None":
+                        final_motion_prompt += f", {st.session_state['vid_style']}"
+                    if "vid_action_override" in st.session_state and st.session_state["vid_action_override"] != "None":
+                        final_motion_prompt += f", Action: {st.session_state['vid_action_override']}"
+                    if "vid_trans" in st.session_state and st.session_state["vid_trans"] != "None":
+                         # Transitions often work best as camera instructions
+                        final_motion_prompt += f", {st.session_state['vid_trans']} transition"
+                    
+                    st.caption(f"Final Prompt: {final_motion_prompt}")
+
                     result = None
                     
                     if "Kling" in video_model:
@@ -2459,7 +2640,7 @@ with tab_video:
                              
                              result = generate_video_kling(
                                  temp_path, 
-                                 motion_prompt, 
+                                 final_motion_prompt, 
                                  duration=5, 
                                  model_version=model_version_input, 
                                  quality_mode=mode_val, 
@@ -2491,7 +2672,7 @@ with tab_video:
                               
                               result = generate_video_humo(
                                   humo_img_input,
-                                  motion_prompt,
+                                  final_motion_prompt,
                                   audio_path=humo_audio_input,
                                   num_inference_steps=h_steps,
                                   guidance_scale=h_guidance,
@@ -2539,3 +2720,243 @@ with tab_video:
                             with st.expander("Error Logs", expanded=True):
                                  st.write(result.get("logs", []))
 
+# ==========================================
+# TAB 8: CHARACTER STUDIO
+# ==========================================
+with tab_char:
+    st.markdown("### 👤 Character Studio")
+    st.info("Design your cast with precision. Used consistently across the platform.")
+
+    col_char_ctrl, col_char_view = st.columns([1, 1.5]) 
+    
+    with col_char_ctrl:
+        with st.container(border=True):
+            st.markdown("#### 🛠️ Design Specs")
+            
+            with st.form("character_creator_form"):
+                # 1. Reference Image
+                st.markdown("**1. Reference (Optional)**")
+                ref_img = st.file_uploader("Upload Face/Reference", type=['png', 'jpg', 'jpeg'])
+                
+                # 2. Output Mode
+                st.markdown("**2. Output Format**")
+                output_mode = st.selectbox("Generation Mode", ["Concept Portrait (Vertical)", "Character Sheet (7-Angle Views)"])
+                
+                st.divider()
+                
+                # 3. Attributes
+                st.markdown("**3. Attributes**")
+                
+                with st.expander("👤 Core Identity", expanded=True):
+                    c_gender = st.selectbox("Gender", ["Female", "Male", "Non-Binary"])
+                    eth_opts = [
+                        "Any",
+                        "African American", "East Asian (Korean/Japanese)", "Southeast Asian", 
+                        "South Asian (Indian)", "Middle Eastern", "Mediterranean", 
+                        "Northern European", "Eastern European", "Latino/Hispanic", 
+                        "Indigenous", "Mixed Race", "Afro-Latina", "Nordic"
+                    ]
+                    c_ethnicity = st.selectbox("Ethnicity", eth_opts)
+                    c_age = st.slider("Age", 18, 90, 25)
+                
+
+                with st.expander("💇‍♀️ Face & Details", expanded=False):
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        c_hair_col = st.selectbox("Hair Color", ["Any", "Blonde", "Brunette", "Black", "Red", "Platinum", "Pastel Pink", "Grey", "White"])
+                        c_eye = st.selectbox("Eye Color", ["Any", "Blue", "Green", "Brown", "Hazel", "Grey", "Amber"])
+                        c_tat_style = st.selectbox("Tattoo Style", ["None", "Minimalist", "Traditional", "Tribal", "Geometric", "Full Sleeve", "Henna", "Face Tats"])
+                    with c2:
+                        c_hair_style = st.selectbox("Hair Style", ["Any", "Long Straight", "Wavy", "Curly", "Bob Cut", "Pixie", "Braids", "Messy Bun", "Ponytail", "Buzz Cut", "Afro", "Dreads"])
+                        c_facial = st.selectbox("Facial Hair", ["None", "Stubble", "Beard", "Goatee", "Mustache", "Clean Shaven"])
+                        c_tat_place = st.multiselect("Tattoo Placement", ["Arms", "Chest", "Neck", "Back", "Face", "Legs", "Lower Back"])
+                    
+                    c_makeup = st.selectbox("Makeup", ["None", "Natural", "Minimal", "Soft Glam", "Heavy Glam", "Goth", "Vintage"])
+                    c_skin = st.multiselect("Skin Details", ["Freckles", "Beauty Marks", "Vitiligo", "Tattoos", "Scarring", "Perfect Skin", "Textured Skin", "Wrinkles"])
+
+                with st.expander("💪 Body Composition", expanded=False):
+                    st.caption("Customize physique details (0-100)")
+                    c_body = st.slider("General Physique", 0, 100, 50, help="0: Skinny | 50: Athletic | 100: Heavy/Curvy")
+                    c_muscle = st.slider("Muscle Mass", 0, 100, 20, help="0: Soft | 100: Ripped Bodybuilder")
+                    
+                    # Bust Details
+                    c1, c2 = st.columns([2, 1]) 
+                    with c1:
+                         c_bust = st.slider("Bust Size", 0, 100, 40, help="Applies to Femme characters")
+                    with c2:
+                         c_bust_type = st.selectbox("Bust Type", ["Natural / Drop", "Perky / Athletic", "Augmented / Implants"])
+                    
+                    c_waist = st.slider("Waist Width", 0, 100, 50, help="0: Cinematic Hourglass | 100: Wide")
+                    c_hips = st.slider("Hips Width", 0, 100, 50, help="0: Narrow | 100: Exaggerated Shelf Hips")
+                    
+                    # Glute Details
+                    c3, c4 = st.columns([2, 1])
+                    with c3:
+                        c_glutes = st.slider("Glute Size", 0, 100, 50, help="0: Flat | 100: Exaggerated Bubble Butt")
+                    with c4:
+                        c_glute_type = st.selectbox("Glute Type", ["Soft / Natural", "Athletic / Hard", "BBL / Surgical"])
+
+                # Name
+                st.divider()
+                st.markdown("**4. Finalize**")
+                char_name = st.text_input("Character Name", placeholder="e.g. Sarah")
+                
+                # Submit
+                st.markdown("<br>", unsafe_allow_html=True)
+                create_char = st.form_submit_button("✨ Generate Character", type="primary", use_container_width=True)
+
+    with col_char_view:
+        st.markdown("#### 📸 Studio Preview")
+        
+        # State Handling
+        if create_char:
+            if not char_name:
+                st.error("Please name your character first.")
+            else:
+                # Build Prompt
+                attrs = {
+                   "gender": c_gender,
+                   "ethnicity": c_ethnicity,
+                   "age": c_age,
+                   "body_type": c_body,
+                   "muscle": c_muscle,
+                   "bust": c_bust,
+                   "bust_type": c_bust_type,
+                   "waist": c_waist,
+                   "hips": c_hips,
+                   "glutes": c_glutes,
+                   "glute_type": c_glute_type,
+                   "hair_color": c_hair_col,
+                   "hair_style": c_hair_style,
+                   "eye_color": c_eye,
+                   "facial_hair": c_facial,
+                   "makeup": c_makeup,
+                   "skin_details": c_skin,
+                   "tattoo_style": c_tat_style,
+                   "tattoo_places": c_tat_place
+                }
+                st.session_state['char_last_attrs'] = attrs 
+                
+                base_prompt = build_character_prompt(attrs)
+                
+                if output_mode == "Character Sheet (7-Angle Views)":
+                    full_prompt = get_character_sheet_prompt(base_prompt)
+                    ar = "16:9" # Sheets need width
+                    target_w, target_h = 1344, 768
+                else:
+                    full_prompt = base_prompt
+                    ar = "4:5" # Portrait
+                    target_w, target_h = 896, 1152
+                
+                st.success("Prompt Built!")
+                with st.expander("View Prompt"):
+                    st.code(full_prompt)
+                
+                # Generate
+                user = st.session_state.current_user.get("username")
+                if auth_mgr.deduct_credits(user, 1):
+                    with st.spinner("Creating Character in Studio..."):
+                         # Check for Identity Lock Reference
+                         assets = []
+                         if st.session_state.get("lock_identity_path"):
+                             assets.append({
+                                 "path": st.session_state["lock_identity_path"],
+                                 "label": f"Cast: {char_name or 'Main'}"
+                             })
+                         
+                         # Payload
+                         payload = {
+                             "positive_prompt": full_prompt,
+                             "width": target_w, "height": target_h,
+                             "model_type": "nano",
+                             "assets": assets
+                         }
+                         
+                         res = generate_image_from_prompt(payload, get_user_out_dir("Characters/Concepts"))
+                         
+                         if res["status"] == "success":
+                             st.session_state['char_preview'] = res['image_path']
+                             st.session_state['char_final_prompt'] = full_prompt
+                             st.toast("Character Generated!")
+                         else:
+                             auth_mgr.add_credits(user, 1) # Refund
+                             st.error(f"Failed: {res.get('logs')}")
+                else:
+                    st.error("Not enough credits.")
+
+        # Display Result
+        if 'char_preview' in st.session_state:
+            preview_path = st.session_state['char_preview']
+            st.image(preview_path, caption="Concept Preview", use_container_width=True)
+            
+            # Save Actions
+            c_save, c_sheet = st.columns(2)
+            with c_save:
+                if st.button("💾 Save as New Asset", use_container_width=True):
+                     if char_name:
+                         # Move to User Assets
+                         user = st.session_state.current_user.get("username")
+                         asset_dir = os.path.join("output", "users", user, "Assets", "Characters", char_name)
+                         os.makedirs(asset_dir, exist_ok=True)
+                         
+                         # Copy Image
+                         new_path = os.path.join(asset_dir, "default.png")
+                         import shutil
+                         shutil.copy(preview_path, new_path)
+                         
+                         # Create Metadata
+                         details = {
+                             "name": char_name,
+                             "prompt": st.session_state.get('char_final_prompt', ''),
+                             "created": str(datetime.datetime.now())
+                         }
+                         with open(os.path.join(asset_dir, "details.json"), "w") as f:
+                             json.dump(details, f)
+                             
+                         st.success(f"Saved {char_name} to Assets!")
+                         # Clear Cache
+                         st.cache_data.clear()
+                         time.sleep(1)
+                         st.rerun()
+                     else:
+                         st.error("Enter a name in the form.")
+            
+            with c_sheet:
+                if st.button("🔒 Lock & Create Sheet", use_container_width=True, type="secondary"):
+                    st.session_state["lock_identity_path"] = preview_path
+                    st.session_state["trigger_lock_sheet"] = True
+                    st.rerun()
+
+        # Handle Triggered Lock Sheet
+        if st.session_state.get("trigger_lock_sheet"):
+            st.session_state["trigger_lock_sheet"] = False # Reset
+            
+            attrs = st.session_state.get("char_last_attrs")
+            if attrs:
+                from execution.character_utils import build_character_prompt, get_character_sheet_prompt
+                base_prompt = build_character_prompt(attrs)
+                full_prompt = get_character_sheet_prompt(base_prompt)
+                target_w, target_h = 1344, 768
+                
+                user = st.session_state.current_user.get("username")
+                if auth_mgr.deduct_credits(user, 1):
+                    with st.spinner("Locking Identity and Creating Sheet..."):
+                        assets = [{
+                            "path": st.session_state["lock_identity_path"],
+                            "label": f"Cast: {char_name or 'Main'}"
+                        }]
+                        payload = {
+                            "positive_prompt": full_prompt,
+                            "width": target_w, "height": target_h,
+                            "model_type": "nano",
+                            "assets": assets
+                        }
+                        res = generate_image_from_prompt(payload, get_user_out_dir("Characters/Concepts"))
+                        if res["status"] == "success":
+                            st.session_state['char_preview'] = res['image_path']
+                            st.session_state['char_final_prompt'] = full_prompt
+                            st.toast("Identity Locked & Sheet Created!")
+                            st.rerun()
+                        else:
+                            auth_mgr.add_credits(user, 1)
+                            st.error("Failed to generate sheet.")

@@ -8,7 +8,13 @@
         "Polaroid SX-70 (Vintage)",
         "iPhone 15 Pro Max (Social)",
         "Canon AE-1 (35mm Film Grain)",
-        "Hasselblad 500C/M (High Fashion)"
+        "Hasselblad 500C/M (High Fashion)",
+        "Arri Alexa 35 (Cinema Standard)",
+        "Red V-Raptor XL (8K Vista Vision)",
+        "Sony Venice 2 (Full Frame Cinema)",
+        "Panavision Millennium DXL2 (Large Format)",
+        "IMAX MKIV (15-perf 70mm Film)",
+        "Blackmagic URSA Mini Pro (Raw)"
     ],
     "lenses": [
         "14mm (Fisheye Distortion)",
@@ -19,7 +25,13 @@
         "85mm (Flattering Portrait)",
         "135mm (Background Compression)",
         "200mm (Fashion Runway)",
-        "Macro Lens (Extreme Detail)"
+        "Macro Lens (Extreme Detail)",
+        "Cooke Anamorphic /i (Classic flare)",
+        "Zeiss Master Prime (Sharp/Clean)",
+        "Panavision Primo 70 (Vintage Warmth)",
+        "Angenieux Optimo Zoom (Versatile)",
+        "Canon K35 Vintage (Soft/Glowing)",
+        "Atlas Orion Anamorphic (Streaks)"
     ],
     "camera_angles": [
         "Eye Level (Neutral)",
@@ -121,5 +133,54 @@
         "Polaroid",
         "Studio Glam",
         "Candid Paparazzi"
+    ],
+    "film_stocks": [
+        "Kodak Portra 400 (Warm/Commercial)",
+        "Kodak Portra 800 (Low Light/Grain)",
+        "Kodak Gold 200 (Nostalgic/Yellow)",
+        "Kodak Ektar 100 (Vibrant/Contrast)",
+        "Kodak Tri-X 400 (Classic B&W)",
+        "Ilford HP5 Plus (Gritty B&W)",
+        "Fujifilm Pro 400H (Cool/Pastel)",
+        "Fujifilm Velvia 50 (Saturated/Landscape)",
+        "Cinestill 800T (Halation/Neon)",
+        "Polaroid 600 (Soft/Faded)"
+    ],
+    "filters": [
+        "Teal & Orange (Blockbuster)",
+        "Vintage Sepia",
+        "Bleach Bypass (Desaturated/Gritty)",
+        "Cross Process (Shifted Colors)",
+        "Dreamy / Soft Focus",
+        "Noir (High Contrast B&W)",
+        "Vaporwave (Purple/Pink Tint)",
+        "Warm Retro (70s)",
+        "Cool Scandi (Minimalist)",
+        "Matte Finish (Low Contrast)"
+    ],
+    "movie_styles": [
+        "In the style of 'Blade Runner 2049' (Neon/Atmospheric)",
+        "In the style of 'The Grand Budapest Hotel' (Symmetrical/Pastel)",
+        "In the style of 'The Matrix' (Green Tint/Cyberpunk)",
+        "In the style of 'Dune' (Monochromatic/Epic)",
+        "In the style of 'Euphoria' (Glitter/Purple Neon)",
+        "In the style of 'Succession' (Corporate/Cold/Snap Zooms)",
+        "In the style of 'Amelie' (Warm/Green/Whimsical)",
+        "In the style of 'John Wick' (Contrast/Neon/Action)",
+        "In the style of 'Mad Max: Fury Road' (Saturated/Orange/Teal)",
+        "In the style of 'Bridgerton' (Regency/Soft/Pastel)",
+        "In the style of 'Oppenheimer' (IMAX/High Contrast/Drama)",
+        "In the style of 'Barbie' (Pink/Plastic/Bright)"
+    ],
+    "transitions": [
+        "None / Hard Cut",
+        "Fade In / Out",
+        "Cross Dissolve",
+        "Whip Pan",
+        "Match Cut",
+        "Zoom Through",
+        "Light Leak Transition",
+        "Blur Transition",
+        "Glitch Effect"
     ]
 }
