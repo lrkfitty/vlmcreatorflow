@@ -162,15 +162,39 @@ def load_assets(base_path="assets", user_assets_dir=None):
 
     # --- LOCAL FALLBACK (Existing Logic) ---
     
+    # --- ROBUST PATH DETECTION ---
+    # Find "AI Content Creators" regardless of casing or operating system
     if not os.path.exists(base_path):
-        cwd_path = os.path.join(os.getcwd(), "assets/AI Content Creators") # Try old path
-        if os.path.exists(cwd_path):
-            base_path = cwd_path
-        elif os.path.exists("assets"):
-             base_path = "assets"
+        # 1. Search in current directory
+        candidates = ["assets", "Assets"]
+        found_base = None
+        
+        for c in candidates:
+            if os.path.exists(c):
+                found_base = c
+                break
+        
+        if found_base:
+            # Look for subfolder
+            sub_candidates = ["AI Content Creators", "ai content creators", "Ai Content Creators"]
+            
+            # Check immediate children of assets/
+            try:
+                children = os.listdir(found_base)
+                for child in children:
+                    if child.lower() == "ai content creators":
+                        base_path = os.path.join(found_base, child)
+                        print(f"✅ Found Asset Path: {base_path}")
+                        break
+            except Exception as e:
+                print(f"Error scanning assets dir: {e}")
+                
+            if base_path == "assets": # Didn't find subfolder, default to root
+                 base_path = found_base
+                 print(f"⚠️ 'AI Content Creators' subfolder not found. Using root '{found_base}'.")
         else:
-            print(f"Warning: Base path {base_path} not found.")
-            return data
+             print(f"❌ Error: 'assets' folder not found in {os.getcwd()}")
+             return data
 
     # --- 1. Vibes / Locations ---
     env_path = os.path.join(base_path, "Environments")
