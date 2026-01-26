@@ -78,8 +78,37 @@ def load_assets(base_path="assets", user_assets_dir=None):
             
     if use_cloud:
         # --- CLOUD LOADING (Single Pass) ---
-        print(f"☁️ Cloud Mode: Scanning {len(manifest)} items from manifest...")
+        print(f"☁️ Cloud Mode: Scanning {len(manifest) if manifest else 'S3 Direct'} items...")
         
+        # If manifest is empty/failed, we MUST scan S3 directly for base assets too
+        if not manifest or len(manifest) < 5:
+            print("⚠️ Manifest empty/missing. Scanning S3 'assets/' prefix directly...")
+            try:
+                import boto3
+                bucket = os.getenv("S3_BUCKET_NAME")
+                s3 = boto3.client('s3', region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
+                
+                # Scan root assets folder
+                paginator = s3.get_paginator('list_objects_v2')
+                pages = paginator.paginate(Bucket=bucket, Prefix="assets/")
+                
+                manifest = []
+                for page in pages:
+                    for obj in page.get('Contents', []):
+                         key = obj['Key']
+                         # Filter valid images
+                         if key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and "users/" not in key:
+                             # Convert key to "relative path" style expected by loader
+                             # Remove 'assets/' prefix if present for cleaner matching logic?
+                             # Actually logic below expects full path?
+                             # Line 101: parts = rel_path.split("/")
+                             # Line 105: check for "AI Content Creators"
+                             # Just use key as rel_path
+                             manifest.append(key)
+                print(f"✅ Discovered {len(manifest)} base assets from S3.")
+            except Exception as e:
+                print(f"❌ Failed to scan S3 base assets: {e}")
+
         # explicit mapping of Folder Name (in manifest) -> Data Category Key
         folder_map = {
             "environments": "locations",

@@ -304,24 +304,18 @@ if st.session_state.get("authenticated"):
     # Debug
     with st.sidebar.expander("🔍 Asset Debug"):
         st.write(f"User: `{username}`")
-        st.write(f"Path: `{user_asset_path}`")
-        
-        if os.path.exists(user_asset_path):
-             st.write("✅ Path Exists")
-             # Recursive walk to see actual files
-             all_files = []
-             for root, dirs, files in os.walk(user_asset_path):
-                 for name in files:
-                     if not name.startswith('.'):
-                         rel_path = os.path.relpath(os.path.join(root, name), user_asset_path)
-                         all_files.append(rel_path)
-             
-             if all_files:
-                 st.write("Found Files:", all_files)
-             else:
-                 st.write("⚠️ Directory exists but is empty.")
+        if os.getenv("S3_BUCKET_NAME"):
+            st.success(f"✅ Cloud Mode Active")
+            st.caption(f"Bucket: {os.getenv('S3_BUCKET_NAME')}")
+            # We can't see files on disk, so we rely on what load_assets found
+            # But load_assets hasn't run yet! It runs at line 327.
+            # We should move this debug block AFTER load_assets.
         else:
-             st.write("❌ Path Missing")
+            st.write(f"Path: `{user_asset_path}`")
+            if os.path.exists(user_asset_path):
+                 st.write("✅ Local Path Exists")
+            else:
+                 st.write("❌ Local Path Missing")
 
 try:
     assets = load_assets(user_assets_dir=user_asset_path) # Pass user path
@@ -1833,25 +1827,43 @@ with tab_world:
                          pass
 
                 # B. Cast (Relations) - Multi Select
+                # B. Cast (Relations) - Multi Select
                 st.markdown("###### 2. Friends & Cast")
-                rel_opts = get_assets_by_category("relations") 
-                # Note: get_assets_by_category now returns simple dict {name: path} for scanned folders
-            
-                rel_keys = list(rel_opts.keys())
-                selected_rels = st.multiselect("Include People", rel_keys)
+                # UNIFIED: Use same pool as Protagonist (Stock + User Chars) + Relations?
+                # Actually, user requested "Every character available".
+                # So we merge wb_char_opts (Characters) + get_assets_by_category("relations")
+                
+                rel_opts = get_assets_by_category("relations")
+                # Merge into a single "Cast Pool"
+                # If name conflict, Characters take precedence or we prefix?
+                # Simple merge:
+                cast_pool = {**wb_char_opts, **rel_opts}
+                
+                rel_keys = sorted(list(cast_pool.keys()))
+                
+                selected_rels = st.multiselect(
+                    "Include People", 
+                    rel_keys,
+                    format_func=lambda x: cast_pool[x].get('name', x) if isinstance(cast_pool[x], dict) else x
+                )
             
                 rel_names = []
                 if selected_rels:
                     st.caption("Selected Cast:")
                     r_cols = st.columns(len(selected_rels))
                     for idx, k in enumerate(selected_rels):
-                        path = rel_opts[k]
+                        path = cast_pool[k] # Use Unified Pool
+                        name = k 
+                        
                          # If from DB it might be a dict
                         if isinstance(path, dict):
-                             path = path.get('default_img', '')
                              name = path.get('name', k)
+                             path = path.get('default_img', '')
                         else:
-                             name = os.path.splitext(k.split('/')[-1])[0]
+                             # Filesystem path
+                             clean_name = os.path.splitext(k.split('/')[-1])[0]
+                             if k in wb_char_opts: name = clean_name # It's a character
+                             else: name = clean_name # It's a relation
                     
                         rel_names.append(name)
                         assets_to_inject.append({"path": path, "label": f"Cast: {name}"})
@@ -2850,6 +2862,26 @@ with tab_char:
                 # 1. Reference Image
                 st.markdown("**1. Reference (Optional)**")
                 ref_img = st.file_uploader("Upload Face/Reference", type=['png', 'jpg', 'jpeg'])
+                
+                # UNIFIED: Add Reference Identity from Library
+                st.caption("Or choose existing Identity:")
+                # Use base 'characters_data' (Unified)
+                char_keys = sorted(list(characters_data.keys()))
+                ref_identity = st.selectbox("Base on Character", ["None"] + char_keys, 
+                                            format_func=lambda x: characters_data[x].get('name', x) if isinstance(characters_data.get(x), dict) else x)
+                
+                # Logic to use ref_identity path if selected and no upload
+                lock_identity_path = None
+                if ref_identity != "None":
+                     val = characters_data[ref_identity]
+                     lock_identity_path = val.get('default_img') if isinstance(val, dict) else val
+                     st.caption(f"Using Identity: {ref_identity.split('/')[-1]}")
+                
+                # Pass this to session state for generation
+                if lock_identity_path:
+                    st.session_state['lock_identity_path'] = lock_identity_path
+                elif 'lock_identity_path' in st.session_state:
+                    del st.session_state['lock_identity_path']
                 
                 # 2. Output Mode
                 st.markdown("**2. Output Format**")
