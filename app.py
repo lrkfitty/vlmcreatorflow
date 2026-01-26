@@ -1270,6 +1270,7 @@ with tab_series:
                     st.session_state['cast_wardrobe_map_snapshot'] = wardrobe_map
                 card_end()
                     
+                if True: # Indentation Fix Wrapper
                     # A. Resolve Lead Characters
                     if char_list:
                         for raw_name in char_list:
