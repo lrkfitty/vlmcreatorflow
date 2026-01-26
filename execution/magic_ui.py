@@ -4,23 +4,68 @@ def inject_magic_css():
     """Injects the global CSS for Aurora Background and Magic UI primitives."""
     css = """
     <style>
-        /* --- GLOBAL THEME & AURORA --- */
+        /* --- GLOBAL RESET & TYPOGRAPHY --- */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800&display=swap');
+        
         :root {
-            --bg-color: #0A0A0A;
-            --card-bg: rgba(255, 255, 255, 0.03);
-            --border-color: rgba(255, 255, 255, 0.1);
+            --bg-color: #000000; /* Pure Black */
+            --text-color: #FFFFFF; /* Pure White */
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --border-color: rgba(255, 255, 255, 0.15); /* Stronger Border */
             --primary-glow: conic-gradient(from 180deg at 50% 50%, #2a8af6 0deg, #a853ba 180deg, #e92a67 360deg);
         }
         
+        html, body, [class*="st-"] {
+            font-family: 'Inter', sans-serif;
+            color: var(--text-color) !important;
+        }
+        
+        /* Force background to black for main container */
         .stApp {
             background-color: var(--bg-color) !important;
             background-image: 
-                radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.1) 0px, transparent 50%), 
-                radial-gradient(at 100% 0%, rgba(168, 85, 247, 0.1) 0px, transparent 50%);
-            color: #E2E8F0 !important;
+                radial-gradient(circle at 15% 50%, rgba(76, 29, 149, 0.15), transparent 25%), 
+                radial-gradient(circle at 85% 30%, rgba(14, 165, 233, 0.15), transparent 25%);
+            background-attachment: fixed;
+        }
+
+        /* --- TEXT READABILITY --- */
+        h1, h2, h3, h4, h5, h6, label, .stMarkdown p, .stCaption {
+            color: #FFFFFF !important;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5); /* separation from bg */
         }
         
-        /* Aurora Text Animation */
+        .stCaption {
+            color: #A3A3A3 !important; /* Slightly dimmer for hierarchy */
+        }
+
+        /* --- GLASSMOPHISM CARD (The "Aura") --- */
+        /* We target the container directly if possible, or use our wrapper */
+        .glass-card {
+            background: rgba(20, 20, 20, 0.6); /* Darker base */
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 
+                0 4px 6px -1px rgba(0, 0, 0, 0.1), 
+                0 2px 4px -1px rgba(0, 0, 0, 0.06),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+        
+        .glass-card:hover {
+            border-color: rgba(255, 255, 255, 0.3);
+            box-shadow: 
+                0 20px 25px -5px rgba(0, 0, 0, 0.2), 
+                0 10px 10px -5px rgba(0, 0, 0, 0.1),
+                0 0 15px rgba(56, 189, 248, 0.2); /* Blue Glow */
+            transform: translateY(-2px);
+        }
+
+        /* --- MAGIC TEXT (Aurora Gradient) --- */
         @keyframes aurora-text {
             0% { background-position: 0% 50%; }
             50% { background-position: 100% 50%; }
@@ -29,114 +74,88 @@ def inject_magic_css():
         
         .magic-text {
             background: linear-gradient(
-                to right, 
-                #62cff4, 
-                #2c67f2, 
-                #62cff4
+                90deg, 
+                #FFFFFF 0%, 
+                #38BDF8 25%, 
+                #C084FC 50%, 
+                #F472B6 75%, 
+                #FFFFFF 100%
             );
             background-size: 200% auto;
-            color: transparent;
+            color: transparent !important;
+            -webkit-text-fill-color: transparent !important;
             -webkit-background-clip: text;
             background-clip: text;
-            animation: aurora-text 3s linear infinite;
-            font-weight: 800;
-            letter-spacing: -0.02em;
-        }
-
-        /* --- GLASSMOPHISM CARD --- */
-        .glass-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            font-weight: 900;
+            letter-spacing: -0.03em;
+            animation: aurora-text 6s linear infinite;
         }
         
-        .glass-card:hover {
-            border-color: rgba(255, 255, 255, 0.2);
-            transform: translateY(-2px);
-            box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5);
+        /* --- SHINY BUTTONS (Aggressive Override) --- */
+        div.stButton > button {
+             background: linear-gradient(110deg, #1e293b 0%, #334155 25%, #475569 50%, #334155 75%, #1e293b 100%);
+             background-size: 200% 200%;
+             color: #FFF !important;
+             border: 1px solid rgba(255,255,255,0.2) !important;
+             border-radius: 8px !important;
+             font-weight: 600 !important;
+             transition: all 0.3s ease !important;
+             animation: shine 4s linear infinite;
+             box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
         }
-        
-        /* --- SHINY BUTTON --- */
-        .shiny-button {
-            background: linear-gradient(110deg, #171717 45%, #333 50%, #171717 55%);
-            background-size: 200% 100%;
-            border: 1px solid var(--border-color);
-            color: #fff;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            font-weight: 500;
-            cursor: pointer;
-            animation: shine 3s linear infinite;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            text-decoration: none !important;
-            transition: 0.2s;
-        }
-        @keyframes shine {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
-        .shiny-button:hover {
-            border-color: #fff;
-            box-shadow: 0 0 20px rgba(255,255,255,0.1);
-        }
-
-        /* --- NEON GRADIENT BORDER --- */
-        .neon-border {
-            position: relative;
-            background: #111;
-            border-radius: 12px;
-            z-index: 1;
-        }
-        .neon-border::before {
-            content: "";
-            position: absolute;
-            inset: -1px;
-            z-index: -1;
-            background: var(--primary-glow);
-            border-radius: 13px;
-            opacity: 0.5;
-            filter: blur(8px);
-        }
-
-        /* --- CUSTOM SCROLLBAR --- */
-        ::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0A0A0A; 
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #333; 
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #555; 
-        }
-        
-        /* --- STREAMLIT OVERRIDES --- */
-        [data-testid="stSidebar"] {
-            background-color: rgba(10, 10, 10, 0.8) !important;
-            backdrop-filter: blur(20px);
-            border-right: 1px solid var(--border-color);
-        }
-        
-        .stButton button {
-            background: #171717;
-            color: #e5e5e5;
-            border: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        h1, h2, h3 {
-             font-family: 'Inter', sans-serif !important;
+        div.stButton > button:hover {
              color: #FFFFFF !important;
+             border-color: #60A5FA !important; /* Blue highlight */
+             transform: translateY(-2px);
+             box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05), 0 0 20px rgba(96, 165, 250, 0.5); /* Blue Glow */
         }
+        
+        div.stButton > button[kind="primary"] {
+             background: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%) !important;
+             border: none !important;
+             box-shadow: 0 0 15px rgba(124, 58, 237, 0.4);
+        }
+
+        /* --- GRID & HOVER IMAGES --- */
+        [data-testid="stImage"] img {
+             border-radius: 12px;
+             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 0.3s ease;
+             border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        [data-testid="stImage"]:hover img {
+             transform: scale(1.05);
+             filter: brightness(1.1);
+             border-color: rgba(255,255,255,0.5);
+             box-shadow: 0 10px 40px -10px rgba(0,0,0,0.5);
+             z-index: 10;
+        }
+
+        /* --- INPUT FIELDS (Seamless) --- */
+        .stTextInput > div > div > input, 
+        .stSelectbox > div > div, 
+        .stMultiSelect > div > div, 
+        .stTextArea > div > div > textarea {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: white !important;
+            border-radius: 8px !important;
+        }
+        
+        .stTextInput > div > div > input:focus,
+        .stTextArea > div > div > textarea:focus {
+            border-color: #38BDF8 !important; /* Cyan Focus */
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            box-shadow: 0 0 0 1px #38BDF8;
+        }
+        
+        /* Sidebar Glass */
+        [data-testid="stSidebar"] {
+            background-color: rgba(0, 0, 0, 0.7) !important;
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255,255,255,0.1);
+        }
+        
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -146,7 +165,7 @@ def magic_text(text, type="h1"):
     st.markdown(f"<{type} class='magic-text'>{text}</{type}>", unsafe_allow_html=True)
 
 def card_begin():
-    """Starts a Glassmorphism Card Wrapper. Must check st.container inside?"""
+    """Starts a Glassmorphism Card Wrapper."""
     st.markdown('<div class="glass-card">', unsafe_allow_html=True)
 
 def card_end():
