@@ -543,31 +543,36 @@ with tab_wizard:
     
     # --- UI Inputs ---
     # --- UI Inputs ---
-    col_vibe, col_outfit, col_char = st.columns(3)
-    
-    with col_vibe:
-        st.markdown('<div class="hub-card">', unsafe_allow_html=True)
-        st.markdown("#### 1. Vibe")
-        selected_vibe_name = st.selectbox("Choose Aesthetic", vibes_list, label_visibility="collapsed", key="wiz_vibe")
-        if selected_vibe_name:
-            st.image(vibes_data[selected_vibe_name], use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # --- UI Inputs (Fragmented for Performance) ---
+    @st.fragment
+    def wizard_selectors(vibes, outfits, characters, v_data, o_data, c_data):
+        c_v, c_o, c_c = st.columns(3)
+        with c_v:
+            st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+            st.markdown("#### 1. Vibe")
+            v = st.selectbox("Choose Aesthetic", vibes, label_visibility="collapsed", key="wiz_vibe")
+            if v and v in v_data:
+                st.image(v_data[v], use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
             
-    with col_outfit:
-        st.markdown('<div class="hub-card">', unsafe_allow_html=True)
-        st.markdown("#### 2. Outfit")
-        selected_outfit_name = st.selectbox("Choose Outfit", outfits_list, label_visibility="collapsed", key="wiz_outfit")
-        if selected_outfit_name:
-            st.image(outfits_data[selected_outfit_name], use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        with c_o:
+            st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+            st.markdown("#### 2. Outfit")
+            o = st.selectbox("Choose Outfit", outfits, label_visibility="collapsed", key="wiz_outfit")
+            if o and o in o_data:
+                st.image(o_data[o], use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
 
-    with col_char:
-        st.markdown('<div class="hub-card">', unsafe_allow_html=True)
-        st.markdown("#### 3. Character")
-        selected_character_name = st.selectbox("Choose Model", characters_list, label_visibility="collapsed", key="wiz_char")
-        if selected_character_name:
-            st.image(characters_data[selected_character_name], use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+        with c_c:
+            st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+            st.markdown("#### 3. Character")
+            c = st.selectbox("Choose Model", characters, label_visibility="collapsed", key="wiz_char")
+            if c and c in c_data:
+                st.image(c_data[c], use_container_width=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    # Call Fragment
+    wizard_selectors(vibes_list, outfits_list, characters_list, vibes_data, outfits_data, characters_data)
 
     st.divider()
 
@@ -630,16 +635,22 @@ with tab_wizard:
             if not auth_mgr.deduct_credits(user, 1):
                 st.error("❌ Insufficient Credits! Please top up.")
             else:
+            else:
+                # Retrieve values from Session State (set by Fragment)
+                s_char = st.session_state.get("wiz_char")
+                s_outfit = st.session_state.get("wiz_outfit")
+                s_vibe = st.session_state.get("wiz_vibe")
+
                 # Get path for Vision
-                char_path = characters_data.get(selected_character_name, selected_character_name)
-                outfit_path = outfits_data.get(selected_outfit_name)
-                vibe_path = vibes_data.get(selected_vibe_name)
+                char_path = characters_data.get(s_char, s_char)
+                outfit_path = outfits_data.get(s_outfit)
+                vibe_path = vibes_data.get(s_vibe)
                 
                 def clean_val(val): return None if val == "Auto" else val
                 
                 prompt_data = generate_prompt_content(
-                    vibe=clean_val(selected_vibe_name), 
-                    outfit=selected_outfit_name, 
+                    vibe=clean_val(s_vibe), 
+                    outfit=s_outfit, 
                     character=char_path,
                     outfit_path=outfit_path,
                     vibe_path=vibe_path,
@@ -662,7 +673,7 @@ with tab_wizard:
                 prompt_data["model_type"] = render_engine 
                 # prompt_data["checkpoint"] removed
                 
-                job_name = f"{selected_outfit_name} - {clean_val(selected_vibe_name)}"
+                job_name = f"{s_outfit} - {clean_val(s_vibe)}"
                 campaign_mgr.add_job(
                     name=job_name,
                     description=f"Engine: {render_engine}",
@@ -688,17 +699,22 @@ with tab_wizard:
     with col_wiz_btn1:
         if st.button("✨ Director Vision AI (Generate Prompt)", type="primary", use_container_width=True):
              with st.spinner("Director is writing master prompt..."):
+                # Retrieve values from Session State
+                s_char = st.session_state.get("wiz_char")
+                s_outfit = st.session_state.get("wiz_outfit")
+                s_vibe = st.session_state.get("wiz_vibe")
+
                 # Get path for Vision
-                char_path = characters_data.get(selected_character_name, selected_character_name)
-                outfit_path = outfits_data.get(selected_outfit_name)
-                vibe_path = vibes_data.get(selected_vibe_name)
+                char_path = characters_data.get(s_char, s_char)
+                outfit_path = outfits_data.get(s_outfit)
+                vibe_path = vibes_data.get(s_vibe)
                 
                 # Filter "Auto" values (pass None if Auto)
                 def clean_val(val): return None if val == "Auto" else val
                 
                 prompt_data = generate_prompt_content(
-                    vibe=selected_vibe_name, 
-                    outfit=selected_outfit_name, 
+                    vibe=s_vibe, 
+                    outfit=s_outfit, 
                     character=char_path,
                     outfit_path=outfit_path,
                     vibe_path=vibe_path,
@@ -748,9 +764,14 @@ with tab_wizard:
                     final_prompt_data["model_type"] = render_engine 
                     
                     # Re-resolve paths for execution
-                    char_path = characters_data.get(selected_character_name, selected_character_name)
-                    outfit_path = outfits_data.get(selected_outfit_name)
-                    vibe_path = vibes_data.get(selected_vibe_name)
+                    # Re-resolve paths for execution
+                    s_char = st.session_state.get("wiz_char")
+                    s_outfit = st.session_state.get("wiz_outfit")
+                    s_vibe = st.session_state.get("wiz_vibe")
+
+                    char_path = characters_data.get(s_char, s_char)
+                    outfit_path = outfits_data.get(s_outfit)
+                    vibe_path = vibes_data.get(s_vibe)
                     
                     # OUTPUT SETUP - User Isolated
                     wiz_out_dir = get_user_out_dir("Wizard")
