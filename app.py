@@ -504,35 +504,53 @@ with tab_assets:
         st.divider()
         st.markdown("#### 📂 Your Library")
         
-        # Show what they have
-        if os.path.exists(user_asset_root):
-            for cat in cat_map.values():
-                cat_path = os.path.join(user_asset_root, cat)
-                if os.path.exists(cat_path):
-                    # Filter for valid image files recursively
-                    valid_exts = ('.png', '.jpg', '.jpeg', '.webp')
-                    found_images = []
-                    for root, dirs, files in os.walk(cat_path):
-                        for f in files:
-                            # Skip hidden files
-                            if f.startswith("."): continue
-                            if f.lower().endswith(valid_exts):
-                                found_images.append(os.path.join(root, f))
-                    
-                    if found_images:
-                        with st.expander(f"📁 {cat} ({len(found_images)})", expanded=False):
-                            c_grid = st.columns(6)
-                            for i, p in enumerate(found_images):
-                                f = os.path.basename(p)
-                                # If in a subfolder, show subfolder name in caption
-                                rel_p = os.path.relpath(p, cat_path)
-                                if os.sep in rel_p:
-                                    caption = f"{os.path.dirname(rel_p)} / {f}"
-                                else:
-                                    caption = f
-                                
-                                with c_grid[i % 6]:
-                                    st.image(p, caption=caption, use_container_width=True)
+        # Display directly from Loaded Assets (which includes S3 URLs if in Cloud Mode)
+        # We filter for items starting with "(My)" which load_assets.py applies to user content
+        
+        user_cats = {
+            "Characters": "characters",
+            "Outfits": "outfits",
+            "Environments": "locations", # Mapped
+            "Vibes": "vibes",
+            "Props": "props", 
+            "Pets": "pets",
+            "Friends": "relations",
+            "Vehicles": "vehicles"
+        }
+        
+        found_any = False
+        
+        for ui_cat, data_key in user_cats.items():
+            # Get all assets for this category
+            # all_dict is {Name: Path/URL}
+            all_dict = assets.get(data_key, {})
+            
+            # Filter for User Assets (marked with (My) prefix or checking if it's an S3 URL with 'users/'?)
+            # The cleanest way is relying on the keys from load_assets
+            my_items = {k: v for k, v in all_dict.items() if "(My)" in k}
+            
+            if my_items:
+                found_any = True
+                with st.expander(f"📁 {ui_cat} ({len(my_items)})", expanded=False):
+                    c_grid = st.columns(6)
+                    for i, (name, url) in enumerate(my_items.items()):
+                        # Clean name for display: "(My) Name" -> "Name"
+                        clean_name = name.replace("(My) ", "")
+                        
+                        with c_grid[i % 6]:
+                            st.image(url, caption=clean_name, use_container_width=True)
+                            
+        if not found_any:
+            st.info("No custom assets found yet. Upload one above!")
+            
+        # Debug Info for User Peace of Mind
+        if os.getenv("S3_BUCKET_NAME"):
+            st.success(f"☁️ Cloud Mode Active: Syncing with S3 ({os.getenv('S3_BUCKET_NAME')})")
+        else:
+            if os.path.exists(user_asset_root):
+                st.caption(f"📂 Local Storage: {user_asset_root}")
+            else:
+                st.warning("⚠️ Local Storage Missing (Expected on Cloud if S3 not fully synced)")
 
 
 # ==========================================
@@ -1248,44 +1266,100 @@ with tab_series:
                                         final_assets_payload = []
                                         resolved_names = []
                                         
-                                        # A. Resolve Lead Characters
-                                        if char_list:
-                                            for raw_name in char_list:
-                                                # 1. Resolve Face
-                                                # Lookup Strategy: Exact -> 1st Word -> Normalized 1st Word
-                                                naive_key = raw_name.split(' ')[0]
-                                                c_path = st.session_state.cast_lookup_map.get(naive_key)
-                                                
-                                                if not c_path:
-                                                    if '_' in raw_name:
-                                                        norm_key = raw_name.replace('_', ' ').split(' ')[0]
-                                                        c_path = st.session_state.cast_lookup_map.get(norm_key)
-                                                        if c_path: naive_key = norm_key # Update key for outfit lookup
-                                                
-                                                if c_path:
-                                                    final_assets_payload.append({
-                                                        "path": c_path,
-                                                        "label": f"Cast: {raw_name}"
-                                                    })
-                                                    resolved_names.append(raw_name)
-                                                    
-                                                    # 2. Resolve Outfit (Linked to this Character)
-                                                    w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                                                    # Robust Strategy: Full Name -> First Name
-                                                    o_name_key = w_snapshot.get(raw_name)
-                                                    
-                                                    if not o_name_key or o_name_key == "Default":
-                                                        o_fallback = w_snapshot.get(naive_key, "Default")
-                                                        if o_fallback != "Default": o_name_key = o_fallback
-                                                        
-                                                    if o_name_key and o_name_key != "Default":
-                                                        o_data = outfits_data.get(o_name_key)
-                                                        if isinstance(o_data, dict): o_data = o_data.get('default_img')
-                                                        if o_data:
-                                                            final_assets_payload.append({
-                                                                "path": o_data,
-                                                                "label": f"Outfit for {raw_name}: {o_name_key}"
-                                                            })
+                              # --- UNIFIED CHARACTER LIST (Global for this Scope) ---
+                # This ensures ALL custom + stock characters are available
+                all_char_opts = {**characters_data} # Start with Stock
+                # User assets are already merged into 'characters_data' by load_assets if logged in!
+                # But let's be double sure we aren't filtering them out.
+                
+                # Update: load_assets DOES merge them into 'characters', so 'characters_data' IS the master list.
+                # However, Mini Series was using 'knowledge_base.get("top_influencers")' which is restricted.
+                # We fix this by defaulting to ALL characters.
+                
+                # Force "The Influencer" to be first if present
+                char_keys = sorted(list(characters_data.keys()))
+                
+                # --- CAST SELECTION ---
+                st.markdown("#### 1. Cast & Crew")
+                
+                # Protagonist Selection (UNIFIED)
+                cast_selection = st.multiselect(
+                    "Select Protagonist(s)", 
+                    options=char_keys,
+                    default=[]
+                )
+                
+                # Save Cast Map for Lookups
+                # We need to map "Name" -> "Path" for the generator
+                # characters_data = {"Name": "Path"}
+                st.session_state.cast_lookup_map = characters_data
+                
+                if cast_selection:
+                    # Wardrobe Logic
+                    st.caption("👗 Wardrobe Selection")
+                    wardrobe_cols = st.columns(len(cast_selection))
+                    
+                    # Store Wardrobe Map for later retrieval during generation
+                    wardrobe_map = {}
+                    
+                    for idx, char_key in enumerate(cast_selection):
+                        with wardrobe_cols[idx]:
+                            # Simplify Name for Display
+                            c_name = char_key.split('/')[-1]
+                            
+                            # Filter Outfits (All Available)
+                            outfit_keys = ["Default (From Image)"] + sorted(list(outfits_data.keys()))
+                            
+                            sel_fit = st.selectbox(f"Outfit: {c_name}", outfit_keys, key=f"fit_sel_{idx}")
+                            if sel_fit == "Default (From Image)":
+                                wardrobe_map[c_name] = "Default"
+                            else:
+                                wardrobe_map[c_name] = sel_fit
+                                
+                            # Try to match First Name for robust lookup
+                            first_name = c_name.split(' ')[0]
+                            wardrobe_map[first_name] = wardrobe_map[c_name]
+                            
+                    st.session_state['cast_wardrobe_map_snapshot'] = wardrobe_map
+                    
+                    # A. Resolve Lead Characters
+                    if char_list:
+                        for raw_name in char_list:
+                            # 1. Resolve Face
+                            # Lookup Strategy: Exact -> 1st Word -> Normalized 1st Word
+                            naive_key = raw_name.split(' ')[0]
+                            c_path = st.session_state.cast_lookup_map.get(naive_key)
+                            
+                            if not c_path:
+                                if '_' in raw_name:
+                                    norm_key = raw_name.replace('_', ' ').split(' ')[0]
+                                    c_path = st.session_state.cast_lookup_map.get(norm_key)
+                                    if c_path: naive_key = norm_key # Update key for outfit lookup
+                            
+                            if c_path:
+                                final_assets_payload.append({
+                                    "path": c_path,
+                                    "label": f"Cast: {raw_name}"
+                                })
+                                resolved_names.append(raw_name)
+                                
+                                # 2. Resolve Outfit (Linked to this Character)
+                                w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                                # Robust Strategy: Full Name -> First Name
+                                o_name_key = w_snapshot.get(raw_name)
+                                
+                                if not o_name_key or o_name_key == "Default":
+                                    o_fallback = w_snapshot.get(naive_key, "Default")
+                                    if o_fallback != "Default": o_name_key = o_fallback
+                                    
+                                if o_name_key and o_name_key != "Default":
+                                    o_data = outfits_data.get(o_name_key)
+                                    if isinstance(o_data, dict): o_data = o_data.get('default_img')
+                                    if o_data:
+                                        final_assets_payload.append({
+                                            "path": o_data,
+                                            "label": f"Outfit for {raw_name}: {o_name_key}"
+                                        })
 
                                     # B. Fallback (If NO characters found, but NOT B-Roll)
                                     is_broll = (shot_idx + 1) in [3, 6, 9, 12]
@@ -1663,9 +1737,28 @@ with tab_world:
                 st.markdown('<div class="hub-card">', unsafe_allow_html=True)
                 st.markdown("##### 👥 Cast & Characters")
                 # A. Protagonist (Single Select)
+                # A. Protagonist (Single Select)
                 st.markdown("###### 1. Protagonist")
-                protag_opts = get_assets_by_category("characters", user_asset_path)
-                protag_key = st.selectbox("Select Protagonist", list(protag_opts.keys()), format_func=lambda x: protag_opts[x].get('name', x) if isinstance(protag_opts[x], dict) else x)  
+                
+                # UNIFIED LIST LOGIC
+                # Merge stock + user assets (already done in characters_data if loaded, but let's be safe)
+                wb_char_opts = {**characters_data}
+                
+                # User Asset Path injection (if not already redundant)
+                if os.path.exists(user_asset_path):
+                     # Re-scan creates "duplicates" but checks for updates. 
+                     # Better to trust load_assets or just add missing.
+                     pass 
+                
+                wb_char_keys = sorted(list(wb_char_opts.keys()))
+                
+                protag_key = st.selectbox(
+                    "Select Protagonist", 
+                    wb_char_keys, 
+                    format_func=lambda x: wb_char_opts[x].get('name', x) if isinstance(wb_char_opts[x], dict) else x
+                )
+                
+                protag_opts = wb_char_opts # Alias for logic below  
             
                 # Handle both World DB dicts and Filesystem paths
                 p_final_path = None
