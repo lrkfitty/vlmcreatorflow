@@ -28,6 +28,13 @@ except ImportError as e:
     st.error(f"Error importing scripts: {e}")
     st.stop()
 
+# --- REMOTE CONFIG INJECTION (Secrets -> Env) ---
+# Ensure helper scripts can see secrets as env vars
+if hasattr(st, "secrets"):
+    for key, val in st.secrets.items():
+        if key not in os.environ:
+            os.environ[key] = str(val)
+
 st.set_page_config(page_title="CreateFlow | Viral Lense Media", layout="wide", page_icon=None)
 
 # --- AUTHENTICATION GATE MOVED AFTER THEME LOADING ---
