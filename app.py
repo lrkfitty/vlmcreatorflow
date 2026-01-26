@@ -635,7 +635,6 @@ with tab_wizard:
             if not auth_mgr.deduct_credits(user, 1):
                 st.error("❌ Insufficient Credits! Please top up.")
             else:
-            else:
                 # Retrieve values from Session State (set by Fragment)
                 s_char = st.session_state.get("wiz_char")
                 s_outfit = st.session_state.get("wiz_outfit")
