@@ -30,10 +30,14 @@ except ImportError as e:
 
 # --- REMOTE CONFIG INJECTION (Secrets -> Env) ---
 # Ensure helper scripts can see secrets as env vars
-if hasattr(st, "secrets"):
-    for key, val in st.secrets.items():
-        if key not in os.environ:
-            os.environ[key] = str(val)
+try:
+    if hasattr(st, "secrets"):
+        for key, val in st.secrets.items():
+            if key not in os.environ:
+                os.environ[key] = str(val)
+except Exception:
+    # Local mode usually doesn't have secrets.toml, which is fine.
+    pass
 
 st.set_page_config(page_title="CreateFlow | Viral Lense Media", layout="wide", page_icon=None)
 
