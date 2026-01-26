@@ -151,7 +151,8 @@ if not st.session_state.authenticated:
     with c2:
         st.markdown("<div style='text-align: center; color: #64748B; font-size: 1rem; font-weight: 500; margin-bottom: 0.5rem;'>Welcome to an all new tool brought to you by</div>", unsafe_allow_html=True)
         st.markdown("<div style='text-align: center; color: #1E293B; font-size: 1.8rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0px;'>VIRAL LENSE MEDIA</div>", unsafe_allow_html=True)
-        st.markdown("<h1 style='text-align: center; font-size: 4.5rem; margin-top: -10px; margin-bottom: 2rem;'>CreateFlow</h1>", unsafe_allow_html=True)
+        # Magic Text H1
+        magic_text("CreateFlow", type="h1")
         
         # Auth Tabs
         tab_login, tab_signup = st.tabs(["Login", "Create Account"])
@@ -175,10 +176,10 @@ with st.sidebar:
     if st.session_state.get("authenticated"):
         u_info = st.session_state.get("current_user", {"username": "Ghost"})
         credits = auth_mgr.get_credits(u_info.get("username"))
-        st.write(f"👤 **{u_info.get('username')}** ({u_info.get('role', 'Viewer')})")
+        st.markdown(f"**{u_info.get('username')}** ({u_info.get('role', 'Viewer')})")
         c1, c2 = st.columns([3, 1])
         with c1:
-             st.write(f"💳 **Credits:** `{credits}`")
+             st.markdown(f"<span style='font-size: 1.5rem; font-weight: 700; color: #fff;'>Credits: {credits}</span>", unsafe_allow_html=True)
         with c2:
              if st.button("🔄", key="refresh_creds", help="Sync Credits"):
                  st.rerun()
@@ -190,9 +191,10 @@ with st.sidebar:
     st.divider()
 
 # HEADER
+# HEADER
 st.markdown("<div class='brand-overline'>Viral Lense Media</div>", unsafe_allow_html=True)
-magic_text("CreateFlow", type="h1")
-st.markdown("<p style='text-align: center; color: #94A3B8; margin-bottom: 3rem; letter-spacing: 0.05em;'>Enterprise-Grade Content Workflow</p>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; font-size: 6rem; font-weight: 800; letter-spacing: -0.05em; margin-bottom: 0.5rem; text-shadow: 0 0 30px rgba(255,255,255,0.1);'>CreateFlow</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #94A3B8; font-size: 1.2rem; margin-bottom: 3rem; letter-spacing: 0.2em; text-transform: uppercase;'>Enterprise-Grade Content Workflow</p>", unsafe_allow_html=True)
 
 # Load Assets
 user_asset_path = None
@@ -267,22 +269,23 @@ def get_user_out_dir(category="General"):
     return path
 
 # --- TABS LAYOUT ---
+# --- TABS LAYOUT ---
 tab_wizard, tab_gallery, tab_assets, tab_series, tab_world, tab_campaign, tab_video, tab_char = st.tabs([
     "Workflow Wizard", 
     "My Gallery",
     "Asset Library",
-    "🎬 Mini Series",
+    "Mini Series",
     "World Builder",
     "Campaign Queue", 
     "Video Studio",
-    "👤 Character Studio"
+    "Character Studio"
 ])
 
 # ==========================================
 # TAB: MY GALLERY
 # ==========================================
 with tab_gallery:
-    st.markdown("### 🖼️ personal Gallery")
+    st.markdown("### Personal Gallery")
     
     if not st.session_state.get("authenticated"):
         st.warning("Please login to see your gallery.")
@@ -368,23 +371,38 @@ with tab_gallery:
         else:
             st.write(f"Found {len(my_images)} images.")
             # Display Grid
+            # Display Grid
             cols = st.columns(4)
             for idx, item in enumerate(my_images):
                 with cols[idx % 4]:
-                    with st.container(border=True):
-                        st.image(item["src"], use_container_width=True)
-                        st.text(item["name"])
-                        
-                        # Download Button logic requires reading data
-                        # Only show if local or if we fetch (performance hit? skip for now)
-                        # st.download_button...
+                    # Magic Card Wrapper with Hover
+                    st.markdown(f"""
+                    <div class="hover-img-container" style="position: relative; margin-bottom: 20px;">
+                        <img src="{item["src"]}" style="width: 100%; border-radius: 12px; border: 1px solid #333;">
+                        <div style="margin-top: 8px;">
+                             <div style="font-size: 0.8rem; color: #888;">{item["name"][:20]}...</div>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Download Action (Hidden visually by CSS but accessible?)
+                    # For now just standard button below until we wire up JS callbacks
+                    # Using the hover_button helper for visual indicator
+                    from execution.magic_ui import hover_button
+                    # st.markdown(hover_button("Download"), unsafe_allow_html=True)  <-- Just visual
+                    
+                    # Actual Download (Streamlit Limitation: Must be native widget for callback)
+                    # We make it small and secondary
+                    if os.path.exists(os.path.abspath(item.get("src", ""))): # Only loop local for now for dl
+                         with open(item["src"], "rb") as file:
+                             st.download_button("Download", data=file, file_name=item["name"], key=f"dl_{idx}")
 
 
 # ==========================================
 # TAB: MY ASSETS
 # ==========================================
 with tab_assets:
-    st.markdown("### 🎨 Personal Asset Management")
+    st.markdown("### Personal Asset Management")
     st.markdown("Upload your own custom content here. It will automatically appear in your generation dropdowns.")
     
     if not st.session_state.get("authenticated"):
@@ -396,10 +414,10 @@ with tab_assets:
         col_up_1, col_up_2 = st.columns([1, 2])
         
         with col_up_1:
-            st.info("ℹ️ **How it works:**\n\n1. Select a category (e.g. Characters).\n2. Upload an image.\n3. Give it a name.\n4. It's now usable in Wizard & World Builder!")
+            st.info("How it works:\n\n1. Select a category (e.g. Characters).\n2. Upload an image.\n3. Give it a name.\n4. It's now usable in Wizard & World Builder!")
             
         with col_up_2:
-            st.markdown("##### 📤 Upload New Asset")
+            st.markdown("##### Upload New Asset")
             
             # Category Map
             cat_map = {
@@ -1631,7 +1649,7 @@ with tab_series:
 # TAB 1.5: WORLD BUILDER
 # ==========================================
 with tab_world:
-    st.markdown("### 🌍 World Builder")
+    st.markdown("### World Builder")
     st.info("Construct complex scenes with multiple characters, props, and specific assets.")
     
     # Load Real Data
@@ -1642,7 +1660,7 @@ with tab_world:
     # Layout: Full Width for Builder
     # Removed "Asset Database" Column as requested
     
-    st.markdown("#### 🎬 Scenario Director")
+    st.markdown("#### Scenario Director")
     
     # 0. Import Helper
     # Ideally should be at top, but placing here for context
@@ -1655,7 +1673,7 @@ with tab_world:
     # 1. Select Scenario
     with st.container():
         card_begin()
-        st.markdown("#### 🎬 Scenario Director")
+        st.markdown("#### Scenario Director")
         
         # Sort by Category then Name
         scenario_keys = sorted(
@@ -1683,11 +1701,11 @@ with tab_world:
         
         with col_c1:
             with st.container():
-                card_begin()
-                st.markdown("##### 👥 Cast & Characters")
-                # A. Protagonist (Single Select)
-                # A. Protagonist (Single Select)
-                st.markdown("###### 1. Protagonist")
+                 card_begin()
+                 st.markdown("##### Cast & Characters")
+                 # A. Protagonist (Single Select)
+                 # A. Protagonist (Single Select)
+                 st.markdown("###### 1. Protagonist")
                 
                 # UNIFIED LIST LOGIC
                 # Merge stock + user assets (already done in characters_data if loaded, but let's be safe)
@@ -1878,7 +1896,7 @@ with tab_world:
         with col_c2:
             with st.container():
                 card_begin()
-                st.markdown("##### 📍 Setting & Props")
+                st.markdown("##### Setting & Props")
 
                 # C. Pets
                 st.markdown("###### 3. Pets")
@@ -1957,10 +1975,10 @@ with tab_world:
         # V3.9: Wrapped in Form to prevent Camera Settings Reload Loop
         with st.form(key="wb_camera_form"):
             # --- CAMERA CONTROLS ---
-            with st.expander("🎥 Camera & Scene Settings", expanded=False):
+            with st.expander("Camera & Scene Settings", expanded=False):
                 col_cam, col_light, col_action = st.columns(3)
                 with col_cam:
-                    st.markdown("**📸 Hardware**")
+                    st.markdown("**Hardware**")
                     sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []), key="wb_cam")
                     sel_lens = st.selectbox("Lens", ["Auto"] + knowledge_base.get("lenses", []), key="wb_lens")
                     sel_shot = st.selectbox("Shot Type", ["Auto", "Close Up", "Medium Shot", "Full Body", "Wide Shot", "Extreme Close Up", "Cowboy Shot", "Overhead"], key="wb_shot") 
@@ -1968,13 +1986,13 @@ with tab_world:
     
     
                 with col_light:
-                    st.markdown("**💡 Lighting & Mood**")
+                    st.markdown("**Lighting & Mood**")
                     sel_lighting = st.selectbox("Lighting", ["Auto"] + knowledge_base.get("lighting", []), key="wb_light")
                     sel_weather = st.selectbox("Weather", ["Auto"] + knowledge_base.get("weather", []), key="wb_weath")
                     sel_film_stock = st.selectbox("Film Stock", ["Auto"] + knowledge_base.get("film_stocks", []), key="wb_stock")
     
                 with col_action:
-                    st.markdown("**🎬 Direction**")
+                    st.markdown("**Direction**")
                     sel_film = st.selectbox("Style", ["Auto"] + knowledge_base.get("styles", []), key="wb_film")
                     sel_angle = st.selectbox("Angle", ["Auto"] + knowledge_base.get("camera_angles", []), key="wb_ang") # Fixed key to match KB
                     sel_filter_look = st.selectbox("Filter / Look", ["Auto"] + knowledge_base.get("filters", []), key="wb_look")
@@ -2008,7 +2026,7 @@ with tab_world:
                     sel_action = st.selectbox("Action", actions, key="wb_act")
             
             # --- CUSTOM DETAILS ---
-            st.markdown("#### 📝 Creative Direction")
+            st.markdown("#### Creative Direction")
             custom_details = st.text_area("Specific Details / Custom Context", placeholder="e.g. Holding a red cup, Laughing uniquely, Cyberpunk neon colors...", help="These details will be added to the prompt.")
     
             # --- PROMPT GENERATION LOGIC UPDATE ---
@@ -2067,7 +2085,7 @@ with tab_world:
             col_ai_btn, col_blank = st.columns([1, 1])
             with col_ai_btn:
                 # FORM SUBMIT BUTTON 1
-                run_director = st.form_submit_button("✨ AI Director: Rewrite & Enhance", help="Uses the World-Class Brain to rewrite this into a masterpiece.")
+                run_director = st.form_submit_button("Director Vision AI (Generate Prompt)", help="Uses the World-Class Brain to rewrite this into a masterpiece.")
             
             if run_director:
                 with st.spinner("Director is rewriting scene..."):
@@ -2167,29 +2185,38 @@ with tab_world:
                      st.toast("🪙 1 Credit Deducted")
              
              if can_proceed:
-                 with st.spinner("Generating..."):
-                     wb_payload = {
-                         "positive_prompt": final_prompt,
-                         "aspect_ratio": sel_ar, 
-                         "model_type": "nano", 
-                         "assets": assets_to_inject
-                     }
-                     res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"))
+             if can_proceed:
+                 # Magic UI Progress
+                 prog_ph = st.empty()
+                 from execution.magic_ui import circular_progress
+                 with prog_ph.container():
+                      circular_progress()
+                      st.caption("Generating...")
+                 
+                 wb_payload = {
+                     "positive_prompt": final_prompt,
+                     "aspect_ratio": sel_ar, 
+                     "model_type": "nano", 
+                     "assets": assets_to_inject
+                 }
+                 res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"))
+                 
+                 prog_ph.empty() # Clear Progress
+                 
+                 with st.expander("Generation Logs", expanded=False):
+                     st.code(res.get("logs", "No logs"))
                      
-                     with st.expander("Generation Logs", expanded=False):
-                         st.code(res.get("logs", "No logs"))
-                         
-                     if res["status"] == "success":
-                         st.session_state['wb_last_img'] = res["image_path"]
-                         if st.session_state.get("authenticated"):
-                             time.sleep(0.5)
-                             st.rerun()
-                     else:
-                         # Refund Logic
-                         username = st.session_state.current_user.get("username")
-                         auth_mgr.add_credits(username, 1)
-                         st.error(f"Generation Failed: {res.get('logs')}")
-                         st.toast("🪙 Credit Refunded")
+                 if res["status"] == "success":
+                     st.session_state['wb_last_img'] = res["image_path"]
+                     if st.session_state.get("authenticated"):
+                         time.sleep(0.5)
+                         st.rerun()
+                 else:
+                     # Refund Logic
+                     username = st.session_state.current_user.get("username")
+                     auth_mgr.add_credits(username, 1)
+                     st.error(f"Generation Failed: {res.get('logs')}")
+                     st.toast("Credit Refunded")
 
         # Display Result (Persistent)
         if 'wb_last_img' in st.session_state and os.path.exists(st.session_state['wb_last_img']):
@@ -2300,7 +2327,7 @@ with tab_world:
                                      )
                 
                 st.divider()
-                if st.button("🚀 Add Storyboard to Campaign Queue", type="primary"):
+                if st.button("Add Storyboard to Campaign Queue", type="primary"):
                     # Capture current assets state
                     import copy
                     current_assets = copy.deepcopy(assets_to_inject)
@@ -2348,19 +2375,25 @@ with tab_world:
             
             # 3. Generate Actions
             if st.button("Generate World Scene", type="primary"):
-                 with st.spinner("Generating with Nano Multimodal..."):
-                     # Construct Payload
-                     wb_payload = {
-                         "positive_prompt": final_prompt,
-                         "aspect_ratio": "4:5", # Default for social
-                         "model_type": "nano", # Force Nano for multi-ref
-                         "assets": assets_to_inject # New Field
-                     }
-                     
-                     res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"))
-                     
-                     if res["status"] == "success":
-                         st.image(res["image_path"], caption="World Build Result")
+                 prog_ph = st.empty()
+                 from execution.magic_ui import circular_progress
+                 with prog_ph.container():
+                      circular_progress()
+                      st.caption("Generating with Nano...")
+
+                 # Construct Payload
+                 wb_payload = {
+                     "positive_prompt": final_prompt,
+                     "aspect_ratio": "4:5", # Default for social
+                     "model_type": "nano", # Force Nano for multi-ref
+                     "assets": assets_to_inject # New Field
+                 }
+                 
+                 res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"))
+                 prog_ph.empty()
+                 
+                 if res["status"] == "success":
+                     st.image(res["image_path"], caption="World Build Result")
                      else:
                          st.error(f"Failed: {res.get('logs')}")
 
@@ -2454,7 +2487,7 @@ with tab_video:
     st.info("Transform your generated images into high-motion video clips using the latest 2026 models.")
     
     # Sub-tabs for Creation vs Gallery
-    v_tab_create, v_tab_gallery = st.tabs(["✨ Generate Video", "📚 Video Gallery (Recover)"])
+    v_tab_create, v_tab_gallery = st.tabs(["Generate Video", "Video Gallery (Recover)"])
     
     with v_tab_gallery:
         # Use User Isolated Directory
@@ -2540,7 +2573,7 @@ with tab_video:
                         quality = st.selectbox("Quality Mode", ["Professional (High Quality, Slower)", "Standard (Fast, Efficient)"])
                         
                     # Advanced Model Override
-                    with st.expander("⚙️ Advanced Model Settings (Override)", expanded=False):
+                    with st.expander("Advanced Model Settings (Override)", expanded=False):
                          model_version_input = st.text_input("Kling Model Version", value="2.6", help="Code auto-converts '2.6' to 'kling-v2-6'.")
                          st.caption("Available: `2.6` (Latest), `1.6` (Stable), `1.5`.")
                          
@@ -2563,7 +2596,7 @@ with tab_video:
                     
                     # Camera Controls
                     camera_data = None
-                    with st.expander("🎥 Camera & Motion Control", expanded=False):
+                    with st.expander("Camera & Motion Control", expanded=False):
                          enable_camera = st.checkbox("Enable Camera Control", value=False)
                          if enable_camera:
                              st.caption("Values range from -10 to 10.")
@@ -2591,7 +2624,7 @@ with tab_video:
     
                     # Motion Transfer (Video Reference)
                     st.divider()
-                    st.markdown("**🕺 Video Driven Motion**")
+                    st.markdown("**Video Driven Motion**")
                     
                     m_tab1, m_tab2 = st.tabs(["🔗 URL Input", "📤 Upload Video"])
                     
@@ -2660,10 +2693,15 @@ with tab_video:
             elif not os.getenv("GOOGLE_API_KEY"):
                 st.error("Missing GOOGLE_API_KEY for Vision Analysis.")
             else:
-                with st.spinner("Analyzing Image Context & Physics..."):
-                    # Save temp for analysis
-                    temp_path = os.path.join("output", "temp_vision_input.png")
-                    with open(temp_path, "wb") as f:
+                prog_ph = st.empty()
+                from execution.magic_ui import circular_progress
+                with prog_ph.container():
+                     circular_progress()
+                     st.caption("Analyzing Context...")
+                
+                # Save temp
+                temp_path = os.path.join("output", "temp_vision_input.png")
+                with open(temp_path, "wb") as f:
                         f.write(video_source_img.getbuffer())
                         
                     suggestion = generate_motion_prompt(temp_path, movement_type=vid_movement, physics_focus=vid_physics)
@@ -2806,14 +2844,14 @@ with tab_video:
 # TAB 8: CHARACTER STUDIO
 # ==========================================
 with tab_char:
-    st.markdown("### 👤 Character Studio")
+    st.markdown("### Character Studio")
     st.info("Design your cast with precision. Used consistently across the platform.")
 
     col_char_ctrl, col_char_view = st.columns([1, 1.5]) 
     
     with col_char_ctrl:
         card_begin()
-        st.markdown("#### 🛠️ Design Specs")
+        st.markdown("#### Design Specs")
         
         with st.form("character_creator_form"):
             # 1. Reference Image
@@ -2849,7 +2887,7 @@ with tab_char:
             # 3. Attributes
             st.markdown("**3. Attributes**")
             
-            with st.expander("👤 Core Identity", expanded=True):
+            with st.expander("Core Identity", expanded=True):
                 c_gender = st.selectbox("Gender", ["Female", "Male", "Non-Binary"])
                 eth_opts = [
                     "Any",
@@ -2862,7 +2900,7 @@ with tab_char:
                 c_age = st.slider("Age", 18, 90, 25)
             
 
-            with st.expander("💇‍♀️ Face & Details", expanded=False):
+            with st.expander("Face & Details", expanded=False):
                 c1, c2 = st.columns(2)
                 with c1:
                     c_hair_col = st.selectbox("Hair Color", ["Any", "Blonde", "Brunette", "Black", "Red", "Platinum", "Pastel Pink", "Grey", "White"])
@@ -2876,7 +2914,7 @@ with tab_char:
                 c_makeup = st.selectbox("Makeup", ["None", "Natural", "Minimal", "Soft Glam", "Heavy Glam", "Goth", "Vintage"])
                 c_skin = st.multiselect("Skin Details", ["Freckles", "Beauty Marks", "Vitiligo", "Tattoos", "Scarring", "Perfect Skin", "Textured Skin", "Wrinkles"])
 
-            with st.expander("💪 Body Composition", expanded=False):
+            with st.expander("Body Composition", expanded=False):
                 st.caption("Customize physique details (0-100)")
                 c_body = st.slider("General Physique", 0, 100, 50, help="0: Skinny | 50: Athletic | 100: Heavy/Curvy")
                 c_muscle = st.slider("Muscle Mass", 0, 100, 20, help="0: Soft | 100: Ripped Bodybuilder")
@@ -2911,7 +2949,7 @@ with tab_char:
 
     with col_char_view:
         card_begin()
-        st.markdown("#### 📸 Studio Preview")
+        st.markdown("#### Studio Preview")
         
         # State Handling
         if create_char:
@@ -2997,7 +3035,7 @@ with tab_char:
             # Save Actions
             c_save, c_sheet = st.columns(2)
             with c_save:
-                if st.button("💾 Save as New Asset", use_container_width=True):
+                if st.button("Save as New Asset", use_container_width=True):
                      if char_name:
                          # Move to User Assets
                          user = st.session_state.current_user.get("username")
@@ -3033,7 +3071,7 @@ with tab_char:
                                  with open(json_path, "rb") as f:
                                      upload_file_obj(f, key_json)
                                  
-                                 st.toast("☁️ Synced to Cloud!")
+                                 st.toast("Synced to Cloud!")
                              except Exception as e:
                                  st.error(f"Cloud Sync Failed: {e}")
                              
@@ -3046,7 +3084,7 @@ with tab_char:
                          st.error("Enter a name in the form.")
             
             with c_sheet:
-                if st.button("🔒 Lock & Create Sheet", use_container_width=True, type="secondary"):
+                if st.button("Lock & Create Sheet", use_container_width=True, type="secondary"):
                     st.session_state["lock_identity_path"] = preview_path
                     st.session_state["trigger_lock_sheet"] = True
                     st.rerun()
@@ -3064,9 +3102,14 @@ with tab_char:
                 
                 user = st.session_state.current_user.get("username")
                 if auth_mgr.deduct_credits(user, 1):
-                    with st.spinner("Locking Identity and Creating Sheet..."):
-                        assets = [{
-                            "path": st.session_state["lock_identity_path"],
+                    prog_ph = st.empty()
+                    from execution.magic_ui import circular_progress
+                    with prog_ph.container():
+                         circular_progress()
+                         st.caption("Creating in Studio...")
+                         
+                    assets = [{
+                        "path": st.session_state["lock_identity_path"],
                             "label": f"Cast: {char_name or 'Main'}"
                         }]
                         payload = {

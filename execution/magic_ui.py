@@ -156,6 +156,95 @@ def inject_magic_css():
             border-right: 1px solid rgba(255,255,255,0.1);
         }
         
+        /* --- DROPDOWNS & MENUS (Black & White) --- */
+        /* Target the clickable box */
+        .stSelectbox div[data-baseweb="select"] > div {
+             background-color: #0A0A0A !important;
+             color: white !important;
+             border: 1px solid #333 !important;
+        }
+        
+        /* Target the dropdown menu list */
+        ul[data-baseweb="menu"] {
+             background-color: #0A0A0A !important;
+             border: 1px solid #333 !important;
+        }
+        
+        /* Target options */
+        li[data-baseweb="option"] {
+             color: #CCC !important;
+        }
+        li[data-baseweb="option"]:hover, li[data-baseweb="option"][aria-selected="true"] {
+             background-color: #333 !important;
+             color: white !important;
+        }
+        
+        /* --- CIRCULAR PROGRESS --- */
+        @keyframes spin {
+             0% { transform: rotate(0deg); }
+             100% { transform: rotate(360deg); }
+        }
+        
+        .circular-loader {
+             width: 48px;
+             height: 48px;
+             border-radius: 50%;
+             background: conic-gradient(#FFFFFF 0%, transparent 40%);
+             position: relative;
+             animation: spin 1s linear infinite;
+        }
+        .circular-loader::before {
+             content: "";
+             position: absolute;
+             inset: 4px;
+             background: #000;
+             border-radius: 50%;
+        }
+        
+        /* --- HOVER DOWNLOAD BUTTON --- */
+        .hover-btn-wrap {
+            position: relative;
+            display: inline-block;
+            overflow: hidden;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        
+        .hover-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #111;
+            color: #FFF;
+            border: 1px solid #333;
+            padding: 8px 16px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            width: 100%;
+        }
+        
+        .hover-btn-wrap:hover .hover-btn {
+             background: #FFF;
+             color: #000;
+             transform: translateY(-100%);
+        }
+        
+        .hover-btn-reveal {
+             position: absolute;
+             inset: 0;
+             display: flex;
+             align-items: center;
+             justify-content: center;
+             background: #FFF;
+             color: #000;
+             transform: translateY(100%);
+             transition: all 0.3s ease;
+        }
+        
+        .hover-btn-wrap:hover .hover-btn-reveal {
+             transform: translateY(0);
+        }
+
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -170,3 +259,21 @@ def card_begin():
 
 def card_end():
     st.markdown('</div>', unsafe_allow_html=True)
+
+def circular_progress():
+    st.markdown('<div class="circular-loader"></div>', unsafe_allow_html=True)
+
+def hover_button(label="Download", key=None):
+    """(Visual Only) Renders the CSS for the hover button. 
+       For actual functionality, we still need st.button or st.download_button overlaid or handled via callbacks.
+       Since Streamlit doesn't allow custom HTML to trigger Python callbacks easily, 
+       we will use this for visual flair on links or static actions, 
+       or wrap a transparent download button on top if possible (tricky).
+       
+       For now, returning HTML string."""
+    return f"""
+    <div class="hover-btn-wrap">
+        <div class="hover-btn">{label}</div>
+        <div class="hover-btn-reveal">⬇</div>
+    </div>
+    """
