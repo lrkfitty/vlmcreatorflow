@@ -314,6 +314,7 @@ if not st.session_state.authenticated:
 
 # --- LOGOUT & SIDEBAR INFO ---
 with st.sidebar:
+    st.caption("v3.9.5 | Build: 2201-DeepFix") # Tracer Bullet
     if st.session_state.get("authenticated"):
         u_info = st.session_state.get("current_user", {"username": "Ghost"})
         credits = auth_mgr.get_credits(u_info.get("username"))
