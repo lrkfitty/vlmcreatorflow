@@ -2185,7 +2185,7 @@ with tab_world:
                      st.toast("🪙 1 Credit Deducted")
              
              if can_proceed:
-             if can_proceed:
+
                  # Magic UI Progress
                  prog_ph = st.empty()
                  from execution.magic_ui import circular_progress
@@ -2394,8 +2394,8 @@ with tab_world:
                  
                  if res["status"] == "success":
                      st.image(res["image_path"], caption="World Build Result")
-                     else:
-                         st.error(f"Failed: {res.get('logs')}")
+                 else:
+                     st.error(f"Failed: {res.get('logs')}")
 
 
 # ==========================================
@@ -2702,11 +2702,11 @@ with tab_video:
                 # Save temp
                 temp_path = os.path.join("output", "temp_vision_input.png")
                 with open(temp_path, "wb") as f:
-                        f.write(video_source_img.getbuffer())
-                        
-                    suggestion = generate_motion_prompt(temp_path, movement_type=vid_movement, physics_focus=vid_physics)
-                    st.session_state["motion_suggestion"] = suggestion
-                    st.rerun()
+                    f.write(video_source_img.getbuffer())
+                    
+                suggestion = generate_motion_prompt(temp_path, movement_type=vid_movement, physics_focus=vid_physics)
+                st.session_state["motion_suggestion"] = suggestion
+                st.rerun()
 
         if "motion_suggestion" in st.session_state:
              # This part is tricky. 'Apply Suggestion' button cannot be outside form targeting inside form.
@@ -3110,21 +3110,21 @@ with tab_char:
                          
                     assets = [{
                         "path": st.session_state["lock_identity_path"],
-                            "label": f"Cast: {char_name or 'Main'}"
-                        }]
-                        payload = {
-                            "positive_prompt": full_prompt,
-                            "width": target_w, "height": target_h,
-                            "model_type": "nano",
-                            "assets": assets
-                        }
-                        res = generate_image_from_prompt(payload, get_user_out_dir("Characters/Concepts"))
-                        if res["status"] == "success":
-                            st.session_state['char_preview'] = res['image_path']
-                            st.session_state['char_final_prompt'] = full_prompt
-                            st.toast("Identity Locked & Sheet Created!")
-                            st.rerun()
-                        else:
-                            auth_mgr.add_credits(user, 1)
-                            st.error("Failed to generate sheet.")
+                        "label": f"Cast: {char_name or 'Main'}"
+                    }]
+                    payload = {
+                        "positive_prompt": full_prompt,
+                        "width": target_w, "height": target_h,
+                        "model_type": "nano",
+                        "assets": assets
+                    }
+                    res = generate_image_from_prompt(payload, get_user_out_dir("Characters/Concepts"))
+                    if res["status"] == "success":
+                        st.session_state['char_preview'] = res['image_path']
+                        st.session_state['char_final_prompt'] = full_prompt
+                        st.toast("Identity Locked & Sheet Created!")
+                        st.rerun()
+                    else:
+                        auth_mgr.add_credits(user, 1)
+                        st.error("Failed to generate sheet.")
         card_end()
