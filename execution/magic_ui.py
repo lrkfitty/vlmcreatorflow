@@ -265,6 +265,20 @@ def inject_magic_css():
              transform: translateY(0);
         }
 
+        /* --- TABS --- */
+        .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
+            font-size: 1.2rem !important; /* Bigger */
+            font-weight: 700 !important; /* Bold */
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        /* Active Tab Highlight */
+        .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
+             color: #FFFFFF !important;
+             border-bottom-color: #38BDF8 !important;
+        }
+
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)

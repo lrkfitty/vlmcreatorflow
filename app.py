@@ -337,6 +337,7 @@ with tab_gallery:
                 st.error(f"Gallery S3 Scan Error: {e}")
                 
         # --- LOCAL SCAN (Fallback or Hybrid) ---
+        # --- LOCAL SCAN (Fallback or Hybrid) ---
         elif os.path.exists(user_root):
             local_imgs = []
             for root, dirs, files in os.walk(user_root):
@@ -376,10 +377,10 @@ with tab_gallery:
                         # Download Logic
                         if os.path.exists(os.path.abspath(item.get("src", ""))):
                              with open(item["src"], "rb") as file:
-                                 st.download_button("⬇️", data=file, file_name=item["name"], key=f"dl_{idx}")
+                                 st.download_button("Download", data=file, file_name=item["name"], key=f"dl_{idx}")
                         else:
                              # S3/URL Link
-                             st.link_button("⬇️", item["src"])
+                             st.link_button("Download", item["src"])
 
                     # Zoom Modal (Expander hack or Dialog)
                     if st.session_state.get(f"zoom_img_{idx}"):
@@ -487,7 +488,7 @@ with tab_assets:
             
             if my_items:
                 found_any = True
-                with st.expander(f"📁 {ui_cat} ({len(my_items)})", expanded=False):
+                with st.expander(f"{ui_cat} ({len(my_items)})", expanded=False):
                     c_grid = st.columns(6)
                     for i, (name, url) in enumerate(my_items.items()):
                         # Clean name for display: "(My) Name" -> "Name"
@@ -2483,7 +2484,7 @@ with tab_video:
                  for vid in videos:
                      vid_path = os.path.join(vid_dir, vid)
                      
-                     with st.expander(f"🎬 {vid}", expanded=True):
+                     with st.expander(f"- {vid}", expanded=True):
                          c1, c2 = st.columns([3, 1])
                          with c1:
                              st.video(vid_path)
@@ -2491,7 +2492,7 @@ with tab_video:
                              st.markdown("**Actions**")
                              with open(vid_path, "rb") as vf:
                                  st.download_button(
-                                     f"⬇️ Download",
+                                     f"Download MP4",
                                      data=vf,
                                      file_name=vid,
                                      mime="video/mp4",
@@ -2601,7 +2602,7 @@ with tab_video:
                     st.divider()
                     st.markdown("**Video Driven Motion**")
                     
-                    m_tab1, m_tab2 = st.tabs(["🔗 URL Input", "📤 Upload Video"])
+                    m_tab1, m_tab2 = st.tabs(["URL Input", "Upload Video"])
                     
                     ref_video_url = None
                     ref_orientation = "image"
