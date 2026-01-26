@@ -136,9 +136,10 @@ def inject_magic_css():
         .stSelectbox > div > div, 
         .stMultiSelect > div > div, 
         .stTextArea > div > div > textarea {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            color: white !important;
+            background-color: #0F172A !important; /* Opaque Dark Slate */
+            border: 1px solid rgba(255, 255, 255, 0.2) !important;
+            color: #FFFFFF !important;
+            caret-color: #38BDF8; /* Cyan Cursor */
             border-radius: 8px !important;
         }
         
