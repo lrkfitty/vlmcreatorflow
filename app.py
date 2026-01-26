@@ -11,7 +11,10 @@ try:
     import importlib
     import load_assets as la_module
     importlib.reload(la_module)
+    import load_assets as la_module
+    importlib.reload(la_module)
     from load_assets import load_assets
+    from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end
     from generate_prompt import generate_prompt_content
     from generate_image import generate_image_from_prompt
     from campaign_runner import CampaignManager
@@ -163,72 +166,11 @@ def apply_custom_theme():
         
         div.stButton > button[kind="secondary"] {
              background: #FFFFFF !important;
-             border: 1px solid #CBD5E1 !important;
-             color: #334155 !important;
-        }
-
-        /* Inputs */
-        .stTextInput > div > div > input, .stTextArea > div > div > textarea, .stSelectbox > div > div, .stMultiSelect > div > div {
-            background-color: #FFFFFF !important;
-            border: 1px solid #CBD5E1 !important;
-            color: #0F172A !important;
-            border-radius: 4px;
-        }
-        
-        /* Dropdowns */
-        ul[data-testid="stSelectboxVirtualDropdown"] {
-             background-color: #FFFFFF !important;
-             border: 1px solid #E2E8F0 !important;
-        }
-        li[role="option"] {
-             color: #0F172A !important;
-        }
-        li[role="option"]:hover {
-             background-color: #F1F5F9 !important;
-        }
-        
-        /* Cards / Containers */
-        .hub-card {
-            background-color: #FFFFFF;
-            border: 1px solid #E2E8F0;
-            border-radius: 8px;
-            padding: 1.5rem;
-            margin-bottom: 1rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-
-        /* Hub Card Titles */
-        .hub-card h4, .hub-card h5 {
-            margin-top: 0 !important;
-            padding-bottom: 0.5rem;
-            border-bottom: 1px solid #F1F5F9;
-            margin-bottom: 1rem;
-        }
-        
-        /* Expander Headers */
-        .streamlit-expanderHeader {
-            background-color: #F8FAFC !important;
-            border: 1px solid #E2E8F0 !important;
-            border-radius: 4px !important;
-            color: #0F172A !important;
-            font-family: 'Montserrat', sans-serif;
-            text-transform: uppercase;
-            font-size: 0.85rem !important;
-        }
-        .streamlit-expanderHeader svg {
-            fill: #0F172A !important;
-        }
-        
-        /* Metrics */
-        [data-testid="stMetricValue"] {
-            color: #0F172A !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
+    # Inject Magic UI styles
+    inject_magic_css()
 
 apply_custom_theme()
 
-# --- NEW AUTHENTICATION UI (MULTI-USER) ---
 # --- NEW AUTHENTICATION UI (MULTI-USER) ---
 # from execution.auth import auth_mgr (Moved to top)
 import extra_streamlit_components as stx
@@ -314,7 +256,7 @@ if not st.session_state.authenticated:
 
 # --- LOGOUT & SIDEBAR INFO ---
 with st.sidebar:
-    st.caption("v3.9.5 | Build: 2201-DeepFix") # Tracer Bullet
+    st.caption("v4.0.0 | Build: Aurora UI") 
     if st.session_state.get("authenticated"):
         u_info = st.session_state.get("current_user", {"username": "Ghost"})
         credits = auth_mgr.get_credits(u_info.get("username"))
@@ -334,8 +276,8 @@ with st.sidebar:
 
 # HEADER
 st.markdown("<div class='brand-overline'>Viral Lense Media</div>", unsafe_allow_html=True)
-st.markdown("<h1 style='text-align: center'>CreateFlow</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #64748B; margin-bottom: 3rem;'>Enterprise-Grade Content Workflow</p>", unsafe_allow_html=True)
+magic_text("CreateFlow", type="h1")
+st.markdown("<p style='text-align: center; color: #94A3B8; margin-bottom: 3rem; letter-spacing: 0.05em;'>Enterprise-Grade Content Workflow</p>", unsafe_allow_html=True)
 
 # Load Assets
 user_asset_path = None
@@ -655,28 +597,28 @@ with tab_wizard:
     def wizard_selectors(vibes, outfits, characters, v_data, o_data, c_data):
         c_v, c_o, c_c = st.columns(3)
         with c_v:
-            st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+            card_begin()
             st.markdown("#### 1. Vibe")
             v = st.selectbox("Choose Aesthetic", vibes, label_visibility="collapsed", key="wiz_vibe")
             if v and v in v_data:
                 st.image(v_data[v], use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+            card_end()
             
         with c_o:
-            st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+            card_begin()
             st.markdown("#### 2. Outfit")
             o = st.selectbox("Choose Outfit", outfits, label_visibility="collapsed", key="wiz_outfit")
             if o and o in o_data:
                 st.image(o_data[o], use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+            card_end()
 
         with c_c:
-            st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+            card_begin()
             st.markdown("#### 3. Character")
             c = st.selectbox("Choose Model", characters, label_visibility="collapsed", key="wiz_char")
             if c and c in c_data:
                 st.image(c_data[c], use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+            card_end()
 
     # Call Fragment
     wizard_selectors(vibes_list, outfits_list, characters_list, vibes_data, outfits_data, characters_data)
@@ -1369,6 +1311,7 @@ with tab_series:
                 char_keys = sorted(list(characters_data.keys()))
                 
                 # --- CAST SELECTION ---
+                card_begin()
                 st.markdown("#### 1. Cast & Crew")
                 
                 # Protagonist Selection (UNIFIED)
@@ -1410,6 +1353,7 @@ with tab_series:
                             wardrobe_map[first_name] = wardrobe_map[c_name]
                             
                     st.session_state['cast_wardrobe_map_snapshot'] = wardrobe_map
+                card_end()
                     
                     # A. Resolve Lead Characters
                     if char_list:
@@ -1794,7 +1738,7 @@ with tab_world:
 
     # 1. Select Scenario
     with st.container():
-        st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+        card_begin()
         st.markdown("#### 🎬 Scenario Director")
         
         # Sort by Category then Name
@@ -1812,7 +1756,7 @@ with tab_world:
         if selected_scenario_key:
             scenario = scenarios[selected_scenario_key]
             st.caption(f"Template: {scenario['template_prompt']}")
-        st.markdown('</div>', unsafe_allow_html=True)
+        card_end()
     
     if selected_scenario_key:
         # --- SCENE COMPOSITION UI (Synced with Filesystem) ---
@@ -1823,7 +1767,7 @@ with tab_world:
         
         with col_c1:
             with st.container():
-                st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+                card_begin()
                 st.markdown("##### 👥 Cast & Characters")
                 # A. Protagonist (Single Select)
                 # A. Protagonist (Single Select)
@@ -2011,11 +1955,14 @@ with tab_world:
                 else:
                     current_selections["RELATIONS"] = "nobody"
 
-                st.markdown('</div>', unsafe_allow_html=True)
+                else:
+                    current_selections["RELATIONS"] = "nobody"
+
+                card_end()
         # --- RIGHT COLUMN: CONTEXT ---
         with col_c2:
             with st.container():
-                st.markdown('<div class="hub-card">', unsafe_allow_html=True)
+                card_begin()
                 st.markdown("##### 📍 Setting & Props")
 
                 # C. Pets
@@ -2090,7 +2037,7 @@ with tab_world:
                 else:
                       current_selections["LOCATION"] = "generic location"
 
-                st.markdown('</div>', unsafe_allow_html=True)
+                card_end()
         
         # V3.9: Wrapped in Form to prevent Camera Settings Reload Loop
         with st.form(key="wb_camera_form"):
@@ -2950,102 +2897,105 @@ with tab_char:
     col_char_ctrl, col_char_view = st.columns([1, 1.5]) 
     
     with col_char_ctrl:
-        with st.container(border=True):
-            st.markdown("#### 🛠️ Design Specs")
+        card_begin()
+        st.markdown("#### 🛠️ Design Specs")
+        
+        with st.form("character_creator_form"):
+            # 1. Reference Image
+            st.markdown("**1. Reference (Optional)**")
+            ref_img = st.file_uploader("Upload Face/Reference", type=['png', 'jpg', 'jpeg'])
             
-            with st.form("character_creator_form"):
-                # 1. Reference Image
-                st.markdown("**1. Reference (Optional)**")
-                ref_img = st.file_uploader("Upload Face/Reference", type=['png', 'jpg', 'jpeg'])
-                
-                # UNIFIED: Add Reference Identity from Library
-                st.caption("Or choose existing Identity:")
-                # Use base 'characters_data' (Unified)
-                char_keys = sorted(list(characters_data.keys()))
-                ref_identity = st.selectbox("Base on Character", ["None"] + char_keys, 
-                                            format_func=lambda x: characters_data[x].get('name', x) if isinstance(characters_data.get(x), dict) else x)
-                
-                # Logic to use ref_identity path if selected and no upload
-                lock_identity_path = None
-                if ref_identity != "None":
-                     val = characters_data[ref_identity]
-                     lock_identity_path = val.get('default_img') if isinstance(val, dict) else val
-                     st.caption(f"Using Identity: {ref_identity.split('/')[-1]}")
-                
-                # Pass this to session state for generation
-                if lock_identity_path:
-                    st.session_state['lock_identity_path'] = lock_identity_path
-                elif 'lock_identity_path' in st.session_state:
-                    del st.session_state['lock_identity_path']
-                
-                # 2. Output Mode
-                st.markdown("**2. Output Format**")
-                output_mode = st.selectbox("Generation Mode", ["Concept Portrait (Vertical)", "Character Sheet (7-Angle Views)"])
-                
-                st.divider()
-                
-                # 3. Attributes
-                st.markdown("**3. Attributes**")
-                
-                with st.expander("👤 Core Identity", expanded=True):
-                    c_gender = st.selectbox("Gender", ["Female", "Male", "Non-Binary"])
-                    eth_opts = [
-                        "Any",
-                        "African American", "East Asian (Korean/Japanese)", "Southeast Asian", 
-                        "South Asian (Indian)", "Middle Eastern", "Mediterranean", 
-                        "Northern European", "Eastern European", "Latino/Hispanic", 
-                        "Indigenous", "Mixed Race", "Afro-Latina", "Nordic"
-                    ]
-                    c_ethnicity = st.selectbox("Ethnicity", eth_opts)
-                    c_age = st.slider("Age", 18, 90, 25)
-                
+            # UNIFIED: Add Reference Identity from Library
+            st.caption("Or choose existing Identity:")
+            # Use base 'characters_data' (Unified)
+            char_keys = sorted(list(characters_data.keys()))
+            ref_identity = st.selectbox("Base on Character", ["None"] + char_keys, 
+                                        format_func=lambda x: characters_data[x].get('name', x) if isinstance(characters_data.get(x), dict) else x)
+            
+            # Logic to use ref_identity path if selected and no upload
+            lock_identity_path = None
+            if ref_identity != "None":
+                 val = characters_data[ref_identity]
+                 lock_identity_path = val.get('default_img') if isinstance(val, dict) else val
+                 st.caption(f"Using Identity: {ref_identity.split('/')[-1]}")
+            
+            # Pass this to session state for generation
+            if lock_identity_path:
+                st.session_state['lock_identity_path'] = lock_identity_path
+            elif 'lock_identity_path' in st.session_state:
+                del st.session_state['lock_identity_path']
+            
+            # 2. Output Mode
+            st.markdown("**2. Output Format**")
+            output_mode = st.selectbox("Generation Mode", ["Concept Portrait (Vertical)", "Character Sheet (7-Angle Views)"])
+            
+            st.divider()
+            
+            # 3. Attributes
+            st.markdown("**3. Attributes**")
+            
+            with st.expander("👤 Core Identity", expanded=True):
+                c_gender = st.selectbox("Gender", ["Female", "Male", "Non-Binary"])
+                eth_opts = [
+                    "Any",
+                    "African American", "East Asian (Korean/Japanese)", "Southeast Asian", 
+                    "South Asian (Indian)", "Middle Eastern", "Mediterranean", 
+                    "Northern European", "Eastern European", "Latino/Hispanic", 
+                    "Indigenous", "Mixed Race", "Afro-Latina", "Nordic"
+                ]
+                c_ethnicity = st.selectbox("Ethnicity", eth_opts)
+                c_age = st.slider("Age", 18, 90, 25)
+            
 
-                with st.expander("💇‍♀️ Face & Details", expanded=False):
-                    c1, c2 = st.columns(2)
-                    with c1:
-                        c_hair_col = st.selectbox("Hair Color", ["Any", "Blonde", "Brunette", "Black", "Red", "Platinum", "Pastel Pink", "Grey", "White"])
-                        c_eye = st.selectbox("Eye Color", ["Any", "Blue", "Green", "Brown", "Hazel", "Grey", "Amber"])
-                        c_tat_style = st.selectbox("Tattoo Style", ["None", "Minimalist", "Traditional", "Tribal", "Geometric", "Full Sleeve", "Henna", "Face Tats"])
-                    with c2:
-                        c_hair_style = st.selectbox("Hair Style", ["Any", "Long Straight", "Wavy", "Curly", "Bob Cut", "Pixie", "Braids", "Messy Bun", "Ponytail", "Buzz Cut", "Afro", "Dreads"])
-                        c_facial = st.selectbox("Facial Hair", ["None", "Stubble", "Beard", "Goatee", "Mustache", "Clean Shaven"])
-                        c_tat_place = st.multiselect("Tattoo Placement", ["Arms", "Chest", "Neck", "Back", "Face", "Legs", "Lower Back"])
-                    
-                    c_makeup = st.selectbox("Makeup", ["None", "Natural", "Minimal", "Soft Glam", "Heavy Glam", "Goth", "Vintage"])
-                    c_skin = st.multiselect("Skin Details", ["Freckles", "Beauty Marks", "Vitiligo", "Tattoos", "Scarring", "Perfect Skin", "Textured Skin", "Wrinkles"])
-
-                with st.expander("💪 Body Composition", expanded=False):
-                    st.caption("Customize physique details (0-100)")
-                    c_body = st.slider("General Physique", 0, 100, 50, help="0: Skinny | 50: Athletic | 100: Heavy/Curvy")
-                    c_muscle = st.slider("Muscle Mass", 0, 100, 20, help="0: Soft | 100: Ripped Bodybuilder")
-                    
-                    # Bust Details
-                    c1, c2 = st.columns([2, 1]) 
-                    with c1:
-                         c_bust = st.slider("Bust Size", 0, 100, 40, help="Applies to Femme characters")
-                    with c2:
-                         c_bust_type = st.selectbox("Bust Type", ["Natural / Drop", "Perky / Athletic", "Augmented / Implants"])
-                    
-                    c_waist = st.slider("Waist Width", 0, 100, 50, help="0: Cinematic Hourglass | 100: Wide")
-                    c_hips = st.slider("Hips Width", 0, 100, 50, help="0: Narrow | 100: Exaggerated Shelf Hips")
-                    
-                    # Glute Details
-                    c3, c4 = st.columns([2, 1])
-                    with c3:
-                        c_glutes = st.slider("Glute Size", 0, 100, 50, help="0: Flat | 100: Exaggerated Bubble Butt")
-                    with c4:
-                        c_glute_type = st.selectbox("Glute Type", ["Soft / Natural", "Athletic / Hard", "BBL / Surgical"])
-
-                # Name
-                st.divider()
-                st.markdown("**4. Finalize**")
-                char_name = st.text_input("Character Name", placeholder="e.g. Sarah")
+            with st.expander("💇‍♀️ Face & Details", expanded=False):
+                c1, c2 = st.columns(2)
+                with c1:
+                    c_hair_col = st.selectbox("Hair Color", ["Any", "Blonde", "Brunette", "Black", "Red", "Platinum", "Pastel Pink", "Grey", "White"])
+                    c_eye = st.selectbox("Eye Color", ["Any", "Blue", "Green", "Brown", "Hazel", "Grey", "Amber"])
+                    c_tat_style = st.selectbox("Tattoo Style", ["None", "Minimalist", "Traditional", "Tribal", "Geometric", "Full Sleeve", "Henna", "Face Tats"])
+                with c2:
+                    c_hair_style = st.selectbox("Hair Style", ["Any", "Long Straight", "Wavy", "Curly", "Bob Cut", "Pixie", "Braids", "Messy Bun", "Ponytail", "Buzz Cut", "Afro", "Dreads"])
+                    c_facial = st.selectbox("Facial Hair", ["None", "Stubble", "Beard", "Goatee", "Mustache", "Clean Shaven"])
+                    c_tat_place = st.multiselect("Tattoo Placement", ["Arms", "Chest", "Neck", "Back", "Face", "Legs", "Lower Back"])
                 
-                # Submit
-                st.markdown("<br>", unsafe_allow_html=True)
-                create_char = st.form_submit_button("✨ Generate Character", type="primary", use_container_width=True)
+                c_makeup = st.selectbox("Makeup", ["None", "Natural", "Minimal", "Soft Glam", "Heavy Glam", "Goth", "Vintage"])
+                c_skin = st.multiselect("Skin Details", ["Freckles", "Beauty Marks", "Vitiligo", "Tattoos", "Scarring", "Perfect Skin", "Textured Skin", "Wrinkles"])
+
+            with st.expander("💪 Body Composition", expanded=False):
+                st.caption("Customize physique details (0-100)")
+                c_body = st.slider("General Physique", 0, 100, 50, help="0: Skinny | 50: Athletic | 100: Heavy/Curvy")
+                c_muscle = st.slider("Muscle Mass", 0, 100, 20, help="0: Soft | 100: Ripped Bodybuilder")
+                
+                # Bust Details
+                c1, c2 = st.columns([2, 1]) 
+                with c1:
+                     c_bust = st.slider("Bust Size", 0, 100, 40, help="Applies to Femme characters")
+                with c2:
+                     c_bust_type = st.selectbox("Bust Type", ["Natural / Drop", "Perky / Athletic", "Augmented / Implants"])
+                
+                c_waist = st.slider("Waist Width", 0, 100, 50, help="0: Cinematic Hourglass | 100: Wide")
+                c_hips = st.slider("Hips Width", 0, 100, 50, help="0: Narrow | 100: Exaggerated Shelf Hips")
+                
+                # Glute Details
+                c3, c4 = st.columns([2, 1])
+                with c3:
+                    c_glutes = st.slider("Glute Size", 0, 100, 50, help="0: Flat | 100: Exaggerated Bubble Butt")
+                with c4:
+                    c_glute_type = st.selectbox("Glute Type", ["Soft / Natural", "Athletic / Hard", "BBL / Surgical"])
+
+            # Name
+            st.divider()
+            st.markdown("**4. Finalize**")
+            char_name = st.text_input("Character Name", placeholder="e.g. Sarah")
+            
+            # Submit
+            st.markdown("<br>", unsafe_allow_html=True)
+            create_char = st.form_submit_button("✨ Generate Character", type="primary", use_container_width=True)
+            
+        card_end()
 
     with col_char_view:
+        card_begin()
         st.markdown("#### 📸 Studio Preview")
         
         # State Handling
@@ -3219,3 +3169,4 @@ with tab_char:
                         else:
                             auth_mgr.add_credits(user, 1)
                             st.error("Failed to generate sheet.")
+        card_end()
