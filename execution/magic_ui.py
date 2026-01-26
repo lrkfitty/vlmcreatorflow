@@ -156,37 +156,45 @@ def inject_magic_css():
             border-right: 1px solid rgba(255,255,255,0.1);
         }
         
-        /* --- DROPDOWNS & MENUS (Aggressive Override) --- */
-        /* 1. The Container */
-        .stSelectbox > div[data-baseweb="select"] > div {
+        /* --- DROPDOWNS & MENUS (NUCLEAR OPTION) --- */
+        /* Force EVERYTHING inside the dropdown menu to be Black Bg / White Text */
+        
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[data-baseweb="menu"] {
              background-color: #000000 !important;
              color: #FFFFFF !important;
              border: 1px solid #333 !important;
         }
 
-        /* 2. The Popover (Menu) */
-        ul[data-baseweb="menu"],
-        div[data-baseweb="popover"] {
-             background-color: #000000 !important;
-             border: 1px solid #333 !important;
-        }
-
-        /* 3. Options */
         li[data-baseweb="option"] {
              background-color: #000000 !important;
-             color: #CCCCCC !important;
+             color: #E0E0E0 !important; /* Slightly off-white for contrast */
+        }
+        
+        li[data-baseweb="option"] * {
+             color: #E0E0E0 !important;
         }
 
-        /* 4. Selected/Hover Option */
         li[data-baseweb="option"]:hover,
         li[data-baseweb="option"][aria-selected="true"] {
              background-color: #222222 !important;
              color: #FFFFFF !important;
         }
         
-        /* 5. SVG Icons (Chevron) */
-        .stSelectbox svg {
-             fill: #FFFFFF !important;
+        li[data-baseweb="option"]:hover *,
+        li[data-baseweb="option"][aria-selected="true"] * {
+             color: #FFFFFF !important;
+        }
+
+        /* The container box */
+        .stSelectbox div[data-baseweb="select"] > div {
+             background-color: #000000 !important;
+             color: #FFFFFF !important;
+             border: 1px solid #444 !important;
+        }
+        
+        .stSelectbox div[data-baseweb="select"] > div * {
              color: #FFFFFF !important;
         }
 

@@ -912,26 +912,9 @@ with tab_series:
             series_script = st.text_area("Episode Synopsis & Dialogue Intent", height=200, placeholder="Synopsis: She finds out he's been lying, but he doesn't know she knows yet.\n\nIntent:\nALICE: Cold, distant.\nBOB: Trying too hard to be casual.")
             
             # V3: Hollywood Camera Controls
-            with st.expander("🎥 Cinematography Settings (Director's Toolkit)", expanded=False):
-                c_cam, c_lens, c_light = st.columns(3)
-                with c_cam:
-                    s_camera = st.selectbox("Camera Body", ["Auto / Director's Choice"] + knowledge_base.get("cameras", []))
-                with c_lens:
-                    s_lens = st.selectbox("Lens Package", ["Auto / Director's Choice"] + knowledge_base.get("lenses", []))
-                with c_light:
-                    s_lighting = st.selectbox("Lighting Style", ["Auto / Director's Choice"] + knowledge_base.get("lighting", []))
-                
-                c_stock, c_look = st.columns(2)
-                with c_stock:
-                    s_film_stock = st.selectbox("Film Stock", ["Auto"] + knowledge_base.get("film_stocks", []), key="series_stock")
-                with c_look:
-                    s_filter_look = st.selectbox("Filter / Look", ["Auto"] + knowledge_base.get("filters", []), key="series_filter")
-
-                c_style, c_trans = st.columns(2)
-                with c_style:
-                     s_movie_style = st.selectbox("Movie Aesthetic", ["Auto"] + knowledge_base.get("movie_styles", []), key="series_style")
-                with c_trans:
-                     s_transition_style = st.selectbox("Transition Style (B-Roll)", ["Auto"] + knowledge_base.get("transitions", []), key="series_trans")
+            # Cinematography Settings Removed to fix Ghost Text
+            # We will use auto-director logic
+            st.caption("Director's Choice: Auto-Cinematography Enabled")
             
             st.markdown("<br>", unsafe_allow_html=True)
             submit_director = st.form_submit_button("✨ Director Vision AI", type="primary", use_container_width=True)
