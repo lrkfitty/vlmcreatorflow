@@ -181,7 +181,12 @@ def build_character_prompt(attributes):
     
     # Environment & Style (Studio)
     env = "professional studio photography, solid neutral background, seamless backdrop"
-    lighting = "soft studio lighting, rembrandt lighting, photography, 8k, highly detailed, sharp focus, consistent anatomy"
+    
+    # TEXTURE & REALISM BOOST (User Key Requirement)
+    # 2026-01-26: Added High Fidelity Skin/Hair Tokens
+    texture_boost = "(natural skin texture:1.3), (visible pores:1.2), (subsurface scattering:1.2), (vellus hair:1.1), (detailed iris:1.2), (hyperrealistic hair strands:1.2), 8k, raw photo, fuji film"
+    
+    lighting = f"soft studio lighting, rembrandt lighting, photography, highly detailed, sharp focus, consistent anatomy, {texture_boost}"
     
     # Outfit (Smart Default)
     outfit = attributes.get("outfit", "")
