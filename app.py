@@ -1703,7 +1703,13 @@ with tab_world:
                             p_final_name = p_val['name']
                             p_final_path = p_val.get('default_img')
                         else:
-                            p_final_name = protag_key.split('/')[-1]
+                            # Filesystem Asset
+                            filename = protag_key.split('/')[-1]
+                            if "default" in filename.lower():
+                                 # Use parent dir as name
+                                 p_final_name = protag_key.split('/')[-2]
+                            else:
+                                 p_final_name = os.path.splitext(filename)[0]
                             p_final_path = p_val
                     
                         temp_selections["PROTAGONIST"] = p_final_name
@@ -2034,7 +2040,7 @@ with tab_world:
                         filter_look=(sel_filter_look if sel_filter_look != "Auto" else None),
                         
                         additional_notes=f"REWRITE THIS SCENE to be cinematic, high-fashion, and detailed. Keep the character consistent: {final_prompt}",
-                        model_engine="gpt-4o"
+                        model_engine=prompt_engine # Use currently selected brain (Gemini 2.0)
                     )
                     
                     if enhanced_res and "positive_prompt" in enhanced_res:
