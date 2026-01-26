@@ -2055,9 +2055,9 @@ with tab_world:
                     if enhanced_res and "positive_prompt" in enhanced_res:
                         # final_prompt = enhanced_res["positive_prompt"] <--- REMOVED to prevent conflict with change detector
                         st.session_state['wb_manual_prompt'] = enhanced_res["positive_prompt"]
+                        st.session_state['last_calculated_prompt'] = enhanced_res["positive_prompt"] # Update this too so it doesn't revert
                         st.toast("Prompt Upgraded by AI Director!")
-                        # Force refresh
-                        # We won't rerun, checking if session state key helps below
+                        st.rerun()
     
             # --- STATE MANAGEMENT FOR PROMPT BOX ---
             # We need the box to update when:
