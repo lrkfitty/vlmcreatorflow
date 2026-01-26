@@ -235,37 +235,10 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                             
                             with open(filepath, "wb") as f:
                                 f.write(image_bytes)
-                            
-                            # Upload to S3 if in cloud mode (Streamlit Cloud detection)
-                            s3_url = None
-                            if os.getenv("STREAMLIT_SHARING_MODE") or not os.path.exists("/Users"):
-                                try:
-                                    import boto3
-                                    from io import BytesIO
-                                    
-                                    bucket = os.getenv("S3_BUCKET_NAME")
-                                    region = os.getenv("AWS_REGION", "ap-southeast-2")
-                                    
-                                    if bucket:
-                                        s3 = boto3.client('s3', region_name=region)
-                                        s3_key = f"user_generated/{filename}"
-                                        
-                                        s3.upload_fileobj(
-                                            BytesIO(image_bytes),
-                                            bucket,
-                                            s3_key,
-                                            ExtraArgs={'ContentType': mime_type}
-                                        )
-                                        
-                                        s3_url = f"https://{bucket}.s3.{region}.amazonaws.com/{s3_key}"
-                                        logs.append(f"✅ Uploaded to S3: {s3_url}")
-                                except Exception as e:
-                                    logs.append(f"⚠️ S3 Upload Failed: {e}")
                                 
                             return {
                                 "status": "success",
-                                "image_path": s3_url if s3_url else filepath,
-                                "local_path": filepath,
+                                "image_path": filepath,
                                 "model_used": "nano-banana-pro",
                                 "logs": "\n".join(logs)
                             }

@@ -136,63 +136,27 @@ def load_assets(base_path="assets", user_assets_dir=None):
             data["vibes"] = data["locations"]
 
         # --- User Assets (Cloud Mode Injection) ---
-        # 1. Local User Assets (if any exist in ephemeral storage)
         if user_assets_dir and os.path.exists(user_assets_dir):
             user_cats = {
-                "Characters": "characters", "Environments": "locations", "Outfits": "outfits", 
-                "Vibes": "vibes", "Friends": "relations", "Pets": "pets", 
-                "Props": "props", "Vehicles": "vehicles", "Foods": "foods"
+                "Characters": "characters",
+                "Environments": "locations",
+                "Outfits": "outfits",
+                "Vibes": "vibes",
+                "Friends": "relations",
+                "Pets": "pets",
+                "Props": "props",
+                "Vehicles": "vehicles",
+                "Foods": "foods"
             }
+            
             for folder_name, data_key in user_cats.items():
                 u_path = os.path.join(user_assets_dir, folder_name)
                 if os.path.exists(u_path):
                     user_items = scan_directory(u_path)
                     for name, path in user_items.items():
-                        final_key = f"(Local) {name}"
+                        final_key = f"(My) {name}"
                         data[data_key][final_key] = path
-
-        # 2. S3 Remote Scan for User Assets (Shared storage)
-        # 2. S3 Remote Scan for User Assets (Shared storage)
-        try:
-            import boto3
-            # Re-fetch env vars to ensure this block is independent
-            s3_bucket = os.getenv("S3_BUCKET_NAME")
-            s3_region = os.getenv("AWS_REGION", "ap-southeast-2")
-            
-            if s3_bucket:
-                s3 = boto3.client('s3')
-                # Scan only the 'assets/' prefix for user-saved stuff
-                resp = s3.list_objects_v2(Bucket=s3_bucket, Prefix="assets/")
-                if 'Contents' in resp:
-                    for obj in resp['Contents']:
-                        key = obj['Key']
-                        if key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                            # format: assets/Category/Sub/File.png
-                            parts = key.split("/")
-                            if len(parts) >= 3:
-                                cat_folder = parts[1].lower()
-                                folder_mapping_s3 = {
-                                    "characters": "characters", "locations": "locations", "environments": "locations",
-                                    "outfits": "outfits", "vibes": "vibes", "friends": "relations", "pets": "pets",
-                                    "props": "props", "vehicles": "vehicles", "foods": "foods"
-                                }
-                                data_key = folder_mapping_s3.get(cat_folder)
-                                if data_key:
-                                    # Generate Name
-                                    sub_parts = parts[2:-1]
-                                    filename = os.path.splitext(parts[-1])[0].replace('_', ' ').title()
-                                    if not sub_parts:
-                                        final_name = filename
-                                    else:
-                                        prefix_str = " / ".join([p.replace('_', ' ').title() for p in sub_parts])
-                                        final_name = f"{prefix_str} / {filename}"
-                                    
-                                    final_key = f"(Cloud) {final_name}"
-                                    url = f"https://{s3_bucket}.s3.{s3_region}.amazonaws.com/{key.replace(' ', '%20')}"
-                                    data[data_key][final_key] = url
-
-        except Exception as e:
-            print(f"⚠️ S3 Asset Scan Failed: {e}")
+                        print(f"✅ Loaded User Asset (Cloud Mode): {final_key} -> {path}")
             
         return data
 

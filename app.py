@@ -25,14 +25,7 @@ try:
     from execution.auth import auth_mgr
     from execution.character_utils import build_character_prompt, get_character_sheet_prompt
 except ImportError as e:
-    import traceback
-    st.error(f"CRITICAL BOOT ERROR: {e}")
-    st.code(traceback.format_exc())
-    st.stop()
-except Exception as e:
-    import traceback
-    st.error(f"UNHANDLED EXCEPTION DURING IMPORT: {e}")
-    st.code(traceback.format_exc())
+    st.error(f"Error importing scripts: {e}")
     st.stop()
 
 st.set_page_config(page_title="CreateFlow | Viral Lense Media", layout="wide", page_icon=None)
@@ -302,28 +295,6 @@ st.markdown("<div class='brand-overline'>Viral Lense Media</div>", unsafe_allow_
 st.markdown("<h1 style='text-align: center'>CreateFlow</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #64748B; margin-bottom: 3rem;'>Enterprise-Grade Content Workflow</p>", unsafe_allow_html=True)
 
-# --- HELPER: FILE ISOLATION ---
-# Returns a user-isolated output path.
-def get_user_out_dir(category="General"):
-    username = st.session_state.current_user.get("username", "guest")
-    user_dir = os.path.join("output", "users", username, category)
-    if not os.path.exists(user_dir):
-        os.makedirs(user_dir, exist_ok=True)
-    return user_dir
-
-def safe_download_button(label, file_path, key=None):
-    """Provides a download button or link depending on if file_path is local or a URL."""
-    fn = os.path.basename(file_path).split('?')[0] # Strip S3 query params if any
-    
-    if file_path.startswith("http"):
-        st.link_button(label, file_path, use_container_width=True, help="Download from Cloud Storage")
-    else:
-        try:
-            with open(file_path, "rb") as f:
-                st.download_button(label, f, file_name=fn, key=key, use_container_width=True)
-        except Exception as e:
-            st.error(f"Download failed: {e}")
-
 # Load Assets
 user_asset_path = None
 if st.session_state.get("authenticated"):
@@ -436,29 +407,14 @@ with tab_gallery:
         
         # Scan for images
         my_images = []
+        if os.path.exists(user_root):
+            for root, dirs, files in os.walk(user_root):
+                for file in files:
+                    if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                        my_images.append(os.path.join(root, file))
         
-        # Check if running on Streamlit Cloud
-        is_cloud = os.getenv("STREAMLIT_SHARING_MODE") or not os.path.exists("/Users")
-        
-        if is_cloud:
-            # Load from S3
-            try:
-                from execution.s3_gallery import list_user_images_from_s3
-                s3_images = list_user_images_from_s3(username)
-                my_images = [img["url"] for img in s3_images]
-                if s3_images:
-                    st.caption(f"☁️ Cloud Mode: Loaded {len(s3_images)} images from S3")
-            except Exception as e:
-                st.warning(f"⚠️ Could not load from S3: {e}")
-        else:
-            # Load from local filesystem
-            if os.path.exists(user_root):
-                for root, dirs, files in os.walk(user_root):
-                    for file in files:
-                        if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                            my_images.append(os.path.join(root, file))
-                # Sort by Modified Time (Newest First)
-                my_images.sort(key=lambda x: os.path.getmtime(x), reverse=True)
+        # Sort by Modified Time (Newest First)
+        my_images.sort(key=lambda x: os.path.getmtime(x), reverse=True)
         
         if not my_images:
             st.info(f"No images found in `{username}`'s folder yet. Go to 'Workflow Wizard' to create something!")
@@ -473,8 +429,9 @@ with tab_gallery:
                         st.image(img_path, use_container_width=True)
                         st.text(os.path.basename(img_path))
                         
-                        # Download Handling (File vs URL)
-                        safe_download_button("⬇️ View/Download", img_path, key=f"gal_dl_{idx}")
+                        # Download
+                        with open(img_path, "rb") as f:
+                            st.download_button("⬇️", f, file_name=os.path.basename(img_path), key=f"gal_dl_{idx}")
 
 
 # ==========================================
@@ -827,7 +784,8 @@ with tab_wizard:
                                 st.caption(f"📁 {abs_path}")
                                 
                                 # Add download button
-                                safe_download_button("⬇️ Download", img_path, key=f"dw_{i}")
+                                with open(img_path, "rb") as f:
+                                    st.download_button("⬇️ Download", f, file_name=os.path.basename(img_path), mime="image/png", key=f"dw_{i}")
                             else:
                                 st.error("Failed")
                                 if result: st.write(result)
@@ -1392,10 +1350,18 @@ with tab_series:
                         if f"img_{key_base}" in st.session_state:
                             img_p = st.session_state[f"img_{key_base}"]
                             st.image(img_p, caption=f"Shot {shot_idx+1} (Ready)", use_container_width=True)
+                            
                             # V3.7: Download Button
-                            if img_p.startswith("http") or os.path.exists(img_p):
-                                safe_download_button("⬇️ Download Shot", img_p, key=f"dl_{key_base}")
-                                st.caption(f"Location: {img_p}")
+                            if os.path.exists(img_p):
+                                with open(img_p, "rb") as file:
+                                    st.download_button(
+                                        label="⬇️ Download Shot",
+                                        data=file,
+                                        file_name=os.path.basename(img_p),
+                                        mime="image/png",
+                                        key=f"dl_{key_base}"
+                                    )
+                                st.caption(f"Saved to: {img_p}")
                         else:
                             st.info("No Image Generated")
                     
@@ -2144,12 +2110,12 @@ with tab_world:
                          st.toast("🪙 Credit Refunded")
 
         # Display Result (Persistent)
-        if 'wb_last_img' in st.session_state:
+        if 'wb_last_img' in st.session_state and os.path.exists(st.session_state['wb_last_img']):
             last_img = st.session_state['wb_last_img']
-            if last_img.startswith("http") or os.path.exists(last_img):
-                st.image(last_img, caption="World Build Result", use_container_width=True)
-                # Add download button
-                safe_download_button("⬇️ Download Result", last_img, key="wb_dl_final")
+            st.image(last_img, caption="World Build Result", use_container_width=True)
+            
+            with open(last_img, "rb") as f:
+                st.download_button("⬇️ Download Image", f, file_name=os.path.basename(last_img), mime="image/png")
     
     with col_act2:
             st.markdown("#### 🎞️ Storyboard Generator")
@@ -2731,10 +2697,14 @@ with tab_video:
                                 st.write(f"**Direct Link:** [Click to Open]({result.get('video_url')})")
                                 st.video(result.get('video_url'))
                                 
-                                if result.get('video_path') and (result['video_path'].startswith("http") or os.path.exists(result['video_path'])):
-                                    with st.container(border=True):
-                                        st.video(result['video_path'])
-                                        safe_download_button("⬇️ Download Video", result['video_path'], key=f"video_dl_{idx}", mime="video/mp4")
+                                if result.get('video_path') and os.path.exists(result['video_path']):
+                                    with open(result['video_path'], "rb") as v_file:
+                                        st.download_button(
+                                            label="⬇️ Download MP4",
+                                            data=v_file,
+                                            file_name=os.path.basename(result['video_path']),
+                                            mime="video/mp4"
+                                        )
                             else:
                                 if "video_path" in result and result["video_path"]:
                                      # Local file existed but no URL?
@@ -2929,37 +2899,11 @@ with tab_char:
                          asset_dir = os.path.join("output", "users", user, "Assets", "Characters", char_name)
                          os.makedirs(asset_dir, exist_ok=True)
                          
-                         # Copy Image Logic (File vs URL)
+                         # Copy Image
                          new_path = os.path.join(asset_dir, "default.png")
+                         import shutil
+                         shutil.copy(preview_path, new_path)
                          
-                         if preview_path.startswith("http"):
-                             # Download from S3 and save locally
-                             try:
-                                 import requests
-                                 r = requests.get(preview_path)
-                                 with open(new_path, "wb") as f:
-                                     f.write(r.content)
-                             except Exception as e:
-                                 st.error(f"Failed to fetch image for saving: {e}")
-                         else:
-                             import shutil
-                             shutil.copy(preview_path, new_path)
-                         
-                         # Upload to S3 if in cloud mode
-                         is_cloud = os.getenv("STREAMLIT_SHARING_MODE") or not os.path.exists("/Users")
-                         if is_cloud:
-                             try:
-                                 import boto3
-                                 bucket = os.getenv("S3_BUCKET_NAME")
-                                 if bucket:
-                                     s3 = boto3.client('s3')
-                                     s3_key = f"assets/Characters/{char_name}/default.png"
-                                     with open(new_path, "rb") as f:
-                                         s3.upload_fileobj(f, bucket, s3_key, ExtraArgs={'ContentType': 'image/png'})
-                                     st.info(f"✅ Synced {char_name} to Cloud Storage (S3)")
-                             except Exception as e:
-                                 st.warning(f"⚠️ S3 Sync Failed: {e}")
-                                 
                          # Create Metadata
                          details = {
                              "name": char_name,
