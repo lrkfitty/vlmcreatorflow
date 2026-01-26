@@ -25,7 +25,14 @@ try:
     from execution.auth import auth_mgr
     from execution.character_utils import build_character_prompt, get_character_sheet_prompt
 except ImportError as e:
-    st.error(f"Error importing scripts: {e}")
+    import traceback
+    st.error(f"CRITICAL BOOT ERROR: {e}")
+    st.code(traceback.format_exc())
+    st.stop()
+except Exception as e:
+    import traceback
+    st.error(f"UNHANDLED EXCEPTION DURING IMPORT: {e}")
+    st.code(traceback.format_exc())
     st.stop()
 
 st.set_page_config(page_title="CreateFlow | Viral Lense Media", layout="wide", page_icon=None)
