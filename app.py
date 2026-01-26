@@ -364,27 +364,30 @@ with tab_gallery:
             cols = st.columns(4)
             for idx, item in enumerate(my_images):
                 with cols[idx % 4]:
-                    # Magic Card Wrapper with Hover
-                    st.markdown(f"""
-                    <div class="hover-img-container" style="position: relative; margin-bottom: 20px;">
-                        <img src="{item["src"]}" style="width: 100%; border-radius: 12px; border: 1px solid #333;">
-                        <div style="margin-top: 8px;">
-                             <div style="font-size: 0.8rem; color: #888;">{item["name"][:20]}...</div>
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # Functional Gallery Card
+                    st.image(item["src"], use_container_width=True)
                     
-                    # Download Action (Hidden visually by CSS but accessible?)
-                    # For now just standard button below until we wire up JS callbacks
-                    # Using the hover_button helper for visual indicator
-                    # from execution.magic_ui import hover_button # Moved to top
-                    # st.markdown(hover_button("Download"), unsafe_allow_html=True)  <-- Just visual
+                    c_view, c_dl = st.columns([1, 1])
+                    with c_view:
+                        if st.button("🔍", key=f"view_{idx}", help="Zoom Image"):
+                            st.session_state[f"zoom_img_{idx}"] = True
                     
-                    # Actual Download (Streamlit Limitation: Must be native widget for callback)
-                    # We make it small and secondary
-                    if os.path.exists(os.path.abspath(item.get("src", ""))): # Only loop local for now for dl
-                         with open(item["src"], "rb") as file:
-                             st.download_button("Download", data=file, file_name=item["name"], key=f"dl_{idx}")
+                    with c_dl:
+                        # Download Logic
+                        if os.path.exists(os.path.abspath(item.get("src", ""))):
+                             with open(item["src"], "rb") as file:
+                                 st.download_button("⬇️", data=file, file_name=item["name"], key=f"dl_{idx}")
+                        else:
+                             # S3/URL Link
+                             st.link_button("⬇️", item["src"])
+
+                    # Zoom Modal (Expander hack or Dialog)
+                    if st.session_state.get(f"zoom_img_{idx}"):
+                        st.markdown(f"**{item['name']}**")
+                        st.image(item["src"], use_container_width=True)
+                        if st.button("Close View", key=f"close_{idx}"):
+                            del st.session_state[f"zoom_img_{idx}"]
+                            st.rerun()
 
 
 # ==========================================
