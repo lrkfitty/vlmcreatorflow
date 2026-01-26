@@ -87,6 +87,7 @@ class AuthManager:
                 "hash": pass_hash,
                 "salt": salt,
                 "role": "admin",
+                "credits": 1000, # Admin gets more
                 "created_at": time.time()
             }
             # Manually save only to disk to avoid blocking startup with S3 upload
@@ -119,6 +120,7 @@ class AuthManager:
             "hash": pass_hash,
             "salt": salt,
             "role": role,
+            "credits": 200, # Signup Bonus
             "created_at": time.time()
         }
         self.save_users()
@@ -147,12 +149,41 @@ class AuthManager:
             payload = {
                 "username": real_username,
                 "role": user.get("role"),
+                "credits": user.get("credits", 0),
                 "exp": time.time() + (7 * 24 * 60 * 60) # 7 Day Expiry
             }
             token = jwt.encode(payload, self.secret_key, algorithm="HS256")
             return token, "Success"
         else:
             return None, "Invalid Password"
+
+    def get_credits(self, username):
+        """Returns current credit balance."""
+        user = self.users.get(username)
+        if user:
+            return user.get("credits", 0)
+        return 0
+
+    def deduct_credits(self, username, amount=1):
+        """Deducts credits if sufficient balance. Returns True/False."""
+        user = self.users.get(username)
+        if not user: return False
+        
+        current = user.get("credits", 0)
+        if current >= amount:
+            user["credits"] = current - amount
+            self.save_users()
+            return True
+        return False
+        
+    def add_credits(self, username, amount):
+        """Adds credits to user."""
+        user = self.users.get(username)
+        if user:
+            user["credits"] = user.get("credits", 0) + amount
+            self.save_users()
+            return True
+        return False
 
     def verify_token(self, token):
         """Decodes token and returns user info."""

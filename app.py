@@ -273,7 +273,9 @@ if not st.session_state.authenticated:
 with st.sidebar:
     if st.session_state.get("authenticated"):
         u_info = st.session_state.get("current_user", {"username": "Ghost"})
+        credits = auth_mgr.get_credits(u_info.get("username"))
         st.write(f"👤 **{u_info.get('username')}** ({u_info.get('role', 'Viewer')})")
+        st.write(f"💳 **Credits:** `{credits}`")
         if st.button("Logout"):
             cookie_manager.delete("auth_token")
             st.session_state.authenticated = False
@@ -591,10 +593,14 @@ with tab_wizard:
     with col_c_batch:
         campaign_batch = st.number_input("Queue Copies", min_value=1, max_value=10, value=1, help="How many variations to queue?")
 
-    with col_c_btn:
         if st.button("Add to Campaign Queue"):
-            # Get path for Vision
-            char_path = characters_data.get(selected_character_name, selected_character_name)
+            # CHECK CREDITS
+            user = st.session_state.current_user.get("username")
+            if not auth_mgr.deduct_credits(user, 1):
+                st.error("❌ Insufficient Credits! Please top up.")
+            else:
+                # Get path for Vision
+                char_path = characters_data.get(selected_character_name, selected_character_name)
             outfit_path = outfits_data.get(selected_outfit_name)
             vibe_path = vibes_data.get(selected_vibe_name)
             
@@ -1141,7 +1147,11 @@ with tab_series:
                         c_gen, c_type = st.columns([1, 1.5])
                         with c_gen:
                             if st.button(f"Generate Shot {shot_idx+1}", key=f"btn_{key_base}"):
-                                with st.spinner("Rolling camera..."):
+                                user = st.session_state.current_user.get("username")
+                                if not auth_mgr.deduct_credits(user, 1):
+                                    st.error("❌ No Credits!")
+                                else:
+                                    with st.spinner("Rolling camera..."):
                                     # Resolve Character (Using Lookup Map for Robustness)
                                     char_list = shot.get('characters', [])
                                     # AI might say "Shay", Map has "Shay" -> Path
@@ -1309,8 +1319,15 @@ with tab_series:
             with st.status("🎬 Production in progress...", expanded=True) as status:
                 st.write("Initializing Batch Queue...")
                 
-                # Output Setup
-                ep_title = st.session_state.series_storyboard.get('title', 'Untitled_Ep').replace(" ", "_")
+                # ESTIMATE COST
+                total_shots = len(generated_shots_data)
+                user = st.session_state.current_user.get("username")
+                
+                if not auth_mgr.deduct_credits(user, total_shots):
+                    st.error(f"❌ Insufficient Credits for {total_shots} shots!")
+                else:
+                    # Output Setup
+                    ep_title = st.session_state.series_storyboard.get('title', 'Untitled_Ep').replace(" ", "_")
                 base_out = os.path.join(get_user_out_dir("Series"), series_title.replace(" ", "_"), ep_title)
                 os.makedirs(base_out, exist_ok=True)
                 
@@ -2418,7 +2435,10 @@ with tab_video:
         st.divider()
         
         if st.button("Generate Video", type="primary"):
-            if not video_source_img:
+            user = st.session_state.current_user.get("username")
+            if not auth_mgr.deduct_credits(user, 5):
+                st.error("❌ Need 5 Credits for Video!")
+            elif not video_source_img:
                 st.error("Please upload an image first.")
             else:
                 with st.status("Generating Video...", expanded=True) as status:
