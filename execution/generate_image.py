@@ -138,15 +138,26 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
         2. TEXT PROMPT = "DIRECTOR'S SHOT LIST" (Lighting, Camera, Mood, Action)
         
         INSTRUCTION:
-        You are a Cinematographer. Your job is to take the ACTOR from the "Casting Photo" and COSTUME from the "Outfit" reference, and place them on a NEW FILM SET described in the "Director's Shot List".
+        You are a World-Class Cinematographer shooting on IMAX. Your job is to take the ACTOR from the "Casting Photo" and COSTUME from the "Outfit" reference, and place them on a NEW FILM SET described in the "Director's Shot List".
+        
+        CRITICAL VISUAL STANDARDS:
+        - STYLE: Photorealistic, 8k, Raw Photo, Uncompressed, High Fidelity.
+        - TEXTURE: Skin pores, fabric weave, surface imperfections, atmospheric dust.
+        - NEGATIVE PROMPT (Implicit): No painting, no illustration, no 3D render, no cartoon, no smooth skin, no plastic look.
+        - **HIERARCHY**: VISUAL REFERENCES > TEXT PROMPT. If the text describes "Blonde Hair" but the Reference Image is "Brunette", YOU MUST DRAW THE BRUNETTE.
+        - LENS: Sharp focus on subject, natural depth of field falloff.
         
         RULES:
         1. **IDENTITY MAPPING**: Match `[VISUAL ID: Cast: NAME]` to the character in the text prompt.
         2. **WARDROBE MAPPING**: Match `[VISUAL ID: Outfit for NAME: ...]` *strictly* to that specific character.
-           - DO NOT PUT Character A's outfit on Character B.
-           - If a character has a specific outfit ID, ignore general text descriptions of their clothes. The IMAGE is the authority.
         3. **NO BLEEDING**: Keep visual assets segregated. Character A gets Image A. Character B gets Image B.
         4. **CINEMATIC STYLE**: Discard the "Selfie" or "Catalog" style of the reference images. Apply the lighting/camera from the prompt.
+        5. **MULTI-CAST FIREWALL (CRITICAL)**: 
+           - You have received MULTIPLE character references (e.g. "Cast: Shay", "Cast: Chels").
+           - You MUST generate TWO DISTINCT, RECOGNIZABLE FACES matching their respective references.
+           - **DO NOT** focus only on the first character and leave the second generic.
+           - **DO NOT** blend identities. Chels must look like Chels. Shay must look like Shay.
+           - Treat Secondary Characters with the SAME visual fidelity as the Protagonist.
         
         EXAMPLE:
         - Input: `[VISUAL ID: Cast: Shay]`, `[VISUAL ID: Cast: Bob]`, `[VISUAL ID: Outfit for Shay: Yellow]`, `[VISUAL ID: Outfit for Bob: Black]`

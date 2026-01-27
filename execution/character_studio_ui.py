@@ -233,7 +233,7 @@ def render_character_studio(characters_data, get_user_out_dir_func):
                          if bucket:
                              try:
                                  # Upload Image
-                                 key_img = f"users/{user}/Assets/Characters/{char_name}/default.png"
+                                 key_img = f"users/{user}/Assets/Characters/{char_name}/{safe_file_name}"
                                  with open(new_path, "rb") as f:
                                      upload_file_obj(f, key_img)
                                      

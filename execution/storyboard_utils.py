@@ -22,6 +22,8 @@ def generate_storyboard_prompts(scenario_name, context, model="gemini"):
     - The "CONTEXT/DETAILS" provided above is the AUTHORITATIVE SCRIPT. It contains the specific characters, setting, and vibe. 
     - You MUST follow the "CONTEXT/DETAILS" exactly. If it contradicts the generic "SCENARIO NAME", the CONTEXT wins.
     - Example: If Scenario is "Coffee Shop" but Context says "On Mars", the scene IS ON MARS.
+    - **DIRECT ATTENTION TO SPECIFIC CHARACTERS**: If the context mentions specific names (e.g., "Chels"), you MUST focus on them. Ensure their visual identity is maintained.
+    - **SPATIAL CONSISTENCY**: If no new location is explicitly described in the context, assume ALL 4 shots occur in the SAME continuous location. Maintain consistent lighting, background elements, and atmosphere across all shots.
     
     CRITICAL DIRECTION:
     - If there are "Friends" or "Cast" mentioned (e.g., Jess, best friend), they are CO-STARS, not extras.

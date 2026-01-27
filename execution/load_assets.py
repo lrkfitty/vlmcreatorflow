@@ -187,15 +187,15 @@ def load_assets(base_path="assets", user_assets_dir=None):
                         pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
                         
                         user_cats = {
-                            "Characters": "characters",
-                            "Environments": "locations",
-                            "Outfits": "outfits",
-                            "Vibes": "vibes",
-                            "Friends": "relations",
-                            "Pets": "pets",
-                            "Props": "props",
-                            "Vehicles": "vehicles",
-                            "Foods": "foods"
+                            "characters": "characters",
+                            "environments": "locations", "locations": "locations",
+                            "outfits": "outfits", "wardrobe": "outfits", "clothing": "outfits", "influencer clothing": "outfits",
+                            "vibes": "vibes",
+                            "friends": "relations", "relations": "relations",
+                            "pets": "pets",
+                            "props": "props",
+                            "vehicles": "vehicles",
+                            "foods": "foods"
                         }
                         
                         for page in pages:
@@ -206,7 +206,8 @@ def load_assets(base_path="assets", user_assets_dir=None):
                                 if len(k_parts) < 5: continue # Need Category + Name
                                 
                                 # k_parts[0]=users, [1]=user, [2]=Assets, [3]=Category, [4:]=Rest
-                                cat_folder = k_parts[3]
+                                cat_folder_raw = k_parts[3]
+                                cat_folder = cat_folder_raw.lower().strip() # Normalize
                                 target_key = user_cats.get(cat_folder)
                                 
                                 if target_key and key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):

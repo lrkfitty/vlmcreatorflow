@@ -49,8 +49,18 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
     - PRIMARY LOCATION: {environment_name}
     - SECONDARY LOCATION (B-ROLL): {secondary_environment}
     
+    DYNAMIC ENVIRONMENT SCALING:
+    - The PRIMARY LOCATION is the starting point or anchor.
+    - HOWEVER, if the SCRIPT explicitly describes a scene moving to a new place (e.g. 'INT. CAR', 'EXT. PARK'), you MUST update the `location` field and the prompt description to match the NEW location.
+    - Do NOT force the Primary Location if the story leaves it. Follow the narrative journey.
+    
     CAST & ROLES:
     {roles_context}
+    
+    CRITICAL INSTRUCTION - CHARACTER NAMES:
+    - ALWAYS refer to characters by their defined NAME (e.g. "Shay", "Chels").
+    - NEVER refer to them by their Role (e.g. "The Love Interest", "The Main Character").
+    - The Asset System only recognizes NAMES.
     
     {cam_context}
     
@@ -61,27 +71,36 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
        - Example: "Wide shot on Arri Alexa with Anamorphic Lens, cinematic moody lighting..."
     
     2. SCENE BREAKDOWN: transform the script into **EXACTLY 12 VISUAL SHOTS**.
-       - You MUST follow this strict pattern:
-         * Shot 1: Narrative (Character)
-         * Shot 2: Narrative (Character)
-         * Shot 3: B-Roll (Atmosphere/Transition using Secondary Env - NO CHARACTERS)
-         * Shot 4: Narrative (Character)
-         * Shot 5: Narrative (Character)
-         * Shot 6: B-Roll (Global Atmosphere/Detail - NO CHARACTERS)
-         * Shot 7: Narrative (Character)
-         * Shot 8: Narrative (Character)
-         * Shot 9: B-Roll (Transition/Symbolism - NO CHARACTERS)
-         * Shot 10: Narrative (Character)
-         * Shot 11: Narrative (Character)
-         * Shot 12: B-Roll (Closing Shot / Tone - NO CHARACTERS)
+       - **Suggested Structure (Adapt if Narrative Requires):**
+         * Shots 1-2: Narrative (Establish Character/Action)
+         * Shot 3: Organic Transition / Atmosphere (B-Roll OR Reaction Shot)
+         * Shots 4-5: Narrative (Deepen Story)
+         * Shot 6: Mid-Point Bridge (Detail/Environment or Character Moment)
+         * Shots 7-11: Narrative Peak / Resolution
+         * Shot 12: B-Roll (Closing Shot / Tone - NO CHARACTERS) OR Final Hero Shot
+
+       - **CRITICAL RULE ON B-ROLL:**
+         * Do NOT force B-Roll every 4th shot if it breaks the flow.
+         * Only use B-Roll (Environment/Details) if it enhances the pacing or atmosphere.
+         * If the scene is dialogue-heavy or emotional, **PRIORITIZE CHARACTER FOCUS**.
 
     3. VISUAL FIDELITY (CRITICAL - DO NOT FAIL THIS):
        - You have been provided with VISUAL REFERENCE images labeled "Wardrobe".
        - You MUST Use these images as the ABSOLUTE SOURCE OF TRUTH.
-       - **STRICT PROHIBITION**: Do NOT invent, hallucinate, or 'creatively describe' unassigned clothes. 
-       - If a character has a "Wardrobe" reference, you must describe THAT EXACT OUTFIT in forensic detail (color, material, cut).
-       - If the reference shows a "Yellow Top", you CANNOT write "Green Athletic Suit".
-       - **VERIFICATION**: Before outputting a description, ask yourself: "Is this visible in the reference image?" If no, DELETE IT.
+
+       A. **WARDROBE (STRICT)**:
+       - Do NOT describe the outfit's visual details (no colors, materials, patterns).
+       - SIMPLY USE THE OUTFIT NAME provided in the "Character Profiles".
+       - Example: If Wardrobe="Red Dress", write: "Shay wearing the Red Dress".
+       - Do NOT write: "Shay wearing a crimson silk gown with spaghetti straps."
+       - REASON: The Image Generator has the photo. Text descriptions fight with the photo.
+
+       B. **FACES (STRICT)**:
+       - Do NOT describe hair color, eye color, skin tone, or facial structure.
+       - **BAD:** "Shay, a blonde woman with blue eyes..." (Confuses the model if asset differs).
+       - **GOOD:** "Shay, wearing the Red Outfit, smiles..." (Forces model to look at the Asset for face).
+       
+       - **VERIFICATION**: Before outputting a description, ask yourself: "Am I describing a physical trait or outfit detail?" If yes, DELETE IT. Only describe Actions, Lighting, and Environment.
 
     4. B-ROLL RULES:
        - B-Roll shots must NOT focus on main characters. Focus on details, environment, lighting, or objects that set the mood (Tone).

@@ -181,7 +181,9 @@ with st.sidebar:
         with c1:
              st.markdown(f"<span style='font-size: 1.5rem; font-weight: 700; color: #fff;'>Credits: {credits}</span>", unsafe_allow_html=True)
         with c2:
-             if st.button("🔄", key="refresh_creds", help="Sync Credits"):
+             if st.button("🔄", key="refresh_creds", help="Hard Refresh (Clear Cache)"):
+                 st.cache_data.clear()
+                 st.cache_resource.clear()
                  st.rerun()
 
         if st.button("Logout"):
@@ -448,7 +450,24 @@ with tab_assets:
                     # Write
                     with open(full_path, "wb") as f:
                         f.write(uploaded_file.getbuffer())
-                        
+                    
+                    # --- S3 SYNC (Critical Fix) ---
+                    if os.getenv("S3_BUCKET_NAME"):
+                        try:
+                            import boto3
+                            from execution.s3_uploader import upload_file_obj # Try to use helper
+                            
+                            # Key: users/{user}/Assets/{Category}/{Filename}
+                            s3_key = f"users/{username}/Assets/{cat_map[target_cat]}/{filename}"
+                            
+                            # Upload
+                            with open(full_path, "rb") as f_up:
+                                upload_file_obj(f_up, object_name=s3_key)
+                                
+                            st.toast(f"☁️ Synced to Cloud: {filename}")
+                        except Exception as e:
+                            st.error(f"S3 Upload Failed: {e}")
+                            
                     st.success(f"Saved **{final_name}** to {target_cat}!")
                     
                     # Clear Cache to allow new asset to show
@@ -794,833 +813,911 @@ with tab_wizard:
 # TAB 2: MINI SERIES STUDIO
 # ==========================================
 with tab_series:
-    st.markdown("### 🎬 Mini Series Studio")
-    st.info("Create episodic content with consistent cast, wardrobe, and environments.")
+    @st.fragment
+    def mini_series_ui():
+        st.markdown("### 🎬 Mini Series Studio")
+        st.info("Create episodic content with consistent cast, wardrobe, and environments.")
 
-    # --- Session State ---
-    if "series_storyboard" not in st.session_state:
-        st.session_state.series_storyboard = None
+        # --- Session State ---
+        if "series_storyboard" not in st.session_state:
+            st.session_state.series_storyboard = None
 
-    # --- STEP 1: SERIES BIBLE ---
-    with st.expander("📖 Step 1: Series Bible", expanded=True):
-        col_sb1, col_sb2 = st.columns([1, 1])
+        # --- STEP 1: SERIES BIBLE ---
+        with st.expander("📖 Step 1: Series Bible", expanded=True):
+            col_sb1, col_sb2 = st.columns([1, 1])
         
-        with col_sb1:
-            series_title = st.text_input("Series Title", placeholder="The Influencer Life")
+            with col_sb1:
+                series_title = st.text_input("Series Title", placeholder="The Influencer Life")
             
-            # IDENTITY (New V2 Fields)
-            st.markdown("#### 🆔 Identity & Tone")
-            c_gen, c_tone = st.columns(2)
-            with c_gen:
-                s_genre = st.selectbox("Genre", ["General", "Rom-com", "Drama", "Crime", "Thriller", "Horror", "Slice of Life"])
-            with c_tone:
-                s_tone = st.selectbox("Tone", ["Neutral", "Luxury", "Gritty", "Dark", "Soft / Romantic", "Comedic"])
+                # IDENTITY (New V2 Fields)
+                st.markdown("#### 🆔 Identity & Tone")
+                c_gen, c_tone = st.columns(2)
+                with c_gen:
+                    s_genre = st.selectbox("Genre", ["General", "Rom-com", "Drama", "Crime", "Thriller", "Horror", "Slice of Life"])
+                with c_tone:
+                    s_tone = st.selectbox("Tone", ["Neutral", "Luxury", "Gritty", "Dark", "Soft / Romantic", "Comedic"])
             
-            s_len = st.radio("Episode Length", ["30 Seconds", "45 Seconds"], horizontal=True)
+                s_len = st.radio("Episode Length", ["30 Seconds", "45 Seconds"], horizontal=True)
 
-            # Cast Selection (Characters + Friends)
-            st.markdown("#### 🎭 Cast Selection")
+                # Cast Selection (Characters + Friends)
+                st.markdown("#### 🎭 Cast Selection")
             
-            # Use Unified Asset Loader (Matches World Builder)
-            char_opts = get_assets_by_category("characters", user_asset_path)
-            rel_opts = get_assets_by_category("relations", user_asset_path)
-            # Merge for selection
-            all_cast_opts = {**char_opts, **rel_opts}
+                # Use Unified Asset Loader (Matches World Builder)
+                char_opts = get_assets_by_category("characters", user_asset_path)
+                rel_opts = get_assets_by_category("relations", user_asset_path)
+                # Merge for selection
+                all_cast_opts = {**char_opts, **rel_opts}
             
-            # Unified Cast List
-            cast_selection = st.multiselect("Select Cast Members", list(all_cast_opts.keys()))
+                # Unified Cast List
+                cast_selection = st.multiselect("Select Cast Members", list(all_cast_opts.keys()))
             
-            # Wardrobe & Role Mapping (V2)
-            cast_wardrobe_map = {}
-            cast_role_map = {}
+                # Wardrobe & Role Mapping (V2)
+                cast_wardrobe_map = {}
+                cast_role_map = {}
             
-            if cast_selection:
-                st.caption("Assign Roles & Wardrobe:")
-                for member in cast_selection:
-                    st.divider()
-                    c_img, c_info = st.columns([1, 4])
+                if cast_selection:
+                    st.caption("Assign Roles & Wardrobe:")
+                    for i, member in enumerate(cast_selection):
+                        st.divider()
+                        c_img, c_info = st.columns([1, 4])
                     
-                    # Resolve Data & Path (Robust Logic)
-                    c_data = all_cast_opts.get(member)
-                    c_path = None
-                    if isinstance(c_data, dict):
-                        c_path = c_data.get('default_img')
-                    else:
-                        c_path = c_data
-
-                    # Show Thumbnail
-                    with c_img:
-                        if c_path and (os.path.exists(c_path) or c_path.startswith("http")):
-                            st.image(c_path, use_container_width=True)
+                        # Resolve Data & Path (Robust Logic)
+                        c_data = all_cast_opts.get(member)
+                        c_path = None
+                        if isinstance(c_data, dict):
+                            c_path = c_data.get('default_img')
                         else:
-                             st.warning("No IMG")
+                            c_path = c_data
 
-                    with c_info:
-                        st.write(f"**{member.split('/')[-1]}**")
-                        c1, c2 = st.columns(2)
+                        # Show Thumbnail
+                        with c_img:
+                            if c_path and (os.path.exists(c_path) or c_path.startswith("http")):
+                                st.image(c_path, use_container_width=True)
+                            else:
+                                 st.warning("No IMG")
+
+                        with c_info:
+                            st.write(f"**{member.split('/')[-1]}**")
+                            c1, c2 = st.columns(2)
                         
-                        with c1:
-                             # Role Select
-                             role = st.selectbox(f"Role", ["Main Character", "Love Interest", "Antagonist", "Friend", "Background"], key=f"role_{member}")
-                             cast_role_map[member] = role
+                            with c1:
+                                 # AUTOMATED ROLES (User Request)
+                                 # Index 0 = Main, Others = Supporting
+                                 if i == 0:
+                                     role = "Main Character"
+                                     st.markdown("⭐ **Role:** Protagonist")
+                                 else:
+                                     role = "Supporting Character"
+                                     st.markdown("👥 **Role:** Supporting Cast")
+                                     
+                                 cast_role_map[member] = role
 
-                        with c2:
-                             # Outfit Select
-                             outfit_opts = list(outfits_data.keys())
-                             sel_fit = st.selectbox(f"Outfit", ["Default"] + outfit_opts, key=f"series_fit_{member}")
-                             cast_wardrobe_map[member] = sel_fit
+                            with c2:
+                                 # Outfit Select
+                                 outfit_opts = list(outfits_data.keys())
+                                 sel_fit = st.selectbox(f"Outfit", ["Default"] + outfit_opts, key=f"series_fit_{member}")
+                                 cast_wardrobe_map[member] = sel_fit
                              
-                             # Show Outfit Preview
-                             if sel_fit != "Default":
-                                 o_path = outfits_data.get(sel_fit)
-                                 if isinstance(o_path, dict): o_path = o_path.get('default_img')
-                                 if o_path:
-                                     st.image(o_path, width=80)
+                                 # Show Outfit Preview
+                                 if sel_fit != "Default":
+                                     o_path = outfits_data.get(sel_fit)
+                                     if isinstance(o_path, dict): o_path = o_path.get('default_img')
+                                     if o_path:
+                                         st.image(o_path, width=80)
                                          
-                # DEBUG: Check State Sync
-                with st.expander("🛠️ Debug: Wardrobe Selections (Raw)", expanded=False):
-                    st.write(cast_wardrobe_map)
+                    # DEBUG: Check State Sync
+                    with st.expander("🛠️ Debug: Wardrobe Selections (Raw)", expanded=False):
+                        st.write(cast_wardrobe_map)
 
-        with col_sb2:
-            st.markdown("#### 🌍 Series Environments")
-            # Combine Vibes and Locations
-            all_locs = list(vibes_data.keys()) + list(assets.get('locations', {}).keys())
+            with col_sb2:
+                st.markdown("#### 🌍 Series Environments")
+                # Combine Vibes and Locations
+                all_locs = list(vibes_data.keys()) + list(assets.get('locations', {}).keys())
             
-            st.write("**Primary Location** (Main Action)")
-            series_env = st.selectbox("Choose Primary", ["None"] + all_locs)
+                st.write("**Primary Location** (Main Action)")
+                series_env = st.selectbox("Choose Primary", ["None"] + all_locs)
             
-            if series_env and series_env != "None":
-                # Preview
-                path = vibes_data.get(series_env) or assets.get('locations', {}).get(series_env)
-                if path:
-                    if isinstance(path, dict): path = path.get('default_img')
-                    st.image(path, caption="Primary Environment")
+                if series_env and series_env != "None":
+                    # Preview
+                    path = vibes_data.get(series_env) or assets.get('locations', {}).get(series_env)
+                    if path:
+                        if isinstance(path, dict): path = path.get('default_img')
+                        st.image(path, caption="Primary Environment")
             
-            st.write("**Secondary Location** (B-Roll / Cutaways)")
-            sec_env = st.selectbox("Choose B-Roll Vibe", ["None"] + all_locs, key="sec_env")
+                st.write("**Secondary Location** (B-Roll / Cutaways)")
+                sec_env = st.selectbox("Choose B-Roll Vibe", ["None"] + all_locs, key="sec_env")
             
-            if sec_env and sec_env != "None":
-                # Preview Secondary
-                path_sec = vibes_data.get(sec_env) or assets.get('locations', {}).get(sec_env)
-                if path_sec:
-                    if isinstance(path_sec, dict): path_sec = path_sec.get('default_img')
-                    st.image(path_sec, caption="Secondary Environment")
+                if sec_env and sec_env != "None":
+                    # Preview Secondary
+                    path_sec = vibes_data.get(sec_env) or assets.get('locations', {}).get(sec_env)
+                    if path_sec:
+                        if isinstance(path_sec, dict): path_sec = path_sec.get('default_img')
+                        st.image(path_sec, caption="Secondary Environment")
 
-    # --- STEP 2: WRITER'S ROOM ---
-    st.markdown("---")
-    st.markdown("### ✍️ Writer's Room")
+        # --- STEP 2: WRITER'S ROOM ---
+        st.markdown("---")
+        st.markdown("### ✍️ Writer's Room")
     
-    c_script, c_action = st.columns([3, 1])
-    with c_script:
-        with st.form(key="director_form"):
-            series_script = st.text_area("Episode Synopsis & Dialogue Intent", height=200, placeholder="Synopsis: She finds out he's been lying, but he doesn't know she knows yet.\n\nIntent:\nALICE: Cold, distant.\nBOB: Trying too hard to be casual.")
+        c_script, c_action = st.columns([3, 1])
+        with c_script:
+            with st.form(key="director_form"):
+                series_script = st.text_area("Episode Synopsis & Dialogue Intent", height=200, placeholder="Synopsis: She finds out he's been lying, but he doesn't know she knows yet.\n\nIntent:\nALICE: Cold, distant.\nBOB: Trying too hard to be casual.")
             
-            # V3: Hollywood Camera Controls
-            # Cinematography Settings Removed to fix Ghost Text
-            # We will use auto-director logic
-            st.caption("Director's Choice: Auto-Cinematography Enabled")
-            
-            st.markdown("<br>", unsafe_allow_html=True)
-            submit_director = st.form_submit_button("✨ Director Vision AI", type="primary", use_container_width=True)
+                # V3: Hollywood Camera Controls - Restored & Expanded
+                with st.expander("🎥 Cinematography Settings", expanded=False):
+                    c_cam, c_lens = st.columns(2)
+                    with c_cam:
+                         cam_opts = [
+                             "Auto", 
+                             "Arri Alexa 65 (Large Format)", "Arri Alexa Mini LF", "Sony Venice 2 (8K)", 
+                             "RED V-Raptor [VV]", "Panavision Millennium DXL2", 
+                             "IMAX 15/70mm Film", "Kodak Vision3 35mm Film", "16mm Bolex", "Super 8mm",
+                             "iPhone 15 Pro Max (ProRes)", "VHS Camcorder (90s)", "CCTV Security Cam"
+                         ]
+                         s_camera = st.selectbox("Camera Body", cam_opts)
+                     
+                         stock_opts = [
+                             "Auto", 
+                             "Kodak Portra 400", "Kodak Portra 800", "Fujifilm Velvia 100", 
+                             "Cinestill 800T (Halation)", "Kodak Tri-X 400 (B&W)", "Ilford HP5 (Grainy B&W)",
+                             "Technicolor (3-Strip)", "Bleach Bypass (Gritty)"
+                         ]
+                         s_film_stock = st.selectbox("Film Stock / LUT", stock_opts)
 
-    if submit_director:
-            if not series_script:
-                st.error("Please enter a synopsis.")
-            elif not cast_selection:
-                st.error("Please select a cast.")
-            else:
-                with st.spinner("AI Director is breaking down the script..."):
-                    # 1. Clean Cast Names for AI & Map for Lookup
-                    # RE-LOAD ASSETS TO MIRROR WORLD BUILDER RESOLUTION
-                    char_opts = get_assets_by_category("characters", user_asset_path)
-                    rel_opts = get_assets_by_category("relations", user_asset_path)
-                    all_cast_opts = {**char_opts, **rel_opts}
+                    with c_lens:
+                         lens_opts = [
+                             "Auto", 
+                             "Arri Signature Prime", "Cooke S4/i Prime", "Panavision Primo 70", "Canon K-35 Vintage",
+                             "Atlas Orion Anamorphic", "Laowa Probe Lens",
+                             "14mm Ultra Wide", "24mm Wide", "35mm Standard", "50mm Standard", 
+                             "85mm Portrait", "105mm Macro", "200mm Telephoto", "600mm Sniper"
+                         ]
+                         s_lens = st.selectbox("Lens Glass", lens_opts)
+
+                         grade_opts = ["Auto", "Teal & Orange (Blockbuster)", "Vintage Warmth", "Cool Blue", "Noir B&W", "Matrix Green", "Euphoria Purple"]
+                         s_filter_look = st.selectbox("Color Grade", grade_opts)
+                
+                    c_light, c_style = st.columns(2)
+                    with c_light:
+                         light_opts = ["Auto", "Golden Hour", "Studio Softbox", "Rembrandt", "Neon Cyberpunk", "Natural Diffused", "Hard Flash", "Silhouette", "God Rays"]
+                         s_lighting = st.selectbox("Lighting", light_opts)
+                    with c_style:
+                         style_opts = [
+                             "Auto", 
+                             "Wes Anderson (Symmetrical/Pastel)", "Christopher Nolan (IMAX/Cold)", "Denis Villeneuve (Brutalist)",
+                             "Wong Kar-wai (Step Printing)", "Quentin Tarantino (Low Angle)", 
+                             "Euphoria (Glitter/A24)", "Cyberpunk (Neon)", "1950s Technicolor", "1990s Sitcom"
+                         ]
+                         s_movie_style = st.selectbox("Style Reference", style_opts)
+            
+                s_transition_style = st.selectbox("Transition Pacing", ["Standard", "Fast / TikTok", "Slow / Cinematic", "Match Cut"])
+            
+                st.markdown("<br>", unsafe_allow_html=True)
+                submit_director = st.form_submit_button("✨ Director Vision AI", type="primary", use_container_width=True)
+
+        if submit_director:
+                if not series_script:
+                    st.error("Please enter a synopsis.")
+                elif not cast_selection:
+                    st.error("Please select a cast.")
+                else:
+                    with st.spinner("AI Director is breaking down the script..."):
+                        # 1. Clean Cast Names for AI & Map for Lookup
+                        # RE-LOAD ASSETS TO MIRROR WORLD BUILDER RESOLUTION
+                        char_opts = get_assets_by_category("characters", user_asset_path)
+                        rel_opts = get_assets_by_category("relations", user_asset_path)
+                        all_cast_opts = {**char_opts, **rel_opts}
                     
-                    clean_cast_map = {} # {'Shay': '/path/to/real/shay.png'}
-                    clean_names_list = []
+                        clean_cast_map = {} # {'Shay': '/path/to/real/shay.png'}
+                        clean_names_list = []
                     
-                    for full_key in cast_selection:
-                        # RESOLVE PATH (The World Builder Way)
+                        for full_key in cast_selection:
+                            # RESOLVE PATH (The World Builder Way)
+                            c_data = all_cast_opts.get(full_key)
+                            real_path = None
+                            if isinstance(c_data, dict):
+                                real_path = c_data.get('default_img')
+                            else:
+                                real_path = c_data
+                            
+                            # Extract clean NICKNAME
+                            base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                            clean_name = base.split(' ')[0]
+                            
+                            # Fallback if file is named "Default" (e.g. Chels/Default.png)
+                            if "Default" in base or "default" in base.lower():
+                                components = full_key.split('/')
+                                if len(components) > 1:
+                                    clean_name = components[-2].strip() # Use Parent Folder (e.g. "Chels")
+                                    
+                            # Fallback if "Stock Photo"
+                            if "Stock Photo" in clean_name:
+                                clean_name = clean_name.replace("Stock Photo", "").strip()
+                        
+                            # MAP NICKNAME -> RESOLVED PATH (Critical Fix)
+                            if real_path:
+                                clean_cast_map[clean_name] = real_path
+                                clean_names_list.append(clean_name)
+                    
+                        # Store map in session for lookup during generation
+                        st.session_state.cast_lookup_map = clean_cast_map
+
+                        # Clean Roles Map
+                        clean_roles_map = {}
+                        if cast_role_map:
+                            for full_key, role in cast_role_map.items():
+                                base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                                c_name = base.split(' ')[0]
+                                clean_roles_map[c_name] = role
+                        
+                        st.session_state.clean_roles_map = clean_roles_map
+
+                        # Clean Wardrobe Map (NEW)
+                        clean_wardrobe_map = {}
+                        director_refs = [] # List of {path, label}
+                    
+                        if cast_wardrobe_map:
+                            for full_key, outfit in cast_wardrobe_map.items():
+                                base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                                c_name = base.split(' ')[0]
+                                clean_wardrobe_map[c_name] = outfit
+                                # FIX: Also store the full base name as a key (e.g. "Shay Blonde Bob")
+                                # This allows precise lookup if we know the specific asset variation
+                                clean_wardrobe_map[base] = outfit 
+                            
+                                # Resolve Wardrobe Path for Multimodal
+                                if outfit != "Default":
+                                    o_path = outfits_data.get(outfit)
+                                    if isinstance(o_path, dict): o_path = o_path.get('default_img')
+                                    if o_path:
+                                        director_refs.append({
+                                            "path": o_path, 
+                                            "label": f"{base}'s Wardrobe: {outfit}"
+                                        })
+                        
+                            # Store Wardrobe Snapshot for Batch Render (After Loop)
+                            st.session_state.cast_wardrobe_map_snapshot = clean_wardrobe_map
+                    
+                        # Also Add Character Faces (Optional but helpful for casting description)
+                        # DEBUG: Visualize the Map Keys
+                        with st.expander("🛠️ Debug: Wardrobe Snapshot Keys", expanded=False):
+                            st.json(clean_wardrobe_map)
+                            st.write("Resolved Director Refs:", director_refs)
+
+                        for c_name, c_path in clean_cast_map.items():
+                             director_refs.append({
+                                 "path": c_path,
+                                 "label": f"Cast Member: {c_name}"
+                             })
+
+                        # V2 API Call (Passing CLEAN NAMES & CLEAN ROLES & WARDROBE & IMAGES)
+                        sb_data = parse_script_to_scenes(
+                            script_text=series_script, 
+                            cast_list=clean_names_list, 
+                            environment_name=series_env,
+                            genre=s_genre,
+                            tone=s_tone,
+                            roles_map=clean_roles_map,
+                            wardrobe_map=clean_wardrobe_map,
+                            ref_images=director_refs, # <--- PASSING THE IMAGES
+                            secondary_environment=sec_env,
+                            # V3 New Params
+                            camera=s_camera,
+                            lens=s_lens,
+                            lighting=s_lighting,
+                            film_stock=s_film_stock,
+                            filter_look=s_filter_look,
+                            movie_style=s_movie_style,
+                            transition_style=s_transition_style
+                        )
+                    
+                        if "error" in sb_data:
+                            st.error(sb_data['error'])
+                        else:
+                            st.session_state.series_storyboard = sb_data
+                        
+                            # --- STATE FLUSH (Critical Fix for "Blank Prompt") ---
+                            # We must clear old widget states so the text_areas reload from the new JSON data
+                            keys_to_clear = [k for k in st.session_state.keys() if k.startswith(("p_s", "img_s", "m_s", "btn_s"))]
+                            for k in keys_to_clear:
+                                del st.session_state[k]
+
+                            st.success("Director Vision Generated!")
+
+        # --- STEP 3: DIRECTOR MODE ---
+        if st.session_state.series_storyboard:
+            st.markdown("---")
+            st.markdown("### 🎬 Director Mode & Storyboard")
+        
+            sb = st.session_state.series_storyboard
+            st.caption(f"Episode: {sb.get('title', 'Untitled')}")
+        
+            # Iterating Scenes
+            generated_shots_data = [] 
+        
+            # Ensure lookup map exists (handle refresh case)
+            # FORCE REBUILD: Ensure map is always in sync with Sidebar Selection
+            # This fixes "Stale Map" issues where new selections aren't found.
+            if True: # Always run
+                 # Fallback rebuild if missing - MATCHING WORLD BUILDER LOGIC
+                 char_opts = get_assets_by_category("characters", user_asset_path)
+                 rel_opts = get_assets_by_category("relations", user_asset_path)
+                 all_cast_opts = {**char_opts, **rel_opts}
+             
+                 clean_cast_map = {}
+                 # cast_selection comes from the Sidebar (Line 852 approx)
+                 # If cast_selection is empty, we check if st.session_state has it
+                 current_selection = cast_selection if 'cast_selection' in locals() else st.session_state.get('wiz_cast_param', []) # Fallback to widget key if known
+
+                 if current_selection:
+                     for full_key in current_selection:
                         c_data = all_cast_opts.get(full_key)
                         real_path = None
                         if isinstance(c_data, dict):
                             real_path = c_data.get('default_img')
                         else:
                             real_path = c_data
-                            
-                        # Extract clean NICKNAME
-                        base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                    
+                        # Parse Name
+                        base = full_key.split('/')[-1].replace('.png','').replace('.jpg','')
                         clean_name = base.split(' ')[0]
-                        
-                        # MAP NICKNAME -> RESOLVED PATH (Critical Fix)
+                    
                         if real_path:
                             clean_cast_map[clean_name] = real_path
-                            clean_names_list.append(clean_name)
-                    
-                    # Store map in session for lookup during generation
-                    st.session_state.cast_lookup_map = clean_cast_map
-
-                    # Clean Roles Map
-                    clean_roles_map = {}
-                    if cast_role_map:
-                        for full_key, role in cast_role_map.items():
-                            base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
-                            c_name = base.split(' ')[0]
-                            clean_roles_map[c_name] = role
-
-                    # Clean Wardrobe Map (NEW)
-                    clean_wardrobe_map = {}
-                    director_refs = [] # List of {path, label}
-                    
-                    if cast_wardrobe_map:
-                        for full_key, outfit in cast_wardrobe_map.items():
-                            base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
-                            c_name = base.split(' ')[0]
-                            clean_wardrobe_map[c_name] = outfit
-                            # FIX: Also store the full base name as a key (e.g. "Shay Blonde Bob")
-                            # This allows precise lookup if we know the specific asset variation
-                            clean_wardrobe_map[base] = outfit 
                             
-                            # Resolve Wardrobe Path for Multimodal
-                            if outfit != "Default":
-                                o_path = outfits_data.get(outfit)
-                                if isinstance(o_path, dict): o_path = o_path.get('default_img')
-                                if o_path:
-                                    director_refs.append({
-                                        "path": o_path, 
-                                        "label": f"{base}'s Wardrobe: {outfit}"
-                                    })
+                            # Also map FULL base name for exact matches
+                            clean_cast_map[base] = real_path
+
+                 st.session_state.cast_lookup_map = clean_cast_map
+                 
+                 # FORCE REBUILD WARDROBE MAP TOO (Fixes "Standard Outfit" Bug)
+                 cast_wardrobe_map = cast_wardrobe_map if 'cast_wardrobe_map' in locals() else st.session_state.get('wiz_wardrobe_param', {})
+                 clean_wardrobe_map = {}
+                 
+                 if cast_wardrobe_map:
+                     for full_key, outfit in cast_wardrobe_map.items():
+                         base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                         c_name = base.split(' ')[0]
+                         clean_wardrobe_map[c_name] = outfit
+                         clean_wardrobe_map[base] = outfit 
+                 
+                 st.session_state.cast_wardrobe_map_snapshot = clean_wardrobe_map
+        
+            cast_map = st.session_state.cast_lookup_map
+
+            for scene_idx, scene in enumerate(sb.get('scenes', [])):
+                with st.container():
+                    st.markdown(f"#### Scene {scene.get('id')}: {scene.get('location')}")
+                
+                    shots = scene.get('shots', [])
+                    for shot_idx, shot in enumerate(shots):
+                        key_base = f"s{scene_idx}_sh{shot_idx}"
+                        motion_type = "Still" # Safe default to prevent UnboundLocalError
+                        mocap_file = None # Safe default for Mocap
+                    
+                        # 2. Resolve Character Asset (Robust Lookup)
+                        char_list = shot.get('characters', [])
+                        # AI might return "Shay" or "Shay (Happy)", try partial match
+                        char_ref_name = char_list[0] if char_list else None
+                        char_full_key = None
+                    
+                        if char_ref_name:
+                            # Try exact match
+                            char_full_key = cast_map.get(char_ref_name)
+                            # Try fuzzy match if exact fail
+                            if not char_full_key:
+                                for c_name, c_key in cast_map.items():
+                                    if c_name in char_ref_name or char_ref_name in c_name:
+                                        char_full_key = c_key
+                                        break
+                    
+                        # Fallback to first selected cast if no match for Shot 1/2
+                        if not char_full_key and cast_selection and not (shot_idx+1 in [3,6,9,12]):
+                             char_full_key = cast_selection[0]
+
+                        # Path Resolution (Strict Validation)
+                        char_path = characters_data.get(char_full_key) or assets.get('relations', {}).get(char_full_key)
+                        if isinstance(char_path, dict): char_path = char_path.get('default_img')
+                    
+                        # Use 'char_full_key' for wardrobe lookup too
+                        outfit_name = cast_wardrobe_map.get(char_full_key, "Default")
+                        outfit_path = outfits_data.get(outfit_name)
+                        if isinstance(outfit_path, dict): outfit_path = outfit_path.get('default_img')
+                        col_txt, col_img = st.columns([1.5, 1])
+                    
+                        with col_txt:
+                            st.markdown(f"**Shot {shot_idx+1}**")
                         
-                        # Store Wardrobe Snapshot for Batch Render (After Loop)
-                        st.session_state.cast_wardrobe_map_snapshot = clean_wardrobe_map
-                    
-                    # Also Add Character Faces (Optional but helpful for casting description)
-                    # DEBUG: Visualize the Map Keys
-                    with st.expander("🛠️ Debug: Wardrobe Snapshot Keys", expanded=False):
-                        st.json(clean_wardrobe_map)
-                        st.write("Resolved Director Refs:", director_refs)
-
-                    for c_name, c_path in clean_cast_map.items():
-                         director_refs.append({
-                             "path": c_path,
-                             "label": f"Cast Member: {c_name}"
-                         })
-
-                    # V2 API Call (Passing CLEAN NAMES & CLEAN ROLES & WARDROBE & IMAGES)
-                    sb_data = parse_script_to_scenes(
-                        script_text=series_script, 
-                        cast_list=clean_names_list, 
-                        environment_name=series_env,
-                        genre=s_genre,
-                        tone=s_tone,
-                        roles_map=clean_roles_map,
-                        wardrobe_map=clean_wardrobe_map,
-                        ref_images=director_refs, # <--- PASSING THE IMAGES
-                        secondary_environment=sec_env,
-                        # V3 New Params
-                        camera=s_camera,
-                        lens=s_lens,
-                        lighting=s_lighting,
-                        film_stock=s_film_stock,
-                        filter_look=s_filter_look,
-                        movie_style=s_movie_style,
-                        transition_style=s_transition_style
-                    )
-                    
-                    if "error" in sb_data:
-                        st.error(sb_data['error'])
-                    else:
-                        st.session_state.series_storyboard = sb_data
+                            # V3: Display Cinematic Metadata
+                            meta_cols = st.columns(4)
+                            meta_cols[0].caption(f"📏 {shot.get('shot_size', 'Auto')}")
+                            meta_cols[1].caption(f"🎥 {shot.get('camera_angle', 'Auto')}")
+                            meta_cols[2].caption(f"💡 {shot.get('lighting_type', 'Auto')}")
+                            meta_cols[3].caption(f"🎨 {shot.get('composition', 'Auto')}")
                         
-                        # --- STATE FLUSH (Critical Fix for "Blank Prompt") ---
-                        # We must clear old widget states so the text_areas reload from the new JSON data
-                        keys_to_clear = [k for k in st.session_state.keys() if k.startswith(("p_s", "img_s", "m_s", "btn_s"))]
-                        for k in keys_to_clear:
-                            del st.session_state[k]
-
-                        st.success("Director Vision Generated!")
-
-    # --- STEP 3: DIRECTOR MODE ---
-    if st.session_state.series_storyboard:
-        st.markdown("---")
-        st.markdown("### 🎬 Director Mode & Storyboard")
-        
-        sb = st.session_state.series_storyboard
-        st.caption(f"Episode: {sb.get('title', 'Untitled')}")
-        
-        # Iterating Scenes
-        generated_shots_data = [] 
-        
-        # Ensure lookup map exists (handle refresh case)
-        if "cast_lookup_map" not in st.session_state:
-             # Fallback rebuild if missing - MATCHING WORLD BUILDER LOGIC
-             char_opts = get_assets_by_category("characters", user_asset_path)
-             rel_opts = get_assets_by_category("relations", user_asset_path)
-             all_cast_opts = {**char_opts, **rel_opts}
-             
-             clean_cast_map = {}
-             for full_key in cast_selection:
-                c_data = all_cast_opts.get(full_key)
-                real_path = None
-                if isinstance(c_data, dict):
-                    real_path = c_data.get('default_img')
-                else:
-                    real_path = c_data
-                
-                base = full_key.split('/')[-1].replace('.png','').replace('.jpg','')
-                clean_name = base.split(' ')[0]
-                
-                if real_path:
-                    clean_cast_map[clean_name] = real_path
-             st.session_state.cast_lookup_map = clean_cast_map
-        
-        cast_map = st.session_state.cast_lookup_map
-
-        for scene_idx, scene in enumerate(sb.get('scenes', [])):
-            with st.container():
-                st.markdown(f"#### Scene {scene.get('id')}: {scene.get('location')}")
-                
-                shots = scene.get('shots', [])
-                for shot_idx, shot in enumerate(shots):
-                    key_base = f"s{scene_idx}_sh{shot_idx}"
-                    
-                    # 2. Resolve Character Asset (Robust Lookup)
-                    char_list = shot.get('characters', [])
-                    # AI might return "Shay" or "Shay (Happy)", try partial match
-                    char_ref_name = char_list[0] if char_list else None
-                    char_full_key = None
-                    
-                    if char_ref_name:
-                        # Try exact match
-                        char_full_key = cast_map.get(char_ref_name)
-                        # Try fuzzy match if exact fail
-                        if not char_full_key:
-                            for c_name, c_key in cast_map.items():
-                                if c_name in char_ref_name or char_ref_name in c_name:
-                                    char_full_key = c_key
+                            # V3.7: Editable Cast List (Fixes Ghost Characters / Leaking)
+                            # allow user to remove "Boyfriend" if Gemini put him in Shot 1
+                            all_cast_keys = list(st.session_state.cast_lookup_map.keys())
+                            # Normalize defaults to ensure they exist in options
+                            current_chars = shot.get('characters', [])
+                            valid_defaults = []
+                            for c in current_chars:
+                                # Try exact or normalized
+                                if c in all_cast_keys: valid_defaults.append(c)
+                                elif c.replace('_', ' ').split(' ')[0] in all_cast_keys: 
+                                    valid_defaults.append(c.replace('_', ' ').split(' ')[0])
+                                
+                            selected_chars = st.multiselect(
+                                "Cast in Shot", 
+                                options=all_cast_keys,
+                                default=valid_defaults,
+                                key=f"cast_sel_{key_base}",
+                                label_visibility="collapsed",
+                                placeholder="Select Cast..."
+                            )
+                            # UPDATE SHOT DATA so Generator uses this
+                            shot['characters'] = selected_chars
+                        
+                            # V3.8: Time of Day Selector
+                            time_opts = ["Morning", "Noon", "Afternoon", "Golden Hour", "Blue Hour", "Night", "Midnight"]
+                            # AI might have provided a time, otherwise default to Day
+                            ai_time = shot.get('time_of_day', 'Day')
+                        
+                            # Normalize AI output to title case for matching
+                            ai_time_norm = ai_time.title() if ai_time else "Day"
+                            # Find closest match or default
+                            def_idx = 0
+                            for idx, opt in enumerate(time_opts):
+                                if opt.lower() in ai_time_norm.lower():
+                                    def_idx = idx
                                     break
-                    
-                    # Fallback to first selected cast if no match for Shot 1/2
-                    if not char_full_key and cast_selection and not (shot_idx+1 in [3,6,9,12]):
-                         char_full_key = cast_selection[0]
-
-                    # Path Resolution (Strict Validation)
-                    char_path = characters_data.get(char_full_key) or assets.get('relations', {}).get(char_full_key)
-                    if isinstance(char_path, dict): char_path = char_path.get('default_img')
-                    
-                    # Use 'char_full_key' for wardrobe lookup too
-                    outfit_name = cast_wardrobe_map.get(char_full_key, "Default")
-                    outfit_path = outfits_data.get(outfit_name)
-                    if isinstance(outfit_path, dict): outfit_path = outfit_path.get('default_img')
-                    col_txt, col_img = st.columns([1.5, 1])
-                    
-                    with col_txt:
-                        st.markdown(f"**Shot {shot_idx+1}**")
-                        
-                        # V3: Display Cinematic Metadata
-                        meta_cols = st.columns(4)
-                        meta_cols[0].caption(f"📏 {shot.get('shot_size', 'Auto')}")
-                        meta_cols[1].caption(f"🎥 {shot.get('camera_angle', 'Auto')}")
-                        meta_cols[2].caption(f"💡 {shot.get('lighting_type', 'Auto')}")
-                        meta_cols[3].caption(f"🎨 {shot.get('composition', 'Auto')}")
-                        
-                        # V3.7: Editable Cast List (Fixes Ghost Characters / Leaking)
-                        # allow user to remove "Boyfriend" if Gemini put him in Shot 1
-                        all_cast_keys = list(st.session_state.cast_lookup_map.keys())
-                        # Normalize defaults to ensure they exist in options
-                        current_chars = shot.get('characters', [])
-                        valid_defaults = []
-                        for c in current_chars:
-                            # Try exact or normalized
-                            if c in all_cast_keys: valid_defaults.append(c)
-                            elif c.replace('_', ' ').split(' ')[0] in all_cast_keys: 
-                                valid_defaults.append(c.replace('_', ' ').split(' ')[0])
                                 
-                        selected_chars = st.multiselect(
-                            "Cast in Shot", 
-                            options=all_cast_keys,
-                            default=valid_defaults,
-                            key=f"cast_sel_{key_base}",
-                            label_visibility="collapsed",
-                            placeholder="Select Cast..."
-                        )
-                        # UPDATE SHOT DATA so Generator uses this
-                        shot['characters'] = selected_chars
-                        
-                        # V3.8: Time of Day Selector
-                        time_opts = ["Morning", "Noon", "Afternoon", "Golden Hour", "Blue Hour", "Night", "Midnight"]
-                        # AI might have provided a time, otherwise default to Day
-                        ai_time = shot.get('time_of_day', 'Day')
-                        
-                        # Normalize AI output to title case for matching
-                        ai_time_norm = ai_time.title() if ai_time else "Day"
-                        # Find closest match or default
-                        def_idx = 0
-                        for idx, opt in enumerate(time_opts):
-                            if opt.lower() in ai_time_norm.lower():
-                                def_idx = idx
-                                break
-                                
-                        selected_time = st.selectbox(
-                            "Time of Day", 
-                            time_opts, 
-                            index=def_idx,
-                            key=f"time_{key_base}",
-                            label_visibility="collapsed"
-                        )
-                        selected_time = st.selectbox(
-                            "Time of Day", 
-                            time_opts, 
-                            index=def_idx,
-                            key=f"time_{key_base}",
-                            label_visibility="collapsed"
-                        )
-                        shot['time_of_day'] = selected_time
+                            selected_time = st.selectbox(
+                                "Time of Day", 
+                                time_opts, 
+                                index=def_idx,
+                                key=f"time_{key_base}",
+                                label_visibility="collapsed"
+                            )
+                            shot['time_of_day'] = selected_time
 
-                        # V3.9: Transition Selector (Editable)
-                        trans_opts = ["None"] + knowledge_base.get("transitions", [])
-                        sel_trans = st.selectbox("Transition", trans_opts, key=f"trans_{key_base}", label_visibility="collapsed")
-                        shot['transition'] = sel_trans
+                            # V3.9: Transition Selector (Editable)
+                            trans_opts = ["None"] + knowledge_base.get("transitions", [])
+                            sel_trans = st.selectbox("Transition", trans_opts, key=f"trans_{key_base}", label_visibility="collapsed")
+                            shot['transition'] = sel_trans
                         
-                        # Editable Prompt
-                        shot_prompt = st.text_area("Visual Prompt", value=shot.get('visual_prompt'), height=250, key=f"p_{key_base}", label_visibility="collapsed")
-                        st.caption(f"Length: {len(shot_prompt) if shot_prompt else 0} chars (Target: 800+)")
+                            # Editable Prompt
+                            shot_prompt = st.text_area("Visual Prompt", value=shot.get('visual_prompt'), height=250, key=f"p_{key_base}", label_visibility="collapsed")
+                            st.caption(f"Length: {len(shot_prompt) if shot_prompt else 0} chars (Target: 800+)")
                         
-                        # Controls
-                        c_gen, c_type = st.columns([1, 1.5])
-                        with c_gen:
-                            if st.button(f"Generate Shot {shot_idx+1}", key=f"btn_{key_base}"):
-                                user = st.session_state.current_user.get("username")
-                                if not auth_mgr.deduct_credits(user, 1):
-                                    st.error("❌ No Credits!")
-                                else:
-                                    with st.spinner("Rolling camera..."):
-                                        # Resolve Character (Using Lookup Map for Robustness)
-                                        char_list = shot.get('characters', [])
-                                        # AI might say "Shay", Map has "Shay" -> Path
-                                        char_path = None
-                                        char_ref = "Unknown"
-                                        
-                                        # V3.6: Multi-Character Injection Loop
-                                        # Logic: Iterate all characters in the shot to support Two-Shots / Ensemble
-                                        final_assets_payload = []
-                                        resolved_names = []
-                                        
-                              # --- UNIFIED CHARACTER LIST (Global for this Scope) ---
-                # This ensures ALL custom + stock characters are available
-                all_char_opts = {**characters_data} # Start with Stock
-                # User assets are already merged into 'characters_data' by load_assets if logged in!
-                # But let's be double sure we aren't filtering them out.
+                            # Controls
+                            c_gen, c_type = st.columns([1, 1.5])
+                            with c_gen:
+                                if st.button(f"Generate Shot {shot_idx+1}", key=f"btn_{key_base}"):
+                                    user = st.session_state.current_user.get("username")
+                                    if not auth_mgr.deduct_credits(user, 1):
+                                        st.error("❌ No Credits!")
+                                    else:
+                                        with st.spinner("Rolling camera..."):
+                                            # DIRECT INJECTION (Refactored to match World Builder Logic)
+                                            # User selected these characters. They go in. Period.
+                                            final_assets_payload = []
+                                            
+                                            # Use the 'selected_chars' from the widget above (Lines 1225)
+                                            # Note: 'cast_selection' might be stale, 'selected_chars' is what the user just touched.
+                                            active_cast_names = selected_chars 
+                                            
+                                            if active_cast_names:
+                                                for c_name in active_cast_names:
+                                                    # 1. Resolve Path from Map (CRITICAL FIX)
+                                                    # Widget gives "Shay", we need "output/.../Shay.png"
+                                                    c_path = st.session_state.cast_lookup_map.get(c_name)
+                                                    
+                                                    # DEBUG: Show what we found
+                                                    # st.info(f"🔎 Looking up '{c_name}': Found path='{c_path}'")
+                                                    
+                                                    if c_path and (os.path.exists(c_path) or c_path.startswith("http")):
+                                                        # 2. Inject Face
+                                                        final_assets_payload.append({
+                                                            "path": c_path,
+                                                            "label": f"Cast: {c_name}"
+                                                        })
+                                                        
+                                                        # 3. Inject Outfit (If Assigned via Wardrobe Map)
+                                                        w_map = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                                                        o_key = w_map.get(c_name, "Default")
+                                                        
+                                                        if o_key and o_key != "Default":
+                                                           o_data = outfits_data.get(o_key)
+                                                           if isinstance(o_data, dict): o_data = o_data.get('default_img')
+                                                           # Also allow HTTP for outfits
+                                                           if o_data and (os.path.exists(o_data) or str(o_data).startswith("http")):
+                                                               final_assets_payload.append({
+                                                                   "path": o_data,
+                                                                   "label": f"Outfit for {c_name}: {o_key}"
+                                                               })
+                                                           else:
+                                                               st.warning(f"⚠️ Outfit Missing: '{o_key}' path invalid: {o_data}")
+                                                    else:
+                                                        st.error(f"❌ Asset Missing: Could not find file for '{c_name}'. Path: '{c_path}'")
+                                                        # Show debug dump of map to help user
+                                                        with st.expander("Show Cast Map Keys"):
+                                                            st.write(st.session_state.cast_lookup_map.keys())
+
+                                            # 4. Inject Environment (Simple Lookup)
+                                            is_broll = (shot_idx + 1) in [3, 6, 9, 12]
+                                            target_env = sec_env if is_broll and sec_env != "None" else series_env
+                                            env_path = vibes_data.get(target_env) or assets.get('locations', {}).get(target_env)
+                                            if isinstance(env_path, dict): env_path = env_path.get('default_img')
+                                            
+                                            if env_path:
+                                                 final_assets_payload.append({
+                                                     "path": env_path,
+                                                     "label": f"Location: {target_env}"
+                                                 })
+
+                                    
+                                            # Generate Prompt Data
+                                            
+                                            # SAFETY CHECK: Ensure prompt is not empty
+                                            # V3.8: Inject Time of Day & Transition
+                                            time_setting = shot.get('time_of_day', 'Day')
+                                            trans_setting = shot.get('transition', 'None')
+                                            # Transitions in prompts act as style/camera guides
+                                            trans_text = f"Visual Transition Style: {trans_setting}. " if trans_setting and trans_setting != "None" else ""
+
+                                            # V3.9: SUBJECT HEADER (Priority Signal for Nano)
+                                            # We explicitly state WHO is in the scene at the very start.
+                                            subject_header = ""
+                                            if final_assets_payload:
+                                                curr_chars = []
+                                                curr_outfits = {}
+                                                for a in final_assets_payload:
+                                                    lbl = a['label']
+                                                    if "Cast:" in lbl:
+                                                        curr_chars.append(lbl.replace("Cast: ", ""))
+                                                    if "Outfit for" in lbl:
+                                                        # Label: Outfit for NAME: OUTFIT
+                                                        parts = lbl.split(": ")
+                                                        if len(parts) >= 2:
+                                                            c_name = parts[0].replace("Outfit for ", "")
+                                                            o_name = parts[-1]
+                                                            curr_outfits[c_name] = o_name
+                                                
+                                                if curr_chars:
+                                                    header_parts = []
+                                                    for c in curr_chars:
+                                                        o = curr_outfits.get(c, "Standard Outfit")
+                                                        header_parts.append(f"[{c} wearing {o}]")
+                                                    subject_header = " ".join(header_parts) + ". "
+
+                                            final_shot_prompt = f"{subject_header}Time of Day: {time_setting}. {trans_text}{shot_prompt}"
+                                            if not final_shot_prompt or len(final_shot_prompt.strip()) < 5:
+                                                st.warning("⚠️ Prompt was empty! Using fallback.")
+                                                final_shot_prompt = f"Cinematic shot of {char_ref} in {target_env}, high quality, 8k, detailed."
+                                                                
+                                                                # SYNC PROMPT WITH LABELS (Critical for Identity)
+                                                                # SYNC PROMPT WITH LABELS (Critical for Identity)
+                                                                # REVERTED: Do NOT swap "Chels" -> "Main Character".
+                                                                # Model needs "Cast: Chels" + Prompt "Chels" to map identity.
+                                                                
+                                            # REPAIR LEGACY SCRIPTS: "Default" -> Real Name (e.g. Chels)
+                                            # If script says "Default", we must find who that is (usually Main Char).
+                                            if "Default" in final_shot_prompt:
+                                                # Find the Main Character's name
+                                                mc_repair_name = "Protagonist" # Fallback
+                                                if "clean_roles_map" in st.session_state:
+                                                    for k, v in st.session_state.clean_roles_map.items():
+                                                        if v == "Main Character":
+                                                            mc_repair_name = k
+                                                            break
+                                                # Or use Primary from Highlander check
+                                                if primary_mc_name: mc_repair_name = primary_mc_name
+                                                
+                                                final_shot_prompt = final_shot_prompt.replace("Default", mc_repair_name)
+                                            
+                                            # REPAIR LEGACY ROLES: "Love Interest" -> "Chels"
+                                            # Stale scripts might say "The Love Interest looks at..."
+                                            # We map Role -> Name to ensure Identity Match.
+                                            if "clean_roles_map" in st.session_state:
+                                                 for real_name, role_title in st.session_state.clean_roles_map.items():
+                                                     if role_title and len(role_title) > 3: # Avoid short noise
+                                                         # Replace "The Love Interest" and "Love Interest"
+                                                         final_shot_prompt = final_shot_prompt.replace(f"The {role_title}", real_name)
+                                                         final_shot_prompt = final_shot_prompt.replace(role_title, real_name)
                 
-                # Update: load_assets DOES merge them into 'characters', so 'characters_data' IS the master list.
-                # However, Mini Series was using 'knowledge_base.get("top_influencers")' which is restricted.
-                # We fix this by defaulting to ALL characters.
+                                            p_data = {
+                                                 "positive_prompt": final_shot_prompt,
+                                                 "negative_prompt": "blurry, low quality, distortion, ugly face",
+                                                 "aspect_ratio": "16:9",
+                                                 "model_type": "nano", 
+                                                 "assets": final_assets_payload  # <--- UPDATED VARIABLE
+                                            }
                 
-                # Force "The Influencer" to be first if present
-                char_keys = sorted(list(characters_data.keys()))
+                                            # DEBUG: Show User what we are sending
+                                            with st.expander(f"🛠️ Debug: Shot {shot_idx+1} Payload", expanded=False):
+                                                st.write(final_assets_payload)
+                                                if final_assets_payload:
+                                                    st.caption("Visual Assets Sent to AI:")
+                                                    d_cols = st.columns(min(len(final_assets_payload), 4))
+                                                    for i, asset in enumerate(final_assets_payload):
+                                                        with d_cols[i % 4]:
+                                                             if os.path.exists(asset['path']):
+                                                                 st.image(asset['path'], caption=asset['label'], use_container_width=True)
+                                                             else:
+                                                                 st.warning(f"Missing: {asset['label']}")
                 
-                # --- CAST SELECTION ---
-                card_begin()
-                st.markdown("#### 1. Cast & Crew")
-                
-                # Protagonist Selection (UNIFIED)
-                cast_selection = st.multiselect(
-                    "Select Protagonist(s)", 
-                    options=char_keys,
-                    default=[]
-                )
-                
-                # Save Cast Map for Lookups
-                # We need to map "Name" -> "Path" for the generator
-                # characters_data = {"Name": "Path"}
-                st.session_state.cast_lookup_map = characters_data
-                
-                if cast_selection:
-                    # Wardrobe Logic
-                    st.caption("👗 Wardrobe Selection")
-                    wardrobe_cols = st.columns(len(cast_selection))
-                    
-                    # Store Wardrobe Map for later retrieval during generation
-                    wardrobe_map = {}
-                    
-                    for idx, char_key in enumerate(cast_selection):
-                        with wardrobe_cols[idx]:
-                            # Simplify Name for Display
-                            c_name = char_key.split('/')[-1]
+                                            res = generate_image_from_prompt(p_data, get_user_out_dir("Series"))
+                                            if res["status"] == "success":
+                                                st.session_state[f"img_{key_base}"] = res["image_path"]
+                                                st.session_state[f"logs_{key_base}"] = res["logs"] # Save logs for debug
+                                                st.session_state[f"prompt_{key_base}"] = final_shot_prompt # Save prompt for debug
+                                                st.success("Shot Captured!")
+                                                st.rerun()
+                                            else:
+                                                err_msg = str(res.get("logs", "Unknown Error"))
+                                                if "SAFETY" in err_msg or "Refusal" in err_msg:
+                                                    st.warning("🚧 **Action Blocked by Safety Filters**")
+                                                    st.info("💡 **Tip:** Try removing explicit descriptors like 'curves', 'sheer', or 'revealing' from the prompt text area above.")
+                                                    with st.expander("Show Detailed Error"):
+                                                        st.error(err_msg)
+                                                else:
+                                                    st.error(f"Generation Failed: {err_msg}")
+                        
+                            with c_type:
+                                motion_type = st.radio("Media", ["Still", "Kling Video", "Sora 2 Video", "Mocap"], key=f"m_{key_base}", horizontal=True, label_visibility="collapsed")
+                                mocap_file = None
+                                if motion_type == "Mocap":
+                                    mocap_file = st.file_uploader("Ref", type=['mp4'], key=f"up_{key_base}", label_visibility="collapsed")
+
+                        with col_img:
+                            # Display Generated Image or Placeholder
+                            if f"img_{key_base}" in st.session_state:
+                                img_p = st.session_state[f"img_{key_base}"]
+                                st.image(img_p, caption=f"Shot {shot_idx+1} (Ready)", use_container_width=True)
                             
-                            # Filter Outfits (All Available)
-                            outfit_keys = ["Default (From Image)"] + sorted(list(outfits_data.keys()))
-                            
-                            sel_fit = st.selectbox(f"Outfit: {c_name}", outfit_keys, key=f"fit_sel_{idx}")
-                            if sel_fit == "Default (From Image)":
-                                wardrobe_map[c_name] = "Default"
+                                # V3.7: Download Button
+                                if os.path.exists(img_p):
+                                    with open(img_p, "rb") as file:
+                                        st.download_button(
+                                            label="⬇️ Download Shot",
+                                            data=file,
+                                            file_name=os.path.basename(img_p),
+                                            mime="image/png",
+                                            key=f"dl_{key_base}"
+                                        )
+                                    
+                                    # LOG DISPLAY
+                                    if f"logs_{key_base}" in st.session_state:
+                                        with st.expander("📝 Debug Scope (Logs)"):
+                                            st.write("**Final Prompt:**", st.session_state.get(f"prompt_{key_base}", "N/A"))
+                                            st.write("**Roles Map:**", st.session_state.get("clean_roles_map", "N/A"))
+                                            st.code(st.session_state[f"logs_{key_base}"], language="text")
+                                    st.caption(f"Saved to: {img_p}")
                             else:
-                                wardrobe_map[c_name] = sel_fit
-                                
-                            # Try to match First Name for robust lookup
-                            first_name = c_name.split(' ')[0]
-                            wardrobe_map[first_name] = wardrobe_map[c_name]
-                            
-                    st.session_state['cast_wardrobe_map_snapshot'] = wardrobe_map
-                card_end()
+                                st.info("No Image Generated")
                     
-                if True: # Indentation Fix Wrapper
-                    # A. Resolve Lead Characters
-                    if char_list:
-                        for raw_name in char_list:
-                            # 1. Resolve Face
-                            # Lookup Strategy: Exact -> 1st Word -> Normalized 1st Word
-                            naive_key = raw_name.split(' ')[0]
-                            c_path = st.session_state.cast_lookup_map.get(naive_key)
-                            
-                            if not c_path:
-                                if '_' in raw_name:
-                                    norm_key = raw_name.replace('_', ' ').split(' ')[0]
-                                    c_path = st.session_state.cast_lookup_map.get(norm_key)
-                                    if c_path: naive_key = norm_key # Update key for outfit lookup
-                            
-                            if c_path:
-                                final_assets_payload.append({
-                                    "path": c_path,
-                                    "label": f"Cast: {raw_name}"
-                                })
-                                resolved_names.append(raw_name)
-                                
-                                # 2. Resolve Outfit (Linked to this Character)
-                                w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                                # Robust Strategy: Full Name -> First Name
-                                o_name_key = w_snapshot.get(raw_name)
-                                
-                                if not o_name_key or o_name_key == "Default":
-                                    o_fallback = w_snapshot.get(naive_key, "Default")
-                                    if o_fallback != "Default": o_name_key = o_fallback
-                                    
-                                if o_name_key and o_name_key != "Default":
-                                    o_data = outfits_data.get(o_name_key)
-                                    if isinstance(o_data, dict): o_data = o_data.get('default_img')
-                                    if o_data:
-                                        final_assets_payload.append({
-                                            "path": o_data,
-                                            "label": f"Outfit for {raw_name}: {o_name_key}"
-                                        })
+                        st.divider()
 
-                                    # B. Fallback (If NO characters found, but NOT B-Roll)
-                                    is_broll = (shot_idx + 1) in [3, 6, 9, 12]
-                                    if not final_assets_payload and cast_selection and not is_broll:
-                                         # Force Protagonist
-                                         first_key = cast_selection[0]
-                                         c_data = all_cast_opts.get(first_key)
-                                         c_path = c_data.get('default_img') if isinstance(c_data, dict) else c_data
-                                         c_name = first_key.split('/')[-1]
-                                         
-                                         if c_path:
-                                             final_assets_payload.append({"path": c_path, "label": f"Cast: {c_name}"})
-                                             # Try outfit
-                                             w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                                             # Try simple lookup
-                                             o_key = w_snapshot.get(c_name.split(' ')[0], "Default")
-                                             if o_key != "Default":
-                                                 o_data = outfits_data.get(o_key)
-                                                 if isinstance(o_data, dict): o_data = o_data.get('default_img')
-                                                 if o_data:
-                                                     final_assets_payload.append({"path": o_data, "label": f"Outfit for {c_name}: {o_key}"})
-
-                                    # Environment Resolution
-                                    target_env = sec_env if is_broll and sec_env != "None" else series_env
-                                    env_path = vibes_data.get(target_env) or assets.get('locations', {}).get(target_env)
-                                    if isinstance(env_path, dict): env_path = env_path.get('default_img')
-                                    
-                                    if env_path:
-                                        final_assets_payload.append({
-                                            "path": env_path,
-                                            "label": f"Location: {target_env}"
-                                        })
-                                    
-                                    # Generate Prompt Data
-                                    
-                                    # SAFETY CHECK: Ensure prompt is not empty
-                                    # V3.8: Inject Time of Day & Transition
-                                    time_setting = shot.get('time_of_day', 'Day')
-                                    trans_setting = shot.get('transition', 'None')
-                                    # Transitions in prompts act as style/camera guides
-                                    trans_text = f"Visual Transition Style: {trans_setting}. " if trans_setting and trans_setting != "None" else ""
-                                    
-                                    final_shot_prompt = f"Time of Day: {time_setting}. {trans_text}{shot_prompt}"
-                                    if not final_shot_prompt or len(final_shot_prompt.strip()) < 5:
-                                        st.warning("⚠️ Prompt was empty! Using fallback.")
-                                        final_shot_prompt = f"Cinematic shot of {char_ref} in {target_env}, high quality, 8k, detailed."
-                                    
-                                    p_data = {
-                                         "positive_prompt": final_shot_prompt,
-                                         "negative_prompt": "blurry, low quality, distortion, ugly face",
-                                         "aspect_ratio": "16:9",
-                                         "model_type": "nano", 
-                                         "assets": final_assets_payload  # <--- UPDATED VARIABLE
-                                    }
-                                    
-                                    # DEBUG: Show User what we are sending
-                                    with st.expander(f"🛠️ Debug: Shot {shot_idx+1} Payload", expanded=False):
-                                        st.write(final_assets_payload)
-                                    
-                                    res = generate_image_from_prompt(p_data, get_user_out_dir("Series"))
-                                    if res["status"] == "success":
-                                        st.session_state[f"img_{key_base}"] = res["image_path"]
-                                        st.success("Shot Captured!")
-                                    else:
-                                        err_msg = str(res.get("logs", "Unknown Error"))
-                                        if "SAFETY" in err_msg or "Refusal" in err_msg:
-                                            st.warning("🚧 **Action Blocked by Safety Filters**")
-                                            st.info("💡 **Tip:** Try removing explicit descriptors like 'curves', 'sheer', or 'revealing' from the prompt text area above.")
-                                            with st.expander("Show Detailed Error"):
-                                                st.error(err_msg)
-                                        else:
-                                            st.error(f"Generation Failed: {err_msg}")
-                        
-                        with c_type:
-                            motion_type = st.radio("Media", ["Still", "Kling Video", "Sora 2 Video", "Mocap"], key=f"m_{key_base}", horizontal=True, label_visibility="collapsed")
-                            mocap_file = None
-                            if motion_type == "Mocap":
-                                mocap_file = st.file_uploader("Ref", type=['mp4'], key=f"up_{key_base}", label_visibility="collapsed")
-
-                    with col_img:
-                        # Display Generated Image or Placeholder
-                        if f"img_{key_base}" in st.session_state:
-                            img_p = st.session_state[f"img_{key_base}"]
-                            st.image(img_p, caption=f"Shot {shot_idx+1} (Ready)", use_container_width=True)
-                            
-                            # V3.7: Download Button
-                            if os.path.exists(img_p):
-                                with open(img_p, "rb") as file:
-                                    st.download_button(
-                                        label="⬇️ Download Shot",
-                                        data=file,
-                                        file_name=os.path.basename(img_p),
-                                        mime="image/png",
-                                        key=f"dl_{key_base}"
-                                    )
-                                st.caption(f"Saved to: {img_p}")
-                        else:
-                            st.info("No Image Generated")
-                    
-                    st.divider()
-
-                    # Store for Batch
-                    generated_shots_data.append({
-                        "scene_id": scene.get('id'),
-                        "shot_id": shot_idx + 1,
-                        "prompt": shot_prompt,
-                        "type": motion_type,
-                        "mocap": mocap_file,
-                        "characters": shot.get('characters'),
-                        "environment": series_env,
-                        "transition": shot.get('transition'),
-                        "generated_still": st.session_state.get(f"img_{key_base}") 
-                    })
-                        
-    # --- STEP 4: PRODUCTION ---
-    st.markdown("---")
-    if st.button("🚀 Produce Episode (Batch Render)", type="primary"):
-        if not st.session_state.series_storyboard:
-            st.error("No storyboard defined.")
-        else:
-            with st.status("🎬 Production in progress...", expanded=True) as status:
-                st.write("Initializing Batch Queue...")
-                
-                # ESTIMATE COST
-                total_shots = len(generated_shots_data)
-                user = st.session_state.current_user.get("username")
-                
-                if not auth_mgr.deduct_credits(user, total_shots):
-                    st.error(f"❌ Insufficient Credits for {total_shots} shots!")
-                else:
-                    # Output Setup
-                    ep_title = st.session_state.series_storyboard.get('title', 'Untitled_Ep').replace(" ", "_")
-                base_out = os.path.join(get_user_out_dir("Series"), series_title.replace(" ", "_"), ep_title)
-                os.makedirs(base_out, exist_ok=True)
-                
-                for shot_data in generated_shots_data:
-                    s_id = shot_data['scene_id']
-                    sh_id = shot_data['shot_id']
-                    p_text = shot_data['prompt']
-                    m_type = shot_data['type']
-                    
-                    # SAFETY GUARD: Ensure Prompt Exists
-                    if not p_text or len(p_text.strip()) < 5:
-                         st.warning(f"⚠️ Shot {s_id}-{sh_id} prompt empty! Using fallback.")
-                         p_text = f"Cinematic shot of scene {s_id} shot {sh_id}, high quality, 8k"
-
-                    # V3.8: Inject Time of Day & Transition (Batch)
-                    t_day = shot_data.get('time_of_day', 'Day')
-                    t_trans = shot_data.get('transition', 'None')
-                    t_text = f"Visual Transition Style: {t_trans}. " if t_trans and t_trans != "None" else ""
-                    
-                    p_text = f"Time of Day: {t_day}. {t_text}{p_text}"
-                    
-                    st.write(f"Processing Scene {s_id} Shot {sh_id} ({m_type})...")
-                    
-                    # 1. Image Generation (Always needed as base)
-                    # Resolve Assets for JSON Injection (Mirroring World Builder)
-                    assets_payload = []
-                    
-                    # Environment Injection (V3 Update)
-                    # Define B-Roll status
-                    is_broll = sh_id in [3, 6, 9, 12]
-                    
-                    # Determine env
-                    target_env = sec_env if is_broll and sec_env != "None" else series_env
-                    if 'location' in shot_data: target_env = shot_data['location'] # Override if specific
-                    
-                    env_path = vibes_data.get(target_env) or assets.get('locations', {}).get(target_env)
-                    if isinstance(env_path, dict): env_path = env_path.get('default_img')
-                    if env_path:
-                        assets_payload.append({
-                            "path": env_path,
-                            "label": f"Location: {target_env}"
+                        # Store for Batch
+                        generated_shots_data.append({
+                            "scene_id": scene.get('id'),
+                            "shot_id": shot_idx + 1,
+                            "prompt": shot_prompt,
+                            "type": motion_type,
+                            "mocap": mocap_file,
+                            "characters": shot.get('characters'),
+                            "environment": series_env,
+                            "transition": shot.get('transition'),
+                            "generated_still": st.session_state.get(f"img_{key_base}") 
                         })
-                    
-                    # A. Character Assets
-                    char_names = shot_data.get('characters', [])
-                    # Use the Clean Map we built earlier to resolve these names
-                    # Note: shot_data['characters'] might be full names or nicknames depending on Gemini
-                    # But we trust our lookup map to handle the mapping.
-                    
-                    for c_name in char_names:
-                        # Try to resolve via cast map
-                        # Logic: Try exact, then try partial
-                        asset_path = None
                         
-                        # 1. Clean Name Lookup
-                        c_key = c_name.strip().split(' ')[0]
-                        asset_path = st.session_state.cast_lookup_map.get(c_key)
-                        
-                        # FIX: Handle Gemini Snake Case ("Shays_boyfriend" -> "Shays")
-                        if not asset_path and '_' in c_name:
-                             norm_key = c_name.replace('_', ' ').strip().split(' ')[0]
-                             fallback_path = st.session_state.cast_lookup_map.get(norm_key)
-                             if fallback_path:
-                                 c_key = norm_key # Update key for Outfit lookup too
-                                 asset_path = fallback_path
-                        
-                        if asset_path:
-                             # 1. CHARACTER FACE
-                             assets_payload.append({
-                                 "path": asset_path,
-                                 "label": f"Cast: {c_name}" # MATCH WORLD BUILDER
-                             })
-                             
-                             # 2. OUTFIT (Lookup from Snapshot)
-                             w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                             
-                             # Robust Lookup: Full Name -> First Name -> Normalized
-                             outfit_name = w_snapshot.get(c_name) # 1. Full Name
-                             
-                             if not outfit_name or outfit_name == "Default":
-                                 outfit_name = w_snapshot.get(c_key, "Default") # 2. First Name
-                                 
-                             # 3. Normalized if needed (already derived c_key might be normalized, but check map again)
-                             # Note: c_key was updated above if normalization happened, so step 2 covers it.
-                             
-                             if outfit_name != "Default":
-                                 # Resolve Outfit Path
-                                 o_path = outfits_data.get(outfit_name)
-                                 if isinstance(o_path, dict): o_path = o_path.get('default_img')
-                                 
-                                 if o_path and os.path.exists(o_path):
-                                     assets_payload.append({
-                                         "path": o_path,
-                                         "label": f"Outfit for {c_name}: {outfit_name}" # MATCH WORLD BUILDER
-                                     })
-                    
-                    # B. Fallback if no assets found but we have a selection (Force Protag)
-                    # Safety Fix: Do not force character on B-Roll shots (3, 6, 9, 12)
-                    is_broll = sh_id in [3, 6, 9, 12]
-                    
-                    if not assets_payload and cast_selection and not is_broll:
-                        # Use first selected cast member (Fallback)
-                        # Fix: Don't use 'all_cast_opts' which might be unbound if cache hit
-                        first_key = cast_selection[0]
-                        # Convert Full Key to Clean Key logic
-                        base = first_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
-                        c_key = base.split(' ')[0]
-                        
-                        path = st.session_state.cast_lookup_map.get(c_key)
-                        
-                        if path:
-                             assets_payload.append({
-                                 "path": path,
-                                 "label": "Main Character"
-                             })
-
-                    # Construct Prompt Data with ASSETS
-                    p_data = {
-                         "positive_prompt": p_text,
-                         "negative_prompt": "blurry, low quality, distortion, ugly face",
-                         "width": 1024, "height": 576, # 16:9 Cinematic
-                         "num_images": 1,
-                         "guidance_scale": 7.5,
-                         "model_type": "nano", 
-                         "checkpoint": None,
-                         "assets": assets_payload # <--- THE KEY FIX
-                    }
-                    
-                    # Generate Still
-                    # We don't pass char_path legacy arg anymore
-                    res = generate_image_from_prompt(p_data, base_out)
-                    
-                    if res and res.get('status') == 'success':
-                        img_path = res['image_path']
-                        st.image(img_path, caption=f"Sc{s_id}_Sh{sh_id}")
-                        
-                        # 2. Video Generation
-                        if m_type == "Kling Video":
-                            st.write("⚡ Sending to Kling AI...")
-                            try:
-                                k_client = KlingClient()
-                                
-                                # Upload Image to S3 to get Public URL
-                                with open(img_path, "rb") as f_img:
-                                    sanitized_series = series_title.replace(" ", "_")
-                                    s3_name = f"series_assets/{sanitized_series}/{ep_title}/sc{s_id}_sh{sh_id}.png"
-                                    img_url = upload_file_obj(f_img, object_name=s3_name)
-                                
-                                if img_url:
-                                    # Send to Kling
-                                    task = k_client.create_video_from_image(img_url, p_text)
-                                    st.success(f"Video Task Started! ID: {task.get('task_id')}")
-                                    st.info("Check 'Video Studio' tab later for results.")
-                                else:
-                                    st.error("Failed to upload image to S3. Skipping video.")
-                            except Exception as e:
-                                st.error(f"Kling Error: {e}")
-                                    
-                        elif m_type == "Sora 2 Video":
-                            st.write("✨ Sending to Sora 2 (OpenAI)...")
-                            try:
-                                sora_client = SoraClient()
-                                # Reuse Image Upload logic
-                                with open(img_path, "rb") as f_img:
-                                    sanitized_series = series_title.replace(" ", "_")
-                                    s3_name = f"series_assets/{sanitized_series}/{ep_title}/sc{s_id}_sh{sh_id}.png"
-                                    img_url = upload_file_obj(f_img, object_name=s3_name)
-                                    
-                                if img_url:
-                                    res_url = sora_client.create_video_from_image(img_url, p_text)
-                                    if isinstance(res_url, dict) and "error" in res_url:
-                                        st.error(f"Sora Error: {res_url['error']}")
-                                    else:
-                                        st.success(f"Video Generated! [Link]({res_url})")
-                                        st.video(res_url)
-                                else: 
-                                    st.error("S3 Upload Failed")
-                            except Exception as e:
-                                st.error(f"Sora Error: {e}")
-                                
+        # --- STEP 4: PRODUCTION ---
+        st.markdown("---")
+        if st.button("🚀 Produce Episode (Batch Render)", type="primary"):
+            if not st.session_state.series_storyboard:
+                st.error("No storyboard defined.")
+            else:
+                with st.status("🎬 Production in progress...", expanded=True) as status:
+                    st.write("Initializing Batch Queue...")
+                
+                    # ESTIMATE COST
+                    total_shots = len(generated_shots_data)
+                    user = st.session_state.current_user.get("username")
+                
+                    if not auth_mgr.deduct_credits(user, total_shots):
+                        st.error(f"❌ Insufficient Credits for {total_shots} shots!")
                     else:
-                        st.error(f"Failed to render shot {sh_id}")
+                        # Output Setup
+                        ep_title = st.session_state.series_storyboard.get('title', 'Untitled_Ep').replace(" ", "_")
+                    base_out = os.path.join(get_user_out_dir("Series"), series_title.replace(" ", "_"), ep_title)
+                    os.makedirs(base_out, exist_ok=True)
+                
+                    for shot_data in generated_shots_data:
+                        s_id = shot_data['scene_id']
+                        sh_id = shot_data['shot_id']
+                        p_text = shot_data['prompt']
+                        m_type = shot_data['type']
+                    
+                        # SAFETY GUARD: Ensure Prompt Exists
+                        if not p_text or len(p_text.strip()) < 5:
+                             st.warning(f"⚠️ Shot {s_id}-{sh_id} prompt empty! Using fallback.")
+                             p_text = f"Cinematic shot of scene {s_id} shot {sh_id}, high quality, 8k"
 
-                status.update(label="Episode Production Complete!", state="complete")
+                        # V3.8: Inject Time of Day & Transition (Batch)
+                        t_day = shot_data.get('time_of_day', 'Day')
+                        t_trans = shot_data.get('transition', 'None')
+                        t_text = f"Visual Transition Style: {t_trans}. " if t_trans and t_trans != "None" else ""
+                    
+                        p_text = f"Time of Day: {t_day}. {t_text}{p_text}"
+                    
+                        st.write(f"Processing Scene {s_id} Shot {sh_id} ({m_type})...")
+                    
+                        # 1. Image Generation (Always needed as base)
+                        # Resolve Assets for JSON Injection (Mirroring World Builder)
+                        assets_payload = []
+                    
+                        # Environment Injection (V3 Update)
+                        # Define B-Roll status
+                        is_broll = sh_id in [3, 6, 9, 12]
+                    
+                        # Determine env
+                        target_env = sec_env if is_broll and sec_env != "None" else series_env
+                        if 'location' in shot_data: target_env = shot_data['location'] # Override if specific
+                    
+                        env_path = vibes_data.get(target_env) or assets.get('locations', {}).get(target_env)
+                        if isinstance(env_path, dict): env_path = env_path.get('default_img')
+                        if env_path:
+                            assets_payload.append({
+                                "path": env_path,
+                                "label": f"Location: {target_env}"
+                            })
+                    
+                        # A. Character Assets
+                        char_names = shot_data.get('characters', [])
+                        # Use the Clean Map we built earlier to resolve these names
+                        # Note: shot_data['characters'] might be full names or nicknames depending on Gemini
+                        # But we trust our lookup map to handle the mapping.
+                    
+                        for c_name in char_names:
+                            # Try to resolve via cast map
+                            # Logic: Try exact, then try partial
+                            asset_path = None
+                        
+                            # 1. Clean Name Lookup
+                            c_key = c_name.strip().split(' ')[0]
+                            asset_path = st.session_state.cast_lookup_map.get(c_key)
+                        
+                            # FIX: Handle Gemini Snake Case ("Shays_boyfriend" -> "Shays")
+                            if not asset_path and '_' in c_name:
+                                 norm_key = c_name.replace('_', ' ').strip().split(' ')[0]
+                                 fallback_path = st.session_state.cast_lookup_map.get(norm_key)
+                                 if fallback_path:
+                                     c_key = norm_key # Update key for Outfit lookup too
+                                     asset_path = fallback_path
+                        
+                            if asset_path:
+                                 # 1. CHARACTER FACE
+                                 assets_payload.append({
+                                     "path": asset_path,
+                                     "label": f"Cast: {c_name}" # MATCH WORLD BUILDER
+                                 })
+                             
+                                 # 2. OUTFIT (Lookup from Snapshot)
+                                 w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                             
+                                 # Robust Lookup: Full Name -> First Name -> Normalized
+                                 outfit_name = w_snapshot.get(c_name) # 1. Full Name
+                             
+                                 if not outfit_name or outfit_name == "Default":
+                                     outfit_name = w_snapshot.get(c_key, "Default") # 2. First Name
+                                 
+                                 # 3. Normalized if needed (already derived c_key might be normalized, but check map again)
+                                 # Note: c_key was updated above if normalization happened, so step 2 covers it.
+                             
+                                 if outfit_name != "Default":
+                                     # Resolve Outfit Path
+                                     o_path = outfits_data.get(outfit_name)
+                                     if isinstance(o_path, dict): o_path = o_path.get('default_img')
+                                 
+                                     if o_path and os.path.exists(o_path):
+                                         assets_payload.append({
+                                             "path": o_path,
+                                             "label": f"Outfit for {c_name}: {outfit_name}" # MATCH WORLD BUILDER
+                                         })
+                    
+                        # B. Fallback if no assets found but we have a selection (Force Protag)
+                        # Safety Fix: Do not force character on B-Roll shots (3, 6, 9, 12)
+                        is_broll = sh_id in [3, 6, 9, 12]
+                    
+                        if not assets_payload and cast_selection and not is_broll:
+                            # Use first selected cast member (Fallback)
+                            # Fix: Don't use 'all_cast_opts' which might be unbound if cache hit
+                            first_key = cast_selection[0]
+                            # Convert Full Key to Clean Key logic
+                            base = first_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                            c_key = base.split(' ')[0]
+                        
+                            path = st.session_state.cast_lookup_map.get(c_key)
+                        
+                            if path:
+                                 assets_payload.append({
+                                     "path": path,
+                                     "label": "Main Character"
+                                 })
+
+                        # Construct Prompt Data with ASSETS
+                        p_data = {
+                             "positive_prompt": p_text,
+                             "negative_prompt": "blurry, low quality, distortion, ugly face",
+                             "width": 1024, "height": 576, # 16:9 Cinematic
+                             "num_images": 1,
+                             "guidance_scale": 7.5,
+                             "model_type": "nano", 
+                             "checkpoint": None,
+                             "assets": assets_payload # <--- THE KEY FIX
+                        }
+                    
+                        # Generate Still
+                        # We don't pass char_path legacy arg anymore
+                        res = generate_image_from_prompt(p_data, base_out)
+                    
+                        if res and res.get('status') == 'success':
+                            img_path = res['image_path']
+                            st.image(img_path, caption=f"Sc{s_id}_Sh{sh_id}")
+                        
+                            # 2. Video Generation
+                            if m_type == "Kling Video":
+                                st.write("⚡ Sending to Kling AI...")
+                                try:
+                                    k_client = KlingClient()
+                                
+                                    # Upload Image to S3 to get Public URL
+                                    with open(img_path, "rb") as f_img:
+                                        sanitized_series = series_title.replace(" ", "_")
+                                        s3_name = f"series_assets/{sanitized_series}/{ep_title}/sc{s_id}_sh{sh_id}.png"
+                                        img_url = upload_file_obj(f_img, object_name=s3_name)
+                                
+                                    if img_url:
+                                        # Send to Kling
+                                        task = k_client.create_video_from_image(img_url, p_text)
+                                        st.success(f"Video Task Started! ID: {task.get('task_id')}")
+                                        st.info("Check 'Video Studio' tab later for results.")
+                                    else:
+                                        st.error("Failed to upload image to S3. Skipping video.")
+                                except Exception as e:
+                                    st.error(f"Kling Error: {e}")
+                                    
+                            elif m_type == "Sora 2 Video":
+                                st.write("✨ Sending to Sora 2 (OpenAI)...")
+                                try:
+                                    sora_client = SoraClient()
+                                    # Reuse Image Upload logic
+                                    with open(img_path, "rb") as f_img:
+                                        sanitized_series = series_title.replace(" ", "_")
+                                        s3_name = f"series_assets/{sanitized_series}/{ep_title}/sc{s_id}_sh{sh_id}.png"
+                                        img_url = upload_file_obj(f_img, object_name=s3_name)
+                                    
+                                    if img_url:
+                                        res_url = sora_client.create_video_from_image(img_url, p_text)
+                                        if isinstance(res_url, dict) and "error" in res_url:
+                                            st.error(f"Sora Error: {res_url['error']}")
+                                        else:
+                                            st.success(f"Video Generated! [Link]({res_url})")
+                                            st.video(res_url)
+                                    else: 
+                                        st.error("S3 Upload Failed")
+                                except Exception as e:
+                                    st.error(f"Sora Error: {e}")
+                                
+                        else:
+                            st.error(f"Failed to render shot {sh_id}")
+
+                    status.update(label="Episode Production Complete!", state="complete")
 
 
+
+    mini_series_ui()
 # ==========================================
 # TAB 1.5: WORLD BUILDER
 # ==========================================
@@ -1746,6 +1843,8 @@ with tab_world:
                         fit_name = fit_key.split('/')[-1] 
                         if os.path.sep in fit_name: fit_name = os.path.splitext(fit_name)[0]
                         
+                        if "default" in fit_name.lower(): fit_name = "Stylish Outfit"
+                        
                         temp_selections["OUTFIT"] = fit_name
                         temp_assets.append({"path": path, "label": f"Outfit: {fit_name}"})
                         if path:
@@ -1858,11 +1957,21 @@ with tab_world:
                           path = val['default_img'] if isinstance(val, dict) else val
                           loc_name = loc_key.split('/')[-1]
                           if os.path.sep in loc_name: loc_name = os.path.splitext(loc_name)[0]
+                          
+                          if "default" in loc_name.lower(): loc_name = "Luxury Location"
+
                           temp_selections["LOCATION"] = loc_name
                           temp_assets.append({"path": path, "label": "Location"})
                           if path: st.image(path, caption=loc_name, width=300)
                     else:
                           temp_selections["LOCATION"] = "generic location"
+                    
+                    st.divider()
+                    st.markdown("###### 6. Vibe / Atmosphere")
+                    vibe_opts = ["Luxury", "Cinematic", "Dark", "Bright", "Cozy", "High Energy", "Chill", "Romantic", "Cyberpunk", "Vintage"]
+                    sel_vibe = st.selectbox("Select Vibe", vibe_opts, index=0)
+                    temp_selections["VIBE"] = sel_vibe
+
                     card_end()
             
             # Persist to Session State (Critical for Generator outside fragment)
@@ -1992,6 +2101,13 @@ with tab_world:
                  p_name = current_selections.get("PROTAGONIST", "The Influencer")
                  final_prompt = final_prompt.replace("[PROTAGONIST]", p_name)
     
+            # --- DEBUG: INSPECT STATE BEFORE RUNNING AI ---
+            with st.expander("🕵️‍♂️ Debug: What the Director AI Sees", expanded=False):
+                st.write("**Current Selections:**", current_selections)
+                st.write("**Assets (Visual Refs):**", assets_to_inject)
+                st.write("**Base Context (Prompt):**", final_prompt)
+                st.write("**Session State Keys:**", list(st.session_state.keys()))
+
             # --- AI DIRECTOR BUTTON ---
             col_ai_btn, col_blank = st.columns([1, 1])
             with col_ai_btn:
@@ -2001,8 +2117,10 @@ with tab_world:
             if run_director:
                 with st.spinner("Director is rewriting scene..."):
                     # 1. Identify Main Assets & Extras
+
                     main_char_path = None
                     main_outfit_path = None
+                    vibe_p = None
                     extras_payload = []
                     
                     for asset in assets_to_inject:
@@ -2013,11 +2131,13 @@ with tab_world:
                              main_char_path = path
                         elif lbl.startswith("Outfit: "): # Exact main outfit label format
                              main_outfit_path = path
+                        elif lbl == "Location":
+                             vibe_p = path
                         else:
                              # Friends, Friend Outfits, Pets, Props
                              extras_payload.append(asset)
                     
-                    st.toast(f"Brain Analyzing: Main + {len(extras_payload)} Extra Assets...")
+                    st.toast(f"Director AI Analyzing: {current_selections.get('PROTAGONIST', 'Character')} + {current_selections.get('OUTFIT', 'Outfit')}...")
     
                     # 2. Call Generator with full context
                     # We treat the current draft as 'additional_notes' context
@@ -2026,6 +2146,7 @@ with tab_world:
                         outfit=current_selections.get("OUTFIT", "fashion"),
                         character=main_char_path, # Pass the PATH
                         outfit_path=main_outfit_path, # Pass the PATH
+                        vibe_path=vibe_p, # Pass Location as Image 3 (Vibe Ref)
                         extra_images=extras_payload, # Pass Friends & Extras
                         
                         # Pass Technical Specs Explicitly
@@ -2039,7 +2160,7 @@ with tab_world:
                         film_stock=(sel_film_stock if sel_film_stock != "Auto" else None),
                         filter_look=(sel_filter_look if sel_filter_look != "Auto" else None),
                         
-                        additional_notes=f"REWRITE THIS SCENE to be cinematic, high-fashion, and detailed. Keep the character consistent: {final_prompt}",
+                        additional_notes=f"REWRITE THIS SCENE to be cinematic, high-fashion, and detailed. Keep the character consistent: {final_prompt}. Context Style: {sel_film}. Atmosphere: {current_selections.get('VIBE', 'General')}.",
                         model_engine=prompt_engine # Use currently selected brain (Gemini 2.0)
                     )
                     

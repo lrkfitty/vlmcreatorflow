@@ -194,7 +194,7 @@ def build_character_prompt(attributes):
         if is_femme:
             outfit = "(tight black leggings:1.3), (sports bra:1.2), tight fit"
         else:
-            outfit = "jeans, t-shirt, casual fit"
+            outfit = "(athletic shorts:1.2), shirtless, bare chest, athletic fit, no shirt"
     
     # Combine
     full_prompt = f"{subject}, {traits_str}, wearing {outfit}, {env}, {lighting}, full body shot"
