@@ -1453,10 +1453,13 @@ with tab_series:
                                                         header_parts.append(f"[{c} wearing {o}]")
                                                     subject_header = " ".join(header_parts) + ". "
 
-                                            final_shot_prompt = f"{subject_header}Time of Day: {time_setting}. {trans_text}{shot_prompt}"
+                                            subject_footer = " \n\n[CRITICAL: Ensure the characters look exactly like the reference images provided above, specifically matching the [VISUAL ID] tags. Maintain consistent lighting and film stock.]"
+                                            
+                                            final_shot_prompt = f"{subject_header}Time of Day: {time_setting}. {trans_text}{shot_prompt}{subject_footer}"
                                             if not final_shot_prompt or len(final_shot_prompt.strip()) < 5:
                                                 st.warning("⚠️ Prompt was empty! Using fallback.")
                                                 final_shot_prompt = f"Cinematic shot of {char_ref} in {target_env}, high quality, 8k, detailed."
+                                                                
                                                                 
                                                                 # SYNC PROMPT WITH LABELS (Critical for Identity)
                                                                 # SYNC PROMPT WITH LABELS (Critical for Identity)

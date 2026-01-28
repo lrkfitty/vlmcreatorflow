@@ -27,6 +27,15 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
         os.makedirs(output_folder)
 
     positive_prompt = prompt_data.get("positive_prompt", "")
+    
+    # SYSTEM PREAMBLE (Force Continuity)
+    system_instruction = (
+        "SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below "
+        "while EXPERTLY matching the visual identities of the provided character reference images. "
+        "You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\n"
+    )
+    if "SYSTEM INSTRUCTION" not in positive_prompt:
+        positive_prompt = system_instruction + positive_prompt
     aspect_ratio = prompt_data.get("aspect_ratio", "9:16")
 
     try:
