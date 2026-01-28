@@ -211,7 +211,8 @@ if st.session_state.get("authenticated"):
 
 try:
     # V4.1: Cached Loading (Performance Fix)
-    @st.cache_data(ttl=300, show_spinner=False)
+    # V4.1: Cached Loading (Performance Fix)
+    @st.cache_data(ttl=3600, persist="disk", show_spinner="Syncing Cloud Assets...")
     def get_cached_assets(user_path):
         return load_assets(user_assets_dir=user_path)
 
@@ -487,35 +488,27 @@ with tab_assets:
                         
                         if int_key and "global_assets" in st.session_state:
                              st.session_state.global_assets[int_key][mem_key] = target_path
-                             
-                        count += 1
                         
+                        # --- S3 SYNC (Restored per-file) ---
+                        if os.getenv("S3_BUCKET_NAME"):
+                             try:
+                                 from execution.s3_uploader import upload_file_obj 
+                                 # Key: users/{user}/Assets/{Category}/{Filename}
+                                 s3_key = f"users/{username}/Assets/{cat_map[target_cat]}/{final_name}{ext}"
+                                 
+                                 # Upload
+                                 # We can upload the buffer directly or the file
+                                 with open(target_path, "rb") as f_up:
+                                     upload_file_obj(f_up, object_name=s3_key)
+                                     
+                                 count += 1
+                             except Exception as e:
+                                 st.error(f"S3 Upload Error for {final_name}: {e}")
+                        else:
+                             count += 1
+                             
                     st.success(f"Saved {count} assets! Check dropdowns instantly.")
                     # NO RERUN needed because we updated State.
-                    
-                    filename = f"{final_name}{ext}"
-                    full_path = os.path.join(save_dir, filename)
-                    
-                    # Write
-                    with open(full_path, "wb") as f:
-                        f.write(uploaded_file.getbuffer())
-                    
-                    # --- S3 SYNC (Critical Fix) ---
-                    if os.getenv("S3_BUCKET_NAME"):
-                        try:
-                            import boto3
-                            from execution.s3_uploader import upload_file_obj # Try to use helper
-                            
-                            # Key: users/{user}/Assets/{Category}/{Filename}
-                            s3_key = f"users/{username}/Assets/{cat_map[target_cat]}/{filename}"
-                            
-                            # Upload
-                            with open(full_path, "rb") as f_up:
-                                upload_file_obj(f_up, object_name=s3_key)
-                                
-                            st.toast(f"☁️ Synced to Cloud: {filename}")
-                        except Exception as e:
-                            st.error(f"S3 Upload Failed: {e}")
                             
                     st.success(f"Saved **{final_name}** to {target_cat}!")
                     
