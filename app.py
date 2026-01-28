@@ -215,7 +215,14 @@ try:
     def get_cached_assets(user_path):
         return load_assets(user_assets_dir=user_path)
 
-    assets = get_cached_assets(user_asset_path)
+    assets_raw = get_cached_assets(user_asset_path)
+    
+    # Session State Storage (Avoids Re-Passing)
+    if "global_assets" not in st.session_state:
+        st.session_state.global_assets = assets_raw
+
+    # Alias for local scope simple access (Read Only)
+    assets = st.session_state.global_assets
     
     # Debug
     # st.sidebar.write(f"User Assets Found: {len(assets.get('characters', {}))}")
@@ -432,22 +439,59 @@ with tab_assets:
             }
             
             target_cat = st.selectbox("Category", list(cat_map.keys()))
-            uploaded_file = st.file_uploader("Choose Image", type=["png", "jpg", "jpeg", "webp"])
-            custom_name = st.text_input("Asset Name (Optional)", placeholder="e.g. Cyberpunk Jacket")
+            uploaded_files = st.file_uploader("Choose Images", type=["png", "jpg", "jpeg", "webp"], accept_multiple_files=True)
+            
+            # Optional Name Override (Only applies if single file, or strictly prefixes?)
+            # User request: "Original file name should be saved... shouldn't have to rename"
+            # So custom_name is truly optional or for prefixing.
+            custom_name_prefix = st.text_input("Name Prefix (Optional)", placeholder="Leave empty to use filenames")
             
             if st.button("Save to Library", type="primary"):
-                if not uploaded_file:
-                    st.error("Please upload a file.")
+                if not uploaded_files:
+                    st.error("Please upload files.")
                 else:
-                    # Determine paths
                     save_dir = os.path.join(user_asset_root, cat_map[target_cat])
                     os.makedirs(save_dir, exist_ok=True)
                     
-                    # Filename logic
-                    final_name = custom_name.strip() if custom_name.strip() else os.path.splitext(uploaded_file.name)[0]
-                    # Sanitize
-                    final_name = "".join([c for c in final_name if c.isalnum() or c in (' ', '-', '_')]).strip()
-                    ext = os.path.splitext(uploaded_file.name)[1]
+                    count = 0
+                    for up_file in uploaded_files:
+                        # 1. Determine Name
+                        if custom_name_prefix:
+                             # Use prefix + index if multiple? Or just prefix if one?
+                             # Let's clean filename
+                             f_clean = os.path.splitext(up_file.name)[0]
+                             final_name = f"{custom_name_prefix} {f_clean}"
+                        else:
+                             final_name = os.path.splitext(up_file.name)[0]
+                             
+                        # Sanitize
+                        final_name = "".join([c for c in final_name if c.isalnum() or c in (' ', '-', '_')]).strip()
+                        ext = os.path.splitext(up_file.name)[1]
+                        
+                        # 2. Save File
+                        target_path = os.path.join(save_dir, f"{final_name}{ext}")
+                        with open(target_path, "wb") as f:
+                            f.write(up_file.getbuffer())
+                            
+                        # 3. SMART INJECT (Instant UI Update)
+                        # Add to Session State so it appears in dropdowns immediately
+                        # Key format: "(My) Name"
+                        mem_key = f"(My) {final_name}"
+                        # Map back to internal Keys
+                        # cat_map keys are UI keys (Characters), we need internal usage keys (characters)
+                        internal_cat_map = {
+                            "Characters": "characters", "Outfits": "outfits", "Environments": "locations",
+                            "Vibes": "vibes", "Props": "props", "Pets": "pets", "Friends": "relations", "Vehicles": "vehicles"
+                        }
+                        int_key = internal_cat_map.get(target_cat)
+                        
+                        if int_key and "global_assets" in st.session_state:
+                             st.session_state.global_assets[int_key][mem_key] = target_path
+                             
+                        count += 1
+                        
+                    st.success(f"Saved {count} assets! Check dropdowns instantly.")
+                    # NO RERUN needed because we updated State.
                     
                     filename = f"{final_name}{ext}"
                     full_path = os.path.join(save_dir, filename)
@@ -819,7 +863,9 @@ with tab_wizard:
 # ==========================================
 with tab_series:
     @st.fragment
-    def mini_series_ui(outfits_data, vibes_data, assets, user_asset_path):
+    def mini_series_ui(user_asset_path):
+        outfits_data = st.session_state.global_assets.get('outfits', {})
+        vibes_data = st.session_state.global_assets.get('vibes', {})
         st.markdown("### 🎬 Mini Series Studio")
         st.info("Create episodic content with consistent cast, wardrobe, and environments.")
 
@@ -1787,7 +1833,7 @@ with tab_series:
 
 
 
-    mini_series_ui(outfits_data, vibes_data, assets, user_asset_path)
+    mini_series_ui(user_asset_path)
 # ==========================================
 # TAB 1.5: WORLD BUILDER
 # ==========================================
@@ -1839,8 +1885,8 @@ with tab_world:
         # --- SCENE COMPOSITION UI (Synced with Filesystem) ---
         # Fragment to prevent full reload
         @st.fragment
-        @st.fragment
-        def wb_composition_fragment(assets, scenarios, selected_scenario_key):
+        def wb_composition_fragment(scenarios, selected_scenario_key):
+            assets = st.session_state.global_assets
             temp_selections = {}
             temp_assets = []
             
@@ -2056,7 +2102,7 @@ with tab_world:
             st.session_state['wb_prop_names'] = prop_names
 
         # Call the Fragment
-        wb_composition_fragment(assets, scenarios, selected_scenario_key)
+        wb_composition_fragment(scenarios, selected_scenario_key)
         
         # Hydrate Local Vars from storage (for downstream legacy logic)
         current_selections = st.session_state.get('wb_selections', {})
