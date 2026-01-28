@@ -895,7 +895,13 @@ with tab_series:
                             with c2:
                                  # Outfit Select
                                  outfit_opts = list(outfits_data.keys())
-                                 sel_fit = st.selectbox(f"Outfit", ["Default"] + outfit_opts, key=f"series_fit_{member}")
+                                 
+                                 # FIX: Stable Key for Widget (Strip S3 Query Params)
+                                 # 'member' might be "https://.../Shay.png?Expires=123"
+                                 # We need "Shay.png" as the stable ID
+                                 stable_id = member.split('/')[-1].split('?')[0]
+                                 
+                                 sel_fit = st.selectbox(f"Outfit", ["Default"] + outfit_opts, key=f"series_fit_{stable_id}")
                                  cast_wardrobe_map[member] = sel_fit
                              
                                  # Show Outfit Preview
@@ -1021,7 +1027,8 @@ with tab_series:
                                 real_path = c_data
                             
                             # Extract clean NICKNAME
-                            base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                            # FIX: Split '?' to handle S3 URLs with params
+                            base = full_key.split('/')[-1].split('?')[0].replace('.png','').replace('.jpg','').strip()
                             clean_name = base.split(' ')[0]
                             
                             # Fallback if file is named "Default" (e.g. Chels/Default.png)
@@ -1046,7 +1053,7 @@ with tab_series:
                         clean_roles_map = {}
                         if cast_role_map:
                             for full_key, role in cast_role_map.items():
-                                base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                                base = full_key.split('/')[-1].split('?')[0].replace('.png','').replace('.jpg','').strip()
                                 c_name = base.split(' ')[0]
                                 clean_roles_map[c_name] = role
                         
@@ -1058,7 +1065,7 @@ with tab_series:
                     
                         if cast_wardrobe_map:
                             for full_key, outfit in cast_wardrobe_map.items():
-                                base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                                base = full_key.split('/')[-1].split('?')[0].replace('.png','').replace('.jpg','').strip()
                                 c_name = base.split(' ')[0]
                                 clean_wardrobe_map[c_name] = outfit
                                 # FIX: Also store the full base name as a key (e.g. "Shay Blonde Bob")
@@ -1159,7 +1166,7 @@ with tab_series:
                             real_path = c_data
                     
                         # Parse Name
-                        base = full_key.split('/')[-1].replace('.png','').replace('.jpg','')
+                        base = full_key.split('/')[-1].split('?')[0].replace('.png','').replace('.jpg','')
                         clean_name = base.split(' ')[0]
                     
                         if real_path:
@@ -1176,7 +1183,7 @@ with tab_series:
                  
                  if cast_wardrobe_map:
                      for full_key, outfit in cast_wardrobe_map.items():
-                         base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                         base = full_key.split('/')[-1].split('?')[0].replace('.png','').replace('.jpg','').strip()
                          c_name = base.split(' ')[0]
                          clean_wardrobe_map[c_name] = outfit
                          clean_wardrobe_map[base] = outfit 
@@ -1250,11 +1257,42 @@ with tab_series:
                             selected_chars = st.multiselect(
                                 "Cast in Shot", 
                                 options=all_cast_keys,
-                                default=valid_defaults,
-                                key=f"cast_sel_{key_base}",
+                                key=f"cast_sh_{key_base}",
                                 label_visibility="collapsed",
                                 placeholder="Select Cast..."
                             )
+                            
+                            # V4: Per-Shot Wardrobe Control (Direct Injection)
+                            shot_wardrobe_map = {}
+                            if selected_chars:
+                                wc1, wc2, wc3 = st.columns(3)
+                                cols = [wc1, wc2, wc3]
+                                for idx, char_name in enumerate(selected_chars):
+                                    with cols[idx % 3]:
+                                        # Default to Global Map Value (Smart Default)
+                                        w_map_snap = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                                        
+                                        # Robust Lookup for Default
+                                        def_val = w_map_snap.get(char_name, "Default")
+                                        if def_val == "Default": def_val = w_map_snap.get(char_name.strip(), "Default")
+                                        if def_val == "Default": def_val = w_map_snap.get(char_name.split(' ')[0], "Default")
+                                        
+                                        outfit_keys = ["Default"] + list(outfits_data.keys())
+                                        
+                                        # Ensure default is valid
+                                        idx_def = 0
+                                        if def_val in outfit_keys:
+                                            idx_def = outfit_keys.index(def_val)
+                                            
+                                        # Render Widget
+                                        s_outfit = st.selectbox(
+                                            f"Outfit: {char_name}",
+                                            outfit_keys,
+                                            index=idx_def,
+                                            key=f"fit_{key_base}_{char_name}",
+                                            label_visibility="collapsed"
+                                        )
+                                        shot_wardrobe_map[char_name] = s_outfit
                             # UPDATE SHOT DATA so Generator uses this
                             shot['characters'] = selected_chars
                         
@@ -1323,13 +1361,34 @@ with tab_series:
                                                             "label": f"Cast: {c_name}"
                                                         })
                                                         
-                                                        # 3. Inject Outfit (If Assigned via Wardrobe Map)
-                                                        w_map = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                                                        o_key = w_map.get(c_name, "Default")
+                                                    # 3. Inject Outfit (Priority: Shot Local > Global Map)
+                                                        o_key = "Default"
+                                                        
+                                                        # A. Try Shot-Specific Map FIRST
+                                                        if 'shot_wardrobe_map' in locals() and c_name in shot_wardrobe_map:
+                                                            o_key = shot_wardrobe_map[c_name]
+                                                        
+                                                        # B. Fallback to Global Map (if Shot Local is Default or Mission)
+                                                        if o_key == "Default":
+                                                            w_map = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                                                            
+                                                            # ROBUST LOOKUP: Exact -> Strip -> First Name
+                                                            o_key = w_map.get(c_name, "Default")
+                                                            if o_key == "Default":
+                                                                o_key = w_map.get(c_name.strip(), "Default")
+                                                            if o_key == "Default":
+                                                                # Try First Name (e.g. "Shay" from "Shay Blonde Bob Front")
+                                                                first_name = c_name.split(' ')[0]
+                                                                o_key = w_map.get(first_name, "Default")
+
+                                                        # DEBUG WARDROBE
+                                                        # st.write(f"DEBUG: {c_name} -> Outfit Key: {o_key}")
+                                                        # st.json(w_map)
                                                         
                                                         if o_key and o_key != "Default":
                                                            o_data = outfits_data.get(o_key)
                                                            if isinstance(o_data, dict): o_data = o_data.get('default_img')
+                                                           
                                                            # Also allow HTTP for outfits
                                                            if o_data and (os.path.exists(o_data) or str(o_data).startswith("http")):
                                                                final_assets_payload.append({
@@ -1337,7 +1396,10 @@ with tab_series:
                                                                    "label": f"Outfit for {c_name}: {o_key}"
                                                                })
                                                            else:
-                                                               st.warning(f"⚠️ Outfit Missing: '{o_key}' path invalid: {o_data}")
+                                                               st.warning(f"⚠️ Outfit Path Invalid: {o_data}")
+                                                        else:
+                                                            # Silent fallback or mild warning if needed
+                                                            pass
                                                     else:
                                                         st.error(f"❌ Asset Missing: Could not find file for '{c_name}'. Path: '{c_path}'")
                                                         # Show debug dump of map to help user
