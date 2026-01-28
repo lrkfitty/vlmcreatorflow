@@ -222,7 +222,7 @@ try:
     vibes_data = assets.get('vibes', {})
     outfits_data = assets.get('outfits', {})
 
-    characters_data = assets.get('characters', {})
+    characters_data = assets.get('characters', {}).copy()
     
     # Merge Friends/Relations into Characters options
     relations_data = assets.get('relations', {})
