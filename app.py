@@ -210,7 +210,12 @@ if st.session_state.get("authenticated"):
     #     st.toast(f"Cloud Mode: {os.getenv('S3_BUCKET_NAME')}")
 
 try:
-    assets = load_assets(user_assets_dir=user_asset_path) # Pass user path
+    # V4.1: Cached Loading (Performance Fix)
+    @st.cache_data(ttl=300, show_spinner=False)
+    def get_cached_assets(user_path):
+        return load_assets(user_assets_dir=user_path)
+
+    assets = get_cached_assets(user_asset_path)
     
     # Debug
     # st.sidebar.write(f"User Assets Found: {len(assets.get('characters', {}))}")
@@ -814,7 +819,7 @@ with tab_wizard:
 # ==========================================
 with tab_series:
     @st.fragment
-    def mini_series_ui():
+    def mini_series_ui(outfits_data, vibes_data, assets, user_asset_path):
         st.markdown("### 🎬 Mini Series Studio")
         st.info("Create episodic content with consistent cast, wardrobe, and environments.")
 
@@ -1782,7 +1787,7 @@ with tab_series:
 
 
 
-    mini_series_ui()
+    mini_series_ui(outfits_data, vibes_data, assets, user_asset_path)
 # ==========================================
 # TAB 1.5: WORLD BUILDER
 # ==========================================
@@ -1834,7 +1839,8 @@ with tab_world:
         # --- SCENE COMPOSITION UI (Synced with Filesystem) ---
         # Fragment to prevent full reload
         @st.fragment
-        def wb_composition_fragment():
+        @st.fragment
+        def wb_composition_fragment(assets, scenarios, selected_scenario_key):
             temp_selections = {}
             temp_assets = []
             
@@ -1846,6 +1852,8 @@ with tab_world:
                     st.markdown("##### Cast & Characters")
                     st.markdown("###### 1. Protagonist")
                     
+                    
+                    characters_data = assets.get('characters', {})
                     wb_char_opts = {**characters_data}
                     wb_char_keys = sorted(list(wb_char_opts.keys()))
                     
@@ -1898,7 +1906,7 @@ with tab_world:
                             st.image(p_final_path, width=200, caption="Reference LoRA/Image")
     
                     st.caption("Main Character Outfit")
-                    fit_opts = get_assets_by_category("outfits")
+                    fit_opts = assets.get('outfits', {})
                     fit_key = st.selectbox("Select Outfit", ["None"] + list(fit_opts.keys()), key="main_outfit")
                     
                     if fit_key and fit_key != "None":
@@ -1916,7 +1924,7 @@ with tab_world:
                             st.image(path, caption=fit_name)
     
                     st.markdown("###### 2. Friends & Cast")
-                    rel_opts = get_assets_by_category("relations")
+                    rel_opts = assets.get('relations', {})
                     cast_pool = {**wb_char_opts, **rel_opts}
                     rel_keys = sorted(list(cast_pool.keys()))
                     
@@ -1954,7 +1962,7 @@ with tab_world:
                         for idx, k in enumerate(selected_rels):
                             with f_cols[idx]:
                                  f_name = cast_pool[k]['name'] if isinstance(cast_pool[k], dict) else k.split('/')[-1]
-                                 f_fit_opts = get_assets_by_category("outfits")
+                                 f_fit_opts = assets.get('outfits', {})
                                  if not f_fit_opts: f_fit_opts = {"Casual": "", "Chic": ""}
                                  f_outfit_key = st.selectbox(f"Outfit for {f_name.split()[0]}", list(f_fit_opts.keys()), key=f"fit_{idx}")
                                  f_outfit_path = None
@@ -1978,7 +1986,7 @@ with tab_world:
                     card_begin()
                     st.markdown("##### Setting & Props")
                     st.markdown("###### 3. Pets")
-                    pet_opts = get_assets_by_category("pets")
+                    pet_opts = assets.get('pets', {})
                     selected_pets = st.multiselect("Include Pets", list(pet_opts.keys()))
                     pet_names = []
                     if selected_pets:
@@ -1992,8 +2000,8 @@ with tab_world:
                                  if path: st.image(path, caption=name)
                     st.divider()
                     st.markdown("###### 4. Props & Vehicles")
-                    prop_opts = get_assets_by_category("props")
-                    veh_opts = get_assets_by_category("vehicles")
+                    prop_opts = assets.get('props', {})
+                    veh_opts = assets.get('vehicles', {})
                     all_props = {**prop_opts, **veh_opts}
                     selected_props = st.multiselect("Include Items", list(all_props.keys()))
                     prop_names = []
@@ -2048,7 +2056,7 @@ with tab_world:
             st.session_state['wb_prop_names'] = prop_names
 
         # Call the Fragment
-        wb_composition_fragment()
+        wb_composition_fragment(assets, scenarios, selected_scenario_key)
         
         # Hydrate Local Vars from storage (for downstream legacy logic)
         current_selections = st.session_state.get('wb_selections', {})
