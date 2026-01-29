@@ -282,10 +282,10 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                                     new_w = int(w * (target_long_edge / h))
                                     
                                 # Only resize if we are smaller than target
-                                if w < target_long_edge and h < target_long_edge:
-                                    logs.append(f"🔍 Upscaling from {w}x{h} to {new_w}x{new_h} (4K)...")
-                                    img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
-                                    img.save(filepath, quality=95)
+                                # if w < target_long_edge and h < target_long_edge:
+                                #    logs.append(f"🔍 Upscaling from {w}x{h} to {new_w}x{new_h} (4K)...")
+                                #    img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                                #    img.save(filepath, quality=95)
                             except Exception as e:
                                 logs.append(f"⚠️ Upscaling Failed: {e}")
                             
