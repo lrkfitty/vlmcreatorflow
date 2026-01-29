@@ -145,6 +145,15 @@ def generate_prompt_content(vibe, outfit, character,
             
             *IF the USER requests a specific shot (e.g. "Close Up"), you MUST enforce it. Do not generate a Full Body shot if Close Up is requested.*
         
+        6.  **SCENE REWRITE LOGIC (HIGHEST PRIORITY):**
+            -   You will be given a "DRAFT SCENE" (User Notes) and "TECHNICAL SPECS".
+            -   **DO NOT** just output the draft.
+            -   **YOU MUST** re-stage the draft using the Camera, Lighting, and Action specs.
+            -   *Example:* Draft says "She is sitting." Specs say "Action: Dancing". -> **OUTPUT: She is DANCING.** (Specs Override Draft).
+            -   *Example:* Draft says "Daylight." Specs say "Lighting: Neon Blue". -> **OUTPUT: NEON BLUE LIGHTING.** (Specs Override Draft).
+            -   **ENRICHMENT:** If the draft is simple (e.g. "A girl in a room"), you MUST invent details based on the 'Vibe' and 'Outfit' to make it 8k quality.
+            -   **ASSET PRESERVATION:** While rewriting the scene, you MUST strictly adhere to the Character Identity and Outfit details provided in the Reference Images. Do not hallucinate different clothes or people.
+        
         OUTPUT RULES:
         -   **DO NOT SUMMARIZE.** The `positive_prompt` must be >100 words.
         -   **JSON ONLY.**

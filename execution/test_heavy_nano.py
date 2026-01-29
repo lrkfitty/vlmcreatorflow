@@ -1,6 +1,7 @@
 import os
 import sys
 import requests
+import json
 from dotenv import load_dotenv
 
 # Mock the environment
@@ -35,4 +36,4 @@ result = generate_image_nano(
 )
 
 print("\n--- RESULT ---")
-print(result)
+print(json.dumps(result, indent=2, default=str))

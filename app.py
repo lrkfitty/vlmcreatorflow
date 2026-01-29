@@ -211,14 +211,50 @@ if st.session_state.get("authenticated"):
 
 try:
     # V4.1: Cached Loading (Performance Fix)
-    # V4.1: Cached Loading (Performance Fix)
-    @st.cache_data(ttl=3600, persist="disk", show_spinner="Syncing Cloud Assets...")
-    def get_cached_assets(user_path):
-        return load_assets(user_assets_dir=user_path)
+    # V4.2: Split Caching (Ultra Performance)
+    # 1. Base Assets (Persisted to Disk, Updates Hourly or Manual)
+    @st.cache_data(ttl=3600, persist="disk", show_spinner="Loading Global Catalog...")
+    def get_base_assets():
+        return load_assets(user_assets_dir=None, skip_base=False)
 
-    assets_raw = get_cached_assets(user_asset_path)
+    # 2. User Assets (Session Cache, Fast, Updates often)
+    @st.cache_data(ttl=300, show_spinner=False)
+    def get_user_assets(user_path):
+        if not user_path: return {}
+        return load_assets(user_assets_dir=user_path, skip_base=True)
+
+    # Load & Merge
+    base_assets = get_base_assets()
+    user_assets_raw = get_user_assets(user_asset_path) if user_asset_path else {} # Return empty dict structure
+
+    # Deep Merge (Naive update overwrites dicts, we need to merge keys within categories)
+    # Actually load_assets returns {'characters': {...}, ...}
+    # So we need to merge the inner dicts
+    assets_raw = base_assets.copy() # Shallow copy of structure
     
-    # Session State Storage (Avoids Re-Passing)
+    # Helper to merge deep
+    # If user_assets_raw is just the dict structure
+    # Wait, load_assets returns { 'characters': {}, ... }
+    # So we iterate and update
+    
+    # Correction: If get_user_assets returns a full struct, we iterate keys
+    # But wait, did I verify load_assets returns empty dicts for categories? Yes.
+    
+    # Safe Merging
+    # We must deep copy the inner dicts first?
+    # Actually, st.cache_data returns mutable refs? We should copy.
+    import copy
+    assets_raw = copy.deepcopy(base_assets) # Protect the disk cache
+    
+    if isinstance(user_assets_raw, dict):
+        for cat, items in user_assets_raw.items():
+            if cat in assets_raw and isinstance(items, dict):
+                assets_raw[cat].update(items)
+            elif cat not in assets_raw:
+                 assets_raw[cat] = items
+    
+    # Proceed
+
     if "global_assets" not in st.session_state:
         st.session_state.global_assets = assets_raw
 

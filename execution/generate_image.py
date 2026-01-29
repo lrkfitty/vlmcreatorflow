@@ -192,22 +192,23 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                 "temperature": 0.9,
             },
             "safetySettings": [
-                { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE" },
-                { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE" },
-                { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE" },
-                { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE" }
+                { "category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_ONLY_HIGH" },
+                { "category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_ONLY_HIGH" },
+                { "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_ONLY_HIGH" },
+                { "category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_ONLY_HIGH" }
             ]
         }
         
         # logs.append(f"Sending request to: {url}")
         
         max_retries = 4 
-        retry_delay = 2 # Start with 2s, double it
+        retry_delay = 20 # Fixed 20s delay
         
         for attempt in range(max_retries + 1):
             try:
-                # Increased timeout to 120s for heavy multimodal payloads (5+ images)
-                response = requests.post(url, headers=headers, json=payload, timeout=120)
+                print(f"🎨 Nano Gen Attempt {attempt+1}/{max_retries+1}...")
+                # Timeout reduced to 30s (User Request: Max 2 mins total)
+                response = requests.post(url, headers=headers, json=payload, timeout=30)
                 
                 if response.status_code == 200:
                     result = response.json()
@@ -223,9 +224,10 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                     if finish_reason == "SAFETY":
                         if attempt < max_retries:
                             safety_ratings = candidates[0].get("safetyRatings", [])
+                            print(f"⚠️ Safety Block (Attempt {attempt+1}). Retrying...")
                             logs.append(f"⚠️ Blocked by Safety Filters (Attempt {attempt+1}/{max_retries}). Ratings: {json.dumps(safety_ratings)}")
                             time.sleep(retry_delay)
-                            retry_delay = min(retry_delay * 1.5, 10)
+                            # retry_delay = min(retry_delay * 1.5, 10) # Fixed 20s
                             continue
                         else:
                             safety_ratings = candidates[0].get("safetyRatings", [])
@@ -255,6 +257,37 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                             
                             with open(filepath, "wb") as f:
                                 f.write(image_bytes)
+                            
+                            # --- 4K UPSCALING (User Request) ---
+                            try:
+                                from PIL import Image
+                                img = Image.open(filepath)
+                                
+                                # Target: 4K (approx 3840 on long edge)
+                                # Nano default is usually ~1024 or ~1280. 
+                                # We want to upscale to "UHD" standards.
+                                
+                                # 9:16 Portrait -> 2160 x 3840
+                                # 16:9 Landscape -> 3840 x 2160
+                                # Square -> 3840 x 3840
+                                
+                                target_long_edge = 3840
+                                w, h = img.size
+                                
+                                if w > h: # Landscape
+                                    new_w = target_long_edge
+                                    new_h = int(h * (target_long_edge / w))
+                                else: # Portrait or Square
+                                    new_h = target_long_edge
+                                    new_w = int(w * (target_long_edge / h))
+                                    
+                                # Only resize if we are smaller than target
+                                if w < target_long_edge and h < target_long_edge:
+                                    logs.append(f"🔍 Upscaling from {w}x{h} to {new_w}x{new_h} (4K)...")
+                                    img = img.resize((new_w, new_h), Image.Resampling.LANCZOS)
+                                    img.save(filepath, quality=95)
+                            except Exception as e:
+                                logs.append(f"⚠️ Upscaling Failed: {e}")
                             
                             # --- S3 AUTO-UPLOAD ---
                             # On Streamlit Cloud, local files are ephemeral. We must sync to S3 immediately.
@@ -308,7 +341,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                     if attempt < max_retries:
                         logs.append(f"⚠️ Model Overloaded (503). Retrying in {retry_delay}s... ({attempt+1}/{max_retries})")
                         time.sleep(retry_delay)
-                        retry_delay *= 2
+                        # retry_delay *= 2 # Fixed 20s delay
                         continue
                     else:
                         raise Exception(f"Model Overloaded (503) after {max_retries} retries.")

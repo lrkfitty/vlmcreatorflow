@@ -17,3 +17,5 @@ token.json
 output/
 sd_local/
 users.json
+.venv/
+output_test/

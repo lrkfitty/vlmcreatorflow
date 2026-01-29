@@ -37,7 +37,7 @@ def scan_directory(directory):
 # --- CLOUD MANIFEST LOGIC ---
 # (scan_manifest function removed - logic moved to Single Pass loop below)
 
-def load_assets(base_path="assets", user_assets_dir=None):
+def load_assets(base_path="assets", user_assets_dir=None, skip_base=False):
     """
     Dynamically loads assets.
     If 'assets_manifest.json' exists, uses S3 URLs (Cloud Mode).
@@ -56,113 +56,114 @@ def load_assets(base_path="assets", user_assets_dir=None):
         "foods": {}
     }
     
-    # 1. CHECK FOR CLOUD MANIFEST
-    manifest_path = "assets_manifest.json"
-    use_cloud = False
-    
-    if os.path.exists(manifest_path):
-        try:
-            with open(manifest_path, "r") as f:
-                manifest = json.load(f)
-            
-            bucket = os.getenv("S3_BUCKET_NAME")
-            if bucket:
-                region = os.getenv("AWS_REGION", "ap-southeast-2")
-                s3_base = f"https://{bucket}.s3.{region}.amazonaws.com/assets"
-                print(f"☁️ Cloud Mode Activated: Using {s3_base}")
-                use_cloud = True
-            else:
-                print("⚠️ Manifest found but S3_BUCKET_NAME missing. Falling back to local.")
-        except Exception as e:
-            print(f"⚠️ Error reading manifest: {e}")
-            
-    if use_cloud:
-        # --- CLOUD LOADING (Single Pass) ---
-        print(f"☁️ Cloud Mode: Scanning {len(manifest) if manifest else 'S3 Direct'} items...")
+    if not skip_base:
+        # 1. CHECK FOR CLOUD MANIFEST
+        manifest_path = "assets_manifest.json"
+        use_cloud = False
         
-        # If manifest is empty/failed, we MUST scan S3 directly for base assets too
-        if not manifest or len(manifest) < 5:
-            print("⚠️ Manifest empty/missing. Scanning S3 'assets/' prefix directly...")
+        if os.path.exists(manifest_path):
             try:
-                import boto3
+                with open(manifest_path, "r") as f:
+                    manifest = json.load(f)
+                
                 bucket = os.getenv("S3_BUCKET_NAME")
-                s3 = boto3.client('s3', region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
-                
-                # Scan root assets folder
-                paginator = s3.get_paginator('list_objects_v2')
-                pages = paginator.paginate(Bucket=bucket, Prefix="assets/")
-                
-                manifest = []
-                for page in pages:
-                    for obj in page.get('Contents', []):
-                         key = obj['Key']
-                         # Filter valid images
-                         if key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and "users/" not in key:
-                             # Convert key to "relative path" style expected by loader
-                             # Remove 'assets/' prefix if present for cleaner matching logic?
-                             # Actually logic below expects full path?
-                             # Line 101: parts = rel_path.split("/")
-                             # Line 105: check for "AI Content Creators"
-                             # Just use key as rel_path
-                             manifest.append(key)
-                print(f"✅ Discovered {len(manifest)} base assets from S3.")
-            except Exception as e:
-                print(f"❌ Failed to scan S3 base assets: {e}")
-
-        # explicit mapping of Folder Name (in manifest) -> Data Category Key
-        folder_map = {
-            "environments": "locations",
-            "vibes": "vibes",
-            "outfits": "outfits",
-            "influencer clothing": "outfits",
-            "influencer clothing ": "outfits", # Handle trailing space
-            "characters": "characters",
-            "shay.so.fine": "characters", # Legacy Mapping
-            "friends": "relations",
-            "pets": "pets",
-            "props": "props",
-            "vehicles": "vehicles",
-            "foods": "foods"
-        }
-
-        for rel_path in manifest:
-            # manifest path: "AI Content Creators/Category/Sub/File.png"
-            parts = rel_path.split("/")
-            
-            # Skip root if present
-            start_idx = 0
-            if len(parts) > 0 and parts[0] == "AI Content Creators":
-                start_idx = 1
-            
-            if len(parts) <= start_idx + 1: continue # Need at least Category + File
-            
-            # Identify Category Folder
-            cat_folder = parts[start_idx].lower().strip()
-            
-            # Map to App Category
-            target_key = folder_map.get(cat_folder)
-            
-            if target_key:
-                # Generate Name
-                # Everything after Category Folder and before Filename is "SubPath"
-                sub_parts = parts[start_idx+1 : -1]
-                filename = os.path.splitext(parts[-1])[0].replace('_', ' ').title()
-                
-                if not sub_parts:
-                    final_name = filename
+                if bucket:
+                    region = os.getenv("AWS_REGION", "ap-southeast-2")
+                    s3_base = f"https://{bucket}.s3.{region}.amazonaws.com/assets"
+                    print(f"☁️ Cloud Mode Activated: Using {s3_base}")
+                    use_cloud = True
                 else:
-                    prefix_str = " / ".join([p.replace('_', ' ').title() for p in sub_parts])
-                    final_name = f"{prefix_str} / {filename}"
+                    print("⚠️ Manifest found but S3_BUCKET_NAME missing. Falling back to local.")
+            except Exception as e:
+                print(f"⚠️ Error reading manifest: {e}")
                 
-                # Generate URL
-                url = f"{s3_base}/{rel_path.replace(' ', '%20')}"
+        if use_cloud:
+            # --- CLOUD LOADING (Single Pass) ---
+            print(f"☁️ Cloud Mode: Scanning {len(manifest) if manifest else 'S3 Direct'} items...")
+            
+            # If manifest is empty/failed, we MUST scan S3 directly for base assets too
+            if not manifest or len(manifest) < 5:
+                print("⚠️ Manifest empty/missing. Scanning S3 'assets/' prefix directly...")
+                try:
+                    import boto3
+                    bucket = os.getenv("S3_BUCKET_NAME")
+                    s3 = boto3.client('s3', region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
+                    
+                    # Scan root assets folder
+                    paginator = s3.get_paginator('list_objects_v2')
+                    pages = paginator.paginate(Bucket=bucket, Prefix="assets/")
+                    
+                    manifest = []
+                    for page in pages:
+                        for obj in page.get('Contents', []):
+                             key = obj['Key']
+                             # Filter valid images
+                             if key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and "users/" not in key:
+                                 # Convert key to "relative path" style expected by loader
+                                 # Remove 'assets/' prefix if present for cleaner matching logic?
+                                 # Actually logic below expects full path?
+                                 # Line 101: parts = rel_path.split("/")
+                                 # Line 105: check for "AI Content Creators"
+                                 # Just use key as rel_path
+                                 manifest.append(key)
+                    print(f"✅ Discovered {len(manifest)} base assets from S3.")
+                except Exception as e:
+                    print(f"❌ Failed to scan S3 base assets: {e}")
+    
+            # explicit mapping of Folder Name (in manifest) -> Data Category Key
+            folder_map = {
+                "environments": "locations",
+                "vibes": "vibes",
+                "outfits": "outfits",
+                "influencer clothing": "outfits",
+                "influencer clothing ": "outfits", # Handle trailing space
+                "characters": "characters",
+                "shay.so.fine": "characters", # Legacy Mapping
+                "friends": "relations",
+                "pets": "pets",
+                "props": "props",
+                "vehicles": "vehicles",
+                "foods": "foods"
+            }
+    
+            for rel_path in manifest:
+                # manifest path: "AI Content Creators/Category/Sub/File.png"
+                parts = rel_path.split("/")
                 
-                # Add to Data
-                data[target_key][final_name] = url
-        
-        # Fallback: If Vibes empty, use Locations
-        if not data["vibes"]:
-            data["vibes"] = data["locations"]
+                # Skip root if present
+                start_idx = 0
+                if len(parts) > 0 and parts[0] == "AI Content Creators":
+                    start_idx = 1
+                
+                if len(parts) <= start_idx + 1: continue # Need at least Category + File
+                
+                # Identify Category Folder
+                cat_folder = parts[start_idx].lower().strip()
+                
+                # Map to App Category
+                target_key = folder_map.get(cat_folder)
+                
+                if target_key:
+                    # Generate Name
+                    # Everything after Category Folder and before Filename is "SubPath"
+                    sub_parts = parts[start_idx+1 : -1]
+                    filename = os.path.splitext(parts[-1])[0].replace('_', ' ').title()
+                    
+                    if not sub_parts:
+                        final_name = filename
+                    else:
+                        prefix_str = " / ".join([p.replace('_', ' ').title() for p in sub_parts])
+                        final_name = f"{prefix_str} / {filename}"
+                    
+                    # Generate URL
+                    url = f"{s3_base}/{rel_path.replace(' ', '%20')}"
+                    
+                    # Add to Data
+                    data[target_key][final_name] = url
+            
+            # Fallback: If Vibes empty, use Locations
+            if not data["vibes"]:
+                data["vibes"] = data["locations"]
 
         if user_assets_dir:
             # Check if this is a path like "output/users/{user}/Assets"
