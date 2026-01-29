@@ -31,138 +31,166 @@ from execution.s3_uploader import upload_file_obj
                     base_out = os.path.join(get_user_out_dir_func("Series"), series_title.replace(" ", "_"), ep_title)
                     os.makedirs(base_out, exist_ok=True)
                     
-                    for shot_data in generated_shots_data:
-                        s_id = shot_data['scene_id']
-                        sh_id = shot_data['shot_id']
-                        p_text = shot_data['prompt']
-                        m_type = shot_data['type']
-                        
-                        # SAFETY GUARD: Ensure Prompt Exists
-                        if not p_text or len(p_text.strip()) < 5:
-                             st.warning(f"⚠️ Shot {s_id}-{sh_id} prompt empty! Using fallback.")
-                             p_text = f"Cinematic shot of scene {s_id} shot {sh_id}, high quality, 8k"
+                # Parallel Execution Setup
+                from concurrent.futures import ThreadPoolExecutor, as_completed
+                
+                # 1. PRE-CALCULATE PAYLOADS (Fix for Missing Assets)
+                shot_tasks = []
+                
+                for shot_data in generated_shots_data:
+                    s_id = shot_data['scene_id']
+                    sh_id = shot_data['shot_id']
+                    p_text = shot_data['prompt']
+                    m_type = shot_data['type']
+                    
+                    # SAFETY GUARD: Ensure Prompt Exists
+                    if not p_text or len(str(p_text).strip()) < 5:
+                         p_text = f"Cinematic shot of scene {s_id} shot {sh_id}, high quality, 8k"
 
-                        # V3.8: Inject Time of Day & Transition (Batch)
-                        t_day = shot_data.get('time_of_day', 'Day')
-                        t_trans = shot_data.get('transition', 'None')
-                        t_text = f"Visual Transition Style: {t_trans}. " if t_trans and t_trans != "None" else ""
-                        
-                        p_text = f"Time of Day: {t_day}. {t_text}{p_text}"
-                        
-                        st.write(f"Processing Scene {s_id} Shot {sh_id} ({m_type})...")
-                        
-                        # 1. Reuse Logic to Re-Construct Assets Payload 
-                        # (We could have stored it, but reconstructing ensures fresh state)
-                        assets_payload = []
-                        
-                        # Environment Injection
-                        target_env = shot_data['environment']
-                        # Override logic same as UI
-                        if shot_data['scene_id'] in [2, 4]: # Rough B-Roll logic approximation or use shot_data
-                             pass # Rely on what was passed in shot_data['environment'] which IS the target env
-                        
-                        env_path = vibes_data.get(target_env) or assets.get('locations', {}).get(target_env)
-                        if isinstance(env_path, dict): env_path = env_path.get('default_img')
-                        if env_path:
-                            assets_payload.append({
-                                "path": env_path,
-                                "label": f"Location: {target_env}"
-                            })
-                        
-                        # Character Assets
-                        char_names = shot_data.get('characters', [])
-                        for c_name in char_names:
-                            # 1. Clean Name Lookup
-                            c_key = c_name.strip().split(' ')[0]
-                            asset_path = st.session_state.cast_lookup_map.get(c_key)
-                            
-                            if not asset_path and '_' in c_name:
-                                 norm_key = c_name.replace('_', ' ').strip().split(' ')[0]
-                                 fallback_path = st.session_state.cast_lookup_map.get(norm_key)
-                                 if fallback_path:
-                                     c_key = norm_key
-                                     asset_path = fallback_path
-                            
-                            if asset_path:
-                                 assets_payload.append({
-                                     "path": asset_path,
-                                     "label": f"Cast: {c_name}"
-                                 })
-                                 
-                                 # 2. Outfit
-                                 w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                                 outfit_name = w_snapshot.get(c_name)
-                                 if not outfit_name or outfit_name == "Default":
-                                     outfit_name = w_snapshot.get(c_key, "Default")
-                                     
-                                 if outfit_name != "Default":
-                                     o_path = outfits_data.get(outfit_name)
-                                     if isinstance(o_path, dict): o_path = o_path.get('default_img')
-                                     if o_path and os.path.exists(o_path):
-                                         assets_payload.append({
-                                             "path": o_path,
-                                             "label": f"Outfit for {c_name}: {outfit_name}"
-                                         })
+                    # V3.8: Inject Time of Day & Transition
+                    t_day = shot_data.get('time_of_day', 'Day')
+                    t_trans = shot_data.get('transition', 'None')
+                    t_text = f"Visual Transition Style: {t_trans}. " if t_trans and t_trans != "None" else ""
+                    
+                    final_prompt = f"Time of Day: {t_day}. {t_text}{p_text}"
+                    
+                    # ROBUST ASSET LOOKUP
+                    assets_payload = []
+                    
+                    # A. Environment
+                    target_env = shot_data['environment']
+                    # Use existing data maps from outer scope
+                    env_path = vibes_data.get(target_env) or assets.get('locations', {}).get(target_env)
+                    if isinstance(env_path, dict): env_path = env_path.get('default_img')
+                    if env_path:
+                        assets_payload.append({ "path": env_path, "label": f"Location: {target_env}" })
 
-                        # Construct Prompt Data
+                    # B. Characters & Outfits
+                    char_names = shot_data.get('characters', [])
+                    for c_name in char_names:
+                        # Clean Key
+                        c_key = c_name.strip().split(' ')[0]
+                        asset_path = st.session_state.cast_lookup_map.get(c_key)
+                        
+                        # Fallback for complex keys
+                        if not asset_path and '_' in c_name:
+                             norm_key = c_name.replace('_', ' ').strip().split(' ')[0]
+                             fallback_path = st.session_state.cast_lookup_map.get(norm_key)
+                             if fallback_path: asset_path = fallback_path
+                        
+                        if asset_path:
+                             assets_payload.append({ "path": asset_path, "label": f"Cast: {c_name}" })
+                             
+                             # Outfit Lookup (Snapshot)
+                             w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                             outfit_name = w_snapshot.get(c_name)
+                             # Fallback to key
+                             if not outfit_name: outfit_name = w_snapshot.get(c_key, "Default")
+                             
+                             if outfit_name and outfit_name != "Default":
+                                 o_path = outfits_data.get(outfit_name)
+                                 if isinstance(o_path, dict): o_path = o_path.get('default_img')
+                                 if o_path:
+                                     assets_payload.append({ "path": o_path, "label": f"Outfit: {outfit_name}" })
+
+                    # Store Task Data
+                    shot_tasks.append({
+                        "id": f"{s_id}-{sh_id}",
+                        "scene_id": s_id,
+                        "shot_id": sh_id,
+                        "prompt": final_prompt,
+                        "assets": assets_payload,
+                        "type": m_type,
+                        "out_dir": base_out
+                    })
+
+                # 2. EXECUTE PARALLEL BATCH
+                total_shots = len(shot_tasks)
+                completed = 0
+                max_workers = 3 # Speed Limit
+                
+                prog_bar = st.progress(0.0)
+                status_text = st.empty()
+                
+                results_map = {}
+
+                with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                    # Map Future -> Task Data
+                    future_to_task = {}
+                    for task in shot_tasks:
+                        # Construct P_Data
                         p_data = {
-                             "positive_prompt": p_text,
+                             "positive_prompt": task['prompt'],
                              "negative_prompt": "blurry, low quality, distortion, ugly face",
                              "width": 1024, "height": 576,
                              "num_images": 1,
                              "guidance_scale": 7.5,
                              "model_type": "nano", 
-                             "assets": assets_payload 
+                             "assets": task['assets'] 
                         }
                         
-                        # Generate Still
-                        res = generate_image_from_prompt(p_data, base_out)
+                        # Submit
+                        future = executor.submit(generate_image_from_prompt, p_data, task['out_dir'])
+                        future_to_task[future] = task
+                    
+                    # Process as they complete
+                    for future in as_completed(future_to_task):
+                        task = future_to_task[future]
+                        t_id = task['id']
                         
-                        if res and res.get('status') == 'success':
-                            img_path = res['image_path']
-                            st.image(img_path, caption=f"Sc{s_id}_Sh{sh_id}")
-                            
-                            # 2. Video Generation
-                            if m_type == "Kling Video":
-                                st.write("⚡ Sending to Kling AI...")
-                                try:
-                                    k_client = KlingClient()
-                                    with open(img_path, "rb") as f_img:
-                                        sanitized_series = series_title.replace(" ", "_")
-                                        s3_name = f"series_assets/{sanitized_series}/{ep_title}/sc{s_id}_sh{sh_id}.png"
-                                        img_url = upload_file_obj(f_img, object_name=s3_name)
-                                    
-                                    if img_url:
-                                        task = k_client.create_video_from_image(img_url, p_text)
-                                        st.success(f"Video Task Started! ID: {task.get('task_id')}")
-                                    else:
-                                        st.error("Failed to upload image to S3.")
-                                except Exception as e:
-                                    st.error(f"Kling Error: {e}")
-                                        
-                            elif m_type == "Sora 2 Video":
-                                st.write("✨ Sending to Sora 2 (OpenAI)...")
-                                try:
-                                    sora_client = SoraClient()
-                                    with open(img_path, "rb") as f_img:
-                                        sanitized_series = series_title.replace(" ", "_")
-                                        s3_name = f"series_assets/{sanitized_series}/{ep_title}/sc{s_id}_sh{sh_id}.png"
-                                        img_url = upload_file_obj(f_img, object_name=s3_name)
-                                        
-                                    if img_url:
-                                        res_url = sora_client.create_video_from_image(img_url, p_text)
-                                        if isinstance(res_url, dict) and "error" in res_url:
-                                            st.error(f"Sora Error: {res_url['error']}")
-                                        else:
-                                            st.success(f"Video Generated! [Link]({res_url})")
-                                            st.video(res_url)
-                                    else: 
-                                        st.error("S3 Upload Failed")
-                                except Exception as e:
-                                    st.error(f"Sora Error: {e}")
-                                    
-                        else:
-                            st.error(f"Failed to render shot {sh_id}")
+                        try:
+                            res = future.result()
+                            if res and res.get('status') == 'success':
+                                results_map[t_id] = res['image_path']
+                                status_text.write(f"✅ Generated Shot {t_id}")
+                            else:
+                                status_text.error(f"❌ Failed Shot {t_id}")
+                        except Exception as e:
+                            status_text.error(f"⚠️ Error Shot {t_id}: {e}")
+                        
+                        completed += 1
+                        prog_bar.progress(completed / total_shots)
+
+                # 3. RENDER RESULTS & KICKOFF VIDEO (Sequential Video for Safety)
+                st.markdown("### 🎞️ Batch Results")
+                
+                # Sort by Scene/Shot order? The loop for display handles it
+                for shot_data in generated_shots_data:
+                    s_id = shot_data['scene_id']
+                    sh_id = shot_data['shot_id']
+                    key = f"{s_id}-{sh_id}"
+                    m_type = shot_data['type']
+                    p_text = shot_data['prompt'] # Use original text for video prompt
+                    
+                    img_path = results_map.get(key)
+                    
+                    if img_path:
+                        st.image(img_path, caption=f"Scene {s_id} Shot {sh_id}")
+                        
+                        # Video Logic (Sequential to avoid massive API hammer on Kling/Sora)
+                        if m_type in ["Kling Video", "Sora 2 Video"]:
+                             st.caption(f"Generating Video ({m_type})...")
+                             # ... Video logic preserved ...
+                             # For now, let's keep video sequential or just notify user to run video separately
+                             # Re-implementing simplified video call here:
+                             try:
+                                 if m_type == "Kling Video":
+                                      k_client = KlingClient()
+                                      with open(img_path, "rb") as f:
+                                          s3_url = upload_file_obj(f, object_name=f"series_assets/{ep_title}/{key}.png")
+                                      if s3_url:
+                                          k_client.create_video_from_image(s3_url, p_text)
+                                          st.success(f"Video queued for {key}")
+                                          
+                                 elif m_type == "Sora 2 Video":
+                                      s_client = SoraClient()
+                                      with open(img_path, "rb") as f:
+                                          s3_url = upload_file_obj(f, object_name=f"series_assets/{ep_title}/{key}.png")
+                                      if s3_url:
+                                          v_url = s_client.create_video_from_image(s3_url, p_text)
+                                          if isinstance(v_url, str): st.video(v_url)
+                             except Exception as e:
+                                 st.error(f"Video Error {key}: {e}")
 
                 status.update(label="Episode Production Complete!", state="complete")
     """
