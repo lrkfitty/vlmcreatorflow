@@ -70,19 +70,10 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
        - Apply the specific Camera/Lens/Lighting settings provided above to EVERY description.
        - Example: "Wide shot on Arri Alexa with Anamorphic Lens, cinematic moody lighting..."
     
-    2. SCENE BREAKDOWN: transform the script into **EXACTLY 12 VISUAL SHOTS**.
-       - **Suggested Structure (Adapt if Narrative Requires):**
-         * Shots 1-2: Narrative (Establish Character/Action)
-         * Shot 3: Organic Transition / Atmosphere (B-Roll OR Reaction Shot)
-         * Shots 4-5: Narrative (Deepen Story)
-         * Shot 6: Mid-Point Bridge (Detail/Environment or Character Moment)
-         * Shots 7-11: Narrative Peak / Resolution
-         * Shot 12: B-Roll (Closing Shot / Tone - NO CHARACTERS) OR Final Hero Shot
-
-       - **CRITICAL RULE ON B-ROLL:**
-         * Do NOT force B-Roll every 4th shot if it breaks the flow.
-         * Only use B-Roll (Environment/Details) if it enhances the pacing or atmosphere.
-         * If the scene is dialogue-heavy or emotional, **PRIORITIZE CHARACTER FOCUS**.
+    2. SCENE BREAKDOWN: transform the script into a logical shot list (6-12 Shots).
+       - **Narrative Logic is King**: usage of B-Roll or Cutaways must only occur if explicitly called for by the script or a necessary time transition.
+       - **Focus on Action**: Break down the script into beats. If a character speaks a long line, break it into multiple angles (Close Up, Reaction Shot of Listener).
+       - **NO FILLER**: Do not insert "Walking" or "Atmosphere" shots unless they drive the story.
 
     3. VISUAL FIDELITY (CRITICAL - DO NOT FAIL THIS):
        - You have been provided with VISUAL REFERENCE images labeled "Wardrobe".
@@ -103,7 +94,7 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
        - **VERIFICATION**: Before outputting a description, ask yourself: "Am I describing a physical trait or outfit detail?" If yes, DELETE IT. Only describe Actions, Lighting, and Environment.
 
     4. B-ROLL RULES:
-       - B-Roll shots must NOT focus on main characters. Focus on details, environment, lighting, or objects that set the mood (Tone).
+       - Only use B-Roll (Environment/Details) if it enhances the pacing or atmosphere.
        - Use the 'Secondary/B-Roll Environment'.
     
     5. SHOT LIST: For each Shot, you must define these SPECIFIC, GRANULAR parameters:
