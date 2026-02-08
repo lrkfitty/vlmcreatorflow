@@ -13,13 +13,18 @@ try:
     importlib.reload(la_module)
     import load_assets as la_module
     importlib.reload(la_module)
-    from load_assets import load_assets
+    from load_assets import load_assets, promote_image_to_asset
     from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button
-    from generate_prompt import generate_prompt_content
+    import generate_image as gi_module
+    importlib.reload(gi_module)
     from generate_image import generate_image_from_prompt
+    
+    import generate_prompt as gp_module
+    importlib.reload(gp_module)
+    from generate_prompt import generate_prompt_content
     from campaign_runner import CampaignManager
     from execution.generate_video import generate_video_kling, generate_video_humo
-    from execution.s3_uploader import upload_file_obj
+    from execution.s3_uploader import upload_file_obj, delete_file
     from generate_video_prompt import generate_motion_prompt
     from world_manager import load_world_db, get_assets_by_category, get_scenarios
     from execution.kling_client import KlingClient
@@ -99,14 +104,19 @@ if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
 # Check Cookie
-if not st.session_state.authenticated:
+if not st.session_state.get("authenticated", False):
     try:
-        auth_token = cookie_manager.get(cookie="auth_token")
-        if auth_token:
-             user_payload = auth_mgr.verify_token(auth_token)
-             if user_payload:
-                 st.session_state.authenticated = True
-                 st.session_state.current_user = user_payload
+        # Check if user is trying to manually login (typing in form)
+        # If so, SKIP auto-login to prevent overwriting their action
+        manual_attempt = st.session_state.get("auth_user") or st.session_state.get("auth_pass") or st.session_state.get("reg_user")
+        
+        if not manual_attempt:
+            auth_token = cookie_manager.get(cookie="auth_token")
+            if auth_token:
+                 user_payload = auth_mgr.verify_token(auth_token)
+                 if user_payload:
+                     st.session_state.authenticated = True
+                     st.session_state.current_user = user_payload
     except Exception:
         pass
 
@@ -185,10 +195,24 @@ with st.sidebar:
                  st.cache_data.clear()
                  st.cache_resource.clear()
                  st.rerun()
+        
+        # Explicit Reset for Troubleshooting
+        if st.button("⚠️ RESET SYSTEM CACHE", use_container_width=True):
+            st.cache_data.clear()
+            st.cache_resource.clear()
+            st.success("Cache Cleared!")
+            time.sleep(1)
+            st.rerun()
 
         if st.button("Logout"):
             cookie_manager.delete("auth_token")
-            st.session_state.authenticated = False
+            # Fully clear session state to preventing lingering variables
+            for key in list(st.session_state.keys()):
+                del st.session_state[key]
+            
+            # Allow time for cookie to clear on frontend
+            with st.spinner("Logging out..."):
+                time.sleep(1)
             st.rerun()
     st.divider()
 
@@ -309,8 +333,41 @@ def get_user_out_dir(category="General"):
     return path
 
 # --- TABS LAYOUT ---
-# --- TABS LAYOUT ---
-tab_wizard, tab_gallery, tab_assets, tab_series, tab_world, tab_campaign, tab_video, tab_char = st.tabs([
+# --- TABS LAYOUT (Persistent) ---
+if "active_tab" not in st.session_state:
+    st.session_state.active_tab = "Workflow Wizard"
+
+# Custom CSS for Pill-like Tabs
+st.markdown("""
+<style>
+    div[data-testid="stRadio"] > label > div {
+        display: none;
+    }
+    div[data-testid="stRadio"] > div[role="radiogroup"] {
+        flex-direction: row;
+        justify-content: center;
+        overflow-x: auto;
+        padding-bottom: 10px;
+    }
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label {
+        background-color: #f0f2f6;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        margin-right: 10px;
+        border: 1px solid #e0e0e0;
+        transition: all 0.2s;
+        cursor: pointer;
+    }
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-checked="true"] {
+        background-color: #ff4b4b;
+        color: white;
+        border-color: #ff4b4b;
+        font-weight: bold;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+nav_options = [
     "Workflow Wizard", 
     "My Gallery",
     "Asset Library",
@@ -319,30 +376,48 @@ tab_wizard, tab_gallery, tab_assets, tab_series, tab_world, tab_campaign, tab_vi
     "Campaign Queue", 
     "Video Studio",
     "Character Studio"
-])
+]
+
+# Admin Panel visibility
+if st.session_state.get("authenticated") and st.session_state.current_user.get("role") == "admin":
+    nav_options.append("Admin Panel")
+
+# Use a callback to update state immediately or just bind to key
+selection = st.radio(
+    "Navigation", 
+    nav_options, 
+    index=nav_options.index(st.session_state.active_tab) if st.session_state.active_tab in nav_options else 0,
+    horizontal=True, 
+    label_visibility="collapsed",
+    key="nav_radio"
+)
+
+# Update session state if it drifted (redundant with callback but safe)
+st.session_state.active_tab = selection
 
 # ==========================================
 # TAB: MY GALLERY
 # ==========================================
-with tab_gallery:
-    st.markdown("### Personal Gallery")
+if selection == "My Gallery":
+    with st.container():
+        st.markdown("### Personal Gallery")
     
-    if not st.session_state.get("authenticated"):
-        st.warning("Please login to see your gallery.")
-    else:
-        username = st.session_state.current_user.get("username")
-        user_root = os.path.join("output", "users", username)
-        abs_root = os.path.abspath(user_root)
-        
-        col_gal_head, col_gal_ref = st.columns([3, 1])
-        with col_gal_head:
-             if os.getenv("S3_BUCKET_NAME"):
-                 st.caption(f"☁️ Cloud Gallery: `s3://{os.getenv('S3_BUCKET_NAME')}/users/{username}`")
-             else:
-                 st.caption(f"📂 Gallery Path: `{abs_root}`")
-        with col_gal_ref:
-             if st.button("🔄 Refresh"):
-                 st.rerun()
+        if not st.session_state.get("authenticated"):
+            st.warning("Please login to see your gallery.")
+        else:
+            username = st.session_state.current_user.get("username")
+            user_root = os.path.join("output", "users", username)
+            abs_root = os.path.abspath(user_root)
+            
+            col_gal_head, col_gal_ref = st.columns([3, 1])
+            with col_gal_head:
+                 if os.getenv("S3_BUCKET_NAME"):
+                     st.caption(f"☁️ Cloud Gallery: `s3://{os.getenv('S3_BUCKET_NAME')}/users/{username}`")
+                 else:
+                     st.caption(f"📂 Gallery Path: `{abs_root}`")
+            with col_gal_ref:
+                 if st.button("🔄 Refresh"):
+                     st.rerun()
         
         my_images = []
         
@@ -372,7 +447,7 @@ with tab_gallery:
                                 url = s3.generate_presigned_url(
                                     'get_object',
                                     Params={'Bucket': bucket, 'Key': key},
-                                    ExpiresIn=3600
+                                    ExpiresIn=2592000  # 30 days
                                 )
                                 # Store tuple (path/url, is_cloud, name)
                                 my_images.append({
@@ -438,20 +513,14 @@ with tab_gallery:
                         st.markdown(f"**{item['name']}**")
                         st.image(item["src"], use_container_width=True)
                         if st.button("Close View", key=f"close_{idx}"):
-                            del st.session_state[f"zoom_img_{idx}"]
+                            st.session_state[f"zoom_img_{idx}"] = False
                             st.rerun()
 
-
 # ==========================================
-# TAB: MY ASSETS
+# TAB: ASSET LIBRARY
 # ==========================================
-with tab_assets:
-    st.markdown("### Personal Asset Management")
-    st.markdown("Upload your own custom content here. It will automatically appear in your generation dropdowns.")
-    
-    if not st.session_state.get("authenticated"):
-        st.warning("Please login to manage assets.")
-    else:
+if selection == "Asset Library":
+    with st.container():
         username = st.session_state.current_user.get("username")
         user_asset_root = os.path.join("output", "users", username, "Assets")
         
@@ -548,6 +617,20 @@ with tab_assets:
                             
                     st.success(f"Saved **{final_name}** to {target_cat}!")
                     
+                    # Update Manifest Logic
+                    # We just added a file. We should update the manifest if it exists, or delete it to force a rescan.
+                    # Deleting is safer and forces a sync on next load (which will recreate it).
+                    # Actually, since load_assets creates it if missing, deleting is a perfect detailed invalidation strategy.
+                    
+                    user_manifest_path = os.path.join(user_asset_root, "user_manifest.json")
+                    if os.path.exists(user_manifest_path):
+                        try:
+                            # Option A: Delete to force refresh
+                            os.remove(user_manifest_path)
+                            # Option B: Append to it (Complex, risky if schema changes)
+                        except Exception:
+                            pass
+                    
                     # Clear Cache to allow new asset to show
                     st.cache_data.clear()
                     st.cache_resource.clear()
@@ -594,6 +677,58 @@ with tab_assets:
                         with c_grid[i % 6]:
                             st.image(url, caption=clean_name, use_container_width=True)
                             
+                            # DELETE BUTTON
+                            # Use ui_cat to ensure uniqueness across categories (e.g. Vibes vs Locations acting as fallback)
+                            if st.button("🗑️", key=f"del_{ui_cat}_{i}_{name}", help=f"Delete {clean_name}"):
+                                try:
+                                    # 1. Determine Folder Name from Internal Key
+                                    # data_key is 'characters', 'outfits', etc.
+                                    # We need 'Characters', 'Outfits' for disk/S3
+                                    folder_map = {
+                                        "characters": "Characters", "outfits": "Outfits", 
+                                        "locations": "Environments", "vibes": "Vibes", 
+                                        "props": "Props", "pets": "Pets", 
+                                        "relations": "Friends", "vehicles": "Vehicles"
+                                    }
+                                    folder_name = folder_map.get(data_key, data_key.capitalize())
+                                    
+                                    # Handle URL parameters for S3 Presigned URLs
+                                    clean_url = url.split('?')[0]
+                                    fname = os.path.basename(clean_url)
+                                    
+                                    # 2. Local Delete (Construct path explicitly)
+                                    # user_asset_root is available in scope
+                                    local_path = os.path.join(user_asset_root, folder_name, fname)
+                                    if os.path.exists(local_path):
+                                        os.remove(local_path)
+                                        # Also try to remove json metadata if it exists
+                                        meta = local_path.replace(os.path.splitext(local_path)[1], ".json")
+                                        if os.path.exists(meta): os.remove(meta)
+                                        st.toast(f"Deleted local file: {clean_name}")
+                                    elif os.path.exists(url) and url != local_path:
+                                        # Fallback if url was actually a different local path
+                                        os.remove(url)
+                                    
+                                    # 3. S3 Delete
+                                    if os.getenv("S3_BUCKET_NAME"):
+                                        # Construct Key: users/{user}/Assets/{Folder}/{Filename}
+                                        s3_key = f"users/{username}/Assets/{folder_name}/{fname}"
+                                        delete_file(s3_key)
+                                        st.toast(f"Deleted from Cloud: {clean_name}")
+                                        
+                                    # 4. State Update
+                                    if data_key in st.session_state.global_assets:
+                                        if name in st.session_state.global_assets[data_key]:
+                                            del st.session_state.global_assets[data_key][name]
+                                            
+                                    # 5. Clear Cache & Rerun
+                                    st.cache_data.clear()
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                    
+                                except Exception as e:
+                                    st.error(f"Delete Failed: {e}")
+                            
         if not found_any:
             st.info("No custom assets found yet. Upload one above!")
             
@@ -610,98 +745,100 @@ with tab_assets:
 # ==========================================
 # TAB 1: WORKFLOW WIZARD (Existing Logic)
 # ==========================================
-with tab_wizard:
-    st.markdown("### Step-by-Step Content Creator")
+if selection == "Workflow Wizard":
+    with st.container():
+        st.markdown("### Step-by-Step Content Creator")
+        
+        # --- UI Inputs ---
+        # --- UI Inputs ---
+        # --- UI Inputs (Fragmented for Performance) ---
+        @st.fragment
+        def wizard_selectors(vibes, outfits, characters, v_data, o_data, c_data):
+            c_v, c_o, c_c = st.columns(3)
+            with c_v:
+                card_begin()
+                st.markdown("#### 1. Vibe")
+                v = st.selectbox("Choose Aesthetic", vibes, label_visibility="collapsed", key="wiz_vibe")
+                if v and v in v_data:
+                    st.image(v_data[v], use_container_width=True)
+                card_end()
+                
+            with c_o:
+                card_begin()
+                st.markdown("#### 2. Outfit")
+                o = st.selectbox("Choose Outfit", outfits, label_visibility="collapsed", key="wiz_outfit")
+                if o and o in o_data:
+                    st.image(o_data[o], use_container_width=True)
+                card_end()
     
-    # --- UI Inputs ---
-    # --- UI Inputs ---
-    # --- UI Inputs (Fragmented for Performance) ---
-    @st.fragment
-    def wizard_selectors(vibes, outfits, characters, v_data, o_data, c_data):
-        c_v, c_o, c_c = st.columns(3)
-        with c_v:
-            card_begin()
-            st.markdown("#### 1. Vibe")
-            v = st.selectbox("Choose Aesthetic", vibes, label_visibility="collapsed", key="wiz_vibe")
-            if v and v in v_data:
-                st.image(v_data[v], use_container_width=True)
-            card_end()
-            
-        with c_o:
-            card_begin()
-            st.markdown("#### 2. Outfit")
-            o = st.selectbox("Choose Outfit", outfits, label_visibility="collapsed", key="wiz_outfit")
-            if o and o in o_data:
-                st.image(o_data[o], use_container_width=True)
-            card_end()
-
-        with c_c:
-            card_begin()
-            st.markdown("#### 3. Character")
-            c = st.selectbox("Choose Model", characters, label_visibility="collapsed", key="wiz_char")
-            if c and c in c_data:
-                st.image(c_data[c], use_container_width=True)
-            card_end()
-
-    # Call Fragment
-    wizard_selectors(vibes_list, outfits_list, characters_list, vibes_data, outfits_data, characters_data)
-
-    st.divider()
-
-    # V3.9: Wrapped in Form to Prevent Reload Loop
-    with st.form(key="wizard_form"):
-        # Expandable Camera Controls
-        with st.expander("🎥 Camera & Scene Settings", expanded=False):
-            col_cam, col_light, col_action = st.columns(3)
-            
-            with col_cam:
-                st.markdown("**Camera**")
-                sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []))
-                sel_lens = st.selectbox("Lens", ["Auto"] + knowledge_base.get("lenses", []))
-                sel_shot = st.selectbox("Shot Type", ["Auto"] + knowledge_base.get("shot_types", []))
-                sel_angle = st.selectbox("Camera Angle", ["Auto"] + knowledge_base.get("camera_angles", []))
-                sel_ar = st.selectbox("Aspect Ratio", ["9:16 (Story/Reel)", "16:9 (Cinematic)", "1:1 (Square)", "4:5 (Instagram Feed)"])
-                sel_style = st.selectbox("Photo Style", ["Auto"] + knowledge_base.get("styles", []))
+            with c_c:
+                card_begin()
+                st.markdown("#### 3. Character")
+                c = st.selectbox("Choose Model", characters, label_visibility="collapsed", key="wiz_char")
+                if c and c in c_data:
+                    st.image(c_data[c], use_container_width=True)
+                card_end()
+    
+        # Call Fragment
+        wizard_selectors(vibes_list, outfits_list, characters_list, vibes_data, outfits_data, characters_data)
+    
+        st.divider()
+    
+        # V3.9: Wrapped in Form to Prevent Reload Loop
+        with st.form(key="wizard_form"):
+            # Expandable Camera Controls
+            with st.expander("🎥 Camera & Scene Settings", expanded=False):
+                col_cam, col_light, col_action = st.columns(3)
                 
-            with col_light:
-                st.markdown("**Atmosphere**")
-                sel_lighting = st.selectbox("Lighting", ["Auto"] + knowledge_base.get("lighting", []))
-                sel_weather = st.selectbox("Weather", ["Auto"] + knowledge_base.get("weather", []))
-                sel_film = st.selectbox("Film Stock (Grain)", ["Auto"] + knowledge_base.get("film_stocks", []), key="wiz_film_stock")
-                
-            with col_action:
-                st.markdown("**Action & Tone**")
-                sel_action = st.selectbox("Subject Action", ["Auto"] + knowledge_base.get("actions", []), key="wiz_action")
-                sel_emotion = st.selectbox("Emotion", ["Auto"] + knowledge_base.get("emotions", []), key="wiz_emotion")
-                sel_filter = st.selectbox("Filter / Look", ["Auto"] + knowledge_base.get("filters", []), key="wiz_filter")
-
-        # Custom Direction
-        st.subheader("4. Creative Direction")
-        custom_scenario = st.text_input("Scenario / Context", placeholder="e.g. At a luxury coffee shop in Paris...")
-        custom_notes = st.text_area("Specific Details", placeholder="Enter any extra details here...")
-        
-        # Advanced Settings & Variants
-        col_adv, col_count = st.columns([3, 1])
-        
-        with col_adv:
-            with st.expander("⚙️ Advanced Brain Settings"):
-                 st.caption("Brain: Gemini 2.0 Flash (Optimized for Cost)")
-                 prompt_engine = "gemini-2.0-flash" 
-                 render_engine = "nano" 
-                 likeness = 0.5
-                 # selected_checkpoint removed
-                 
-        with col_count:
-            num_images = st.slider("Generate Count", 1, 4, 1, key="wiz_test_count")
-
-        # --- CAMPAIGN BUTTON ---
-        col_c_btn, col_c_batch = st.columns([3, 1])
-        with col_c_batch:
-            campaign_batch = st.number_input("Queue Copies", min_value=1, max_value=10, value=1, help="How many variations to queue?")
-
-        submit_wiz = st.form_submit_button("Add to Campaign Queue", type="primary")
-
-    if submit_wiz:
+                with col_cam:
+                    st.markdown("**Camera**")
+                    sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []))
+                    sel_lens = st.selectbox("Lens", ["Auto"] + knowledge_base.get("lenses", []))
+                    sel_shot = st.selectbox("Shot Type", ["Auto"] + knowledge_base.get("shot_types", []))
+                    sel_angle = st.selectbox("Camera Angle", ["Auto"] + knowledge_base.get("camera_angles", []))
+                    sel_ar = st.selectbox("Aspect Ratio", ["Auto", "4:5 (Standard)", "16:9 (Cinematic)", "9:16 (Social)"], index=0)
+                    sel_style = st.selectbox("Photo Style", ["Auto"] + knowledge_base.get("styles", []))
+                    
+                with col_light:
+                    st.markdown("**Atmosphere**")
+                    sel_lighting = st.selectbox("Lighting", ["Auto"] + knowledge_base.get("lighting", []))
+                    sel_weather = st.selectbox("Weather", ["Auto"] + knowledge_base.get("weather", []))
+                    sel_film = st.selectbox("Film Stock (Grain)", ["Auto"] + knowledge_base.get("film_stocks", []), key="wiz_film_stock")
+                    
+                with col_action:
+                    st.markdown("**Action & Tone**")
+                    sel_action = st.selectbox("Subject Action", ["Auto"] + knowledge_base.get("actions", []), key="wiz_action")
+                    sel_emotion = st.selectbox("Emotion", ["Auto"] + knowledge_base.get("emotions", []), key="wiz_emotion")
+                    sel_filter = st.selectbox("Filter / Look", ["Auto"] + knowledge_base.get("filters", []), key="wiz_filter")
+    
+            # Custom Direction
+            st.subheader("4. Creative Direction")
+            custom_scenario = st.text_input("Scenario / Context", placeholder="e.g. At a luxury coffee shop in Paris...")
+            custom_notes = st.text_area("Specific Details", placeholder="Enter any extra details here...")
+            
+            # Advanced Settings & Variants
+            col_adv, col_count = st.columns([3, 1])
+            
+            with col_adv:
+                with st.expander("⚙️ Advanced Brain Settings"):
+                     st.caption("Brain: Gemini 2.0 Flash (Optimized for Cost)")
+                     prompt_engine = "gemini-2.0-flash" 
+                     render_engine = "nano" 
+                     likeness = 0.5
+                     st.sidebar.success("✅ Running in Low-Cost Mode (Flash 2.0)")
+                     # selected_checkpoint removed
+                     
+            with col_count:
+                num_images = st.slider("Generate Count", 1, 4, 1, key="wiz_test_count")
+    
+            # --- CAMPAIGN BUTTON ---
+            col_c_btn, col_c_batch = st.columns([3, 1])
+            with col_c_batch:
+                campaign_batch = st.number_input("Queue Copies", min_value=1, max_value=10, value=1, help="How many variations to queue?")
+    
+            submit_wiz = st.form_submit_button("Add to Campaign Queue", type="primary")
+    
+        if submit_wiz:
             # CHECK CREDITS
             user = st.session_state.current_user.get("username")
             if not auth_mgr.deduct_credits(user, 1):
@@ -823,7 +960,40 @@ with tab_wizard:
         )
         
         with col_wiz_btn2:
-             if st.button("🎨 Generate Images", type="primary", use_container_width=True):
+             c_q, c_g = st.columns([1, 2])
+             with c_q:
+                 add_queue = st.button("Add to Queue", use_container_width=True, key="wiz_add_q")
+             with c_g:
+                 run_now = st.button("🎨 Generate Images", type="primary", use_container_width=True, key="wiz_run")
+             
+             if add_queue:
+                 # Update prompt data
+                 final_prompt_data = st.session_state.wiz_generated_prompt.copy()
+                 final_prompt_data["positive_prompt"] = wiz_prompt_text
+                 final_prompt_data["likeness_strength"] = likeness
+                 final_prompt_data["model_type"] = render_engine 
+                 
+                 # Re-resolve paths
+                 s_char = st.session_state.get("wiz_char")
+                 s_outfit = st.session_state.get("wiz_outfit")
+                 s_vibe = st.session_state.get("wiz_vibe")
+                 char_path = characters_data.get(s_char, s_char)
+                 outfit_path = outfits_data.get(s_outfit)
+                 vibe_path = vibes_data.get(s_vibe)
+                 
+                 campaign_mgr.add_job(
+                    name=f"Wiz_{s_char}_{int(time.time())}",
+                    description=f"Wizard: {s_char} in {s_outfit}",
+                    prompt_data=final_prompt_data,
+                    settings={"batch_count": num_images},
+                    output_folder=get_user_out_dir("Wizard"),
+                    char_path=char_path,
+                    outfit_path=outfit_path,
+                    vibe_path=vibe_path
+                 )
+                 st.success("✅ Added to Campaign Queue!")
+
+             if run_now:
                  with st.status(f"Running workflow ({prompt_engine} + {render_engine})...", expanded=True) as status:
                     st.write(f"Generating {num_images} Image(s)...")
                     
@@ -876,8 +1046,22 @@ with tab_wizard:
                                 st.caption(f"📁 {abs_path}")
                                 
                                 # Add download button
-                                with open(img_path, "rb") as f:
-                                    st.download_button("⬇️ Download", f, file_name=os.path.basename(img_path), mime="image/png", key=f"dw_{i}")
+                                c_d, c_s = st.columns(2)
+                                with c_d:
+                                    with open(img_path, "rb") as f:
+                                        st.download_button("⬇️ Download", f, file_name=os.path.basename(img_path), mime="image/png", key=f"dw_{i}")
+                                with c_s:
+                                    if st.button("📁 Quick Save", key=f"qs_{i}", help="Saves to 'Wizard' category in Assets"):
+                                        if st.session_state.get("authenticated"):
+                                            user = st.session_state.current_user.get("username")
+                                            # Default name to timestamp/index if not providing a form
+                                            a_name = f"Wiz_{int(time.time())}_{i}"
+                                            res = promote_image_to_asset(img_path, user, "Vibes", a_name, wiz_prompt_text)
+                                            if res["status"] == "success":
+                                                st.toast(f"Saved to Vibes!")
+                                                st.cache_data.clear()
+                                            else:
+                                                st.error(f"Save Failed: {res.get('error')}")
                             else:
                                 st.error("Failed")
                                 if result: st.write(result)
@@ -887,988 +1071,128 @@ with tab_wizard:
 
 
 
-# ==========================================
-# TAB 2: MINI SERIES STUDIO
-# ==========================================
-with tab_series:
-    @st.fragment
-    def mini_series_ui(user_asset_path):
-        outfits_data = st.session_state.global_assets.get('outfits', {})
-        vibes_data = st.session_state.global_assets.get('vibes', {})
-        st.markdown("### 🎬 Mini Series Studio")
-        st.info("Create episodic content with consistent cast, wardrobe, and environments.")
 
-        # --- Session State ---
-        if "series_storyboard" not in st.session_state:
-            st.session_state.series_storyboard = None
 
-        # --- STEP 1: SERIES BIBLE ---
-        with st.expander("📖 Step 1: Series Bible", expanded=True):
-            col_sb1, col_sb2 = st.columns([1, 1])
+# ==========================================
+# TAB: MINI SERIES STUDIO
+# ==========================================
+if selection == "Mini Series":
+    with st.container():
+        from execution.mini_series_ui import mini_series_ui
+        mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_base, auth_mgr, get_user_out_dir, campaign_mgr)
+# ==========================================
+# ==========================================
+# TAB: ADMIN PANEL
+# ==========================================
+if selection == "Admin Panel":
+    with st.container():
+        st.markdown("### 🛡️ School Community Admin")
+        st.info("Manage the Allowlist for student access. Only emails in this list can sign up.")
+
+        # Tabs
+        tab_list, tab_users, tab_upload, tab_stats = st.tabs(["Active Allowlist", "User Management", "Upload CSV", "System Config"])
         
-            with col_sb1:
-                series_title = st.text_input("Series Title", placeholder="The Influencer Life")
-            
-                # IDENTITY (New V2 Fields)
-                st.markdown("#### 🆔 Identity & Tone")
-                c_gen, c_tone = st.columns(2)
-                with c_gen:
-                    s_genre = st.selectbox("Genre", ["General", "Rom-com", "Drama", "Crime", "Thriller", "Horror", "Slice of Life"])
-                with c_tone:
-                    s_tone = st.selectbox("Tone", ["Neutral", "Luxury", "Gritty", "Dark", "Soft / Romantic", "Comedic"])
-            
-                s_len = st.radio("Episode Length", ["30 Seconds", "45 Seconds"], horizontal=True)
-
-                # Cast Selection (Characters + Friends)
-                st.markdown("#### 🎭 Cast Selection")
-            
-                # Use Unified Asset Loader (Matches World Builder)
-                char_opts = get_assets_by_category("characters", user_asset_path)
-                rel_opts = get_assets_by_category("relations", user_asset_path)
-                # Merge for selection
-                all_cast_opts = {**char_opts, **rel_opts}
-            
-                # Unified Cast List
-                cast_selection = st.multiselect("Select Cast Members", list(all_cast_opts.keys()))
-            
-                # Wardrobe & Role Mapping (V2)
-                cast_wardrobe_map = {}
-                cast_role_map = {}
-            
-                if cast_selection:
-                    st.caption("Assign Roles & Wardrobe:")
-                    for i, member in enumerate(cast_selection):
-                        st.divider()
-                        c_img, c_info = st.columns([1, 4])
-                    
-                        # Resolve Data & Path (Robust Logic)
-                        c_data = all_cast_opts.get(member)
-                        c_path = None
-                        if isinstance(c_data, dict):
-                            c_path = c_data.get('default_img')
-                        else:
-                            c_path = c_data
-
-                        # Show Thumbnail
-                        with c_img:
-                            if c_path and (os.path.exists(c_path) or c_path.startswith("http")):
-                                st.image(c_path, use_container_width=True)
-                            else:
-                                 st.warning("No IMG")
-
-                        with c_info:
-                            st.write(f"**{member.split('/')[-1]}**")
-                            c1, c2 = st.columns(2)
-                        
-                            with c1:
-                                 # AUTOMATED ROLES (User Request)
-                                 # Index 0 = Main, Others = Supporting
-                                 if i == 0:
-                                     role = "Main Character"
-                                     st.markdown("⭐ **Role:** Protagonist")
-                                 else:
-                                     role = "Supporting Character"
-                                     st.markdown("👥 **Role:** Supporting Cast")
-                                     
-                                 cast_role_map[member] = role
-
-                            with c2:
-                                 # Outfit Select
-                                 outfit_opts = list(outfits_data.keys())
-                                 
-                                 # FIX: Stable Key for Widget (Strip S3 Query Params)
-                                 # 'member' might be "https://.../Shay.png?Expires=123"
-                                 # We need "Shay.png" as the stable ID
-                                 stable_id = member.split('/')[-1].split('?')[0]
-                                 
-                                 sel_fit = st.selectbox(f"Outfit", ["Default"] + outfit_opts, key=f"series_fit_{stable_id}")
-                                 cast_wardrobe_map[member] = sel_fit
-                             
-                                 # Show Outfit Preview
-                                 if sel_fit != "Default":
-                                     o_path = outfits_data.get(sel_fit)
-                                     if isinstance(o_path, dict): o_path = o_path.get('default_img')
-                                     if o_path:
-                                         st.image(o_path, width=80)
-                                         
-                    # DEBUG: Check State Sync
-                    with st.expander("🛠️ Debug: Wardrobe Selections (Raw)", expanded=False):
-                        st.write(cast_wardrobe_map)
-
-            with col_sb2:
-                st.markdown("#### 🌍 Series Environments")
-                # Combine Vibes and Locations
-                all_locs = list(vibes_data.keys()) + list(assets.get('locations', {}).keys())
-            
-                st.write("**Primary Location** (Main Action)")
-                series_env = st.selectbox("Choose Primary", ["None"] + all_locs)
-            
-                if series_env and series_env != "None":
-                    # Preview
-                    path = vibes_data.get(series_env) or assets.get('locations', {}).get(series_env)
-                    if path:
-                        if isinstance(path, dict): path = path.get('default_img')
-                        st.image(path, caption="Primary Environment")
-            
-                st.write("**Secondary Location** (B-Roll / Cutaways)")
-                sec_env = st.selectbox("Choose B-Roll Vibe", ["None"] + all_locs, key="sec_env")
-            
-                if sec_env and sec_env != "None":
-                    # Preview Secondary
-                    path_sec = vibes_data.get(sec_env) or assets.get('locations', {}).get(sec_env)
-                    if path_sec:
-                        if isinstance(path_sec, dict): path_sec = path_sec.get('default_img')
-                        st.image(path_sec, caption="Secondary Environment")
-
-        # --- STEP 2: WRITER'S ROOM ---
-        st.markdown("---")
-        st.markdown("### ✍️ Writer's Room")
-    
-        c_script, c_action = st.columns([3, 1])
-        with c_script:
-            with st.form(key="director_form"):
-                series_script = st.text_area("Episode Synopsis & Dialogue Intent", height=200, placeholder="Synopsis: She finds out he's been lying, but he doesn't know she knows yet.\n\nIntent:\nALICE: Cold, distant.\nBOB: Trying too hard to be casual.")
-            
-                # V3: Hollywood Camera Controls - Restored & Expanded
-                with st.expander("🎥 Cinematography Settings", expanded=False):
-                    c_cam, c_lens = st.columns(2)
-                    with c_cam:
-                         cam_opts = [
-                             "Auto", 
-                             "Arri Alexa 65 (Large Format)", "Arri Alexa Mini LF", "Sony Venice 2 (8K)", 
-                             "RED V-Raptor [VV]", "Panavision Millennium DXL2", 
-                             "IMAX 15/70mm Film", "Kodak Vision3 35mm Film", "16mm Bolex", "Super 8mm",
-                             "iPhone 15 Pro Max (ProRes)", "VHS Camcorder (90s)", "CCTV Security Cam"
-                         ]
-                         s_camera = st.selectbox("Camera Body", cam_opts)
-                     
-                         stock_opts = [
-                             "Auto", 
-                             "Kodak Portra 400", "Kodak Portra 800", "Fujifilm Velvia 100", 
-                             "Cinestill 800T (Halation)", "Kodak Tri-X 400 (B&W)", "Ilford HP5 (Grainy B&W)",
-                             "Technicolor (3-Strip)", "Bleach Bypass (Gritty)"
-                         ]
-                         s_film_stock = st.selectbox("Film Stock / LUT", stock_opts)
-
-                    with c_lens:
-                         lens_opts = [
-                             "Auto", 
-                             "Arri Signature Prime", "Cooke S4/i Prime", "Panavision Primo 70", "Canon K-35 Vintage",
-                             "Atlas Orion Anamorphic", "Laowa Probe Lens",
-                             "14mm Ultra Wide", "24mm Wide", "35mm Standard", "50mm Standard", 
-                             "85mm Portrait", "105mm Macro", "200mm Telephoto", "600mm Sniper"
-                         ]
-                         s_lens = st.selectbox("Lens Glass", lens_opts)
-
-                         grade_opts = ["Auto", "Teal & Orange (Blockbuster)", "Vintage Warmth", "Cool Blue", "Noir B&W", "Matrix Green", "Euphoria Purple"]
-                         s_filter_look = st.selectbox("Color Grade", grade_opts)
-                
-                    c_light, c_style = st.columns(2)
-                    with c_light:
-                         light_opts = ["Auto", "Golden Hour", "Studio Softbox", "Rembrandt", "Neon Cyberpunk", "Natural Diffused", "Hard Flash", "Silhouette", "God Rays"]
-                         s_lighting = st.selectbox("Lighting", light_opts)
-                    with c_style:
-                         style_opts = [
-                             "Auto", 
-                             "Wes Anderson (Symmetrical/Pastel)", "Christopher Nolan (IMAX/Cold)", "Denis Villeneuve (Brutalist)",
-                             "Wong Kar-wai (Step Printing)", "Quentin Tarantino (Low Angle)", 
-                             "Euphoria (Glitter/A24)", "Cyberpunk (Neon)", "1950s Technicolor", "1990s Sitcom"
-                         ]
-                         s_movie_style = st.selectbox("Style Reference", style_opts)
-            
-                s_transition_style = st.selectbox("Transition Pacing", ["Standard", "Fast / TikTok", "Slow / Cinematic", "Match Cut"])
-            
-                st.markdown("<br>", unsafe_allow_html=True)
-                submit_director = st.form_submit_button("✨ Director Vision AI", type="primary", use_container_width=True)
-
-        if submit_director:
-                if not series_script:
-                    st.error("Please enter a synopsis.")
-                elif not cast_selection:
-                    st.error("Please select a cast.")
+        with tab_list:
+            c_tog, c_add = st.columns([2, 1])
+            with c_tog:
+                is_enforced = os.getenv("ENFORCE_ALLOWLIST", "True").lower() == "true"
+                if st.checkbox("Enforce Allowlist (Reject unknown emails)", value=is_enforced):
+                    auth_mgr.toggle_allowlist_enforcement(True)
+                    st.toast("Allowlist Enforced")
                 else:
-                    with st.spinner("AI Director is breaking down the script..."):
-                        # 1. Clean Cast Names for AI & Map for Lookup
-                        # RE-LOAD ASSETS TO MIRROR WORLD BUILDER RESOLUTION
-                        char_opts = get_assets_by_category("characters", user_asset_path)
-                        rel_opts = get_assets_by_category("relations", user_asset_path)
-                        all_cast_opts = {**char_opts, **rel_opts}
-                    
-                        clean_cast_map = {} # {'Shay': '/path/to/real/shay.png'}
-                        clean_names_list = []
-                    
-                        for full_key in cast_selection:
-                            # RESOLVE PATH (The World Builder Way)
-                            c_data = all_cast_opts.get(full_key)
-                            real_path = None
-                            if isinstance(c_data, dict):
-                                real_path = c_data.get('default_img')
-                            else:
-                                real_path = c_data
-                            
-                            # Extract clean NICKNAME
-                            # FIX: Split '?' to handle S3 URLs with params
-                            base = full_key.split('/')[-1].split('?')[0].replace('.png','').replace('.jpg','').strip()
-                            clean_name = base.split(' ')[0]
-                            
-                            # Fallback if file is named "Default" (e.g. Chels/Default.png)
-                            if "Default" in base or "default" in base.lower():
-                                components = full_key.split('/')
-                                if len(components) > 1:
-                                    clean_name = components[-2].strip() # Use Parent Folder (e.g. "Chels")
-                                    
-                            # Fallback if "Stock Photo"
-                            if "Stock Photo" in clean_name:
-                                clean_name = clean_name.replace("Stock Photo", "").strip()
-                        
-                            # MAP NICKNAME -> RESOLVED PATH (Critical Fix)
-                            if real_path:
-                                clean_cast_map[clean_name] = real_path
-                                clean_names_list.append(clean_name)
-                    
-                        # Store map in session for lookup during generation
-                        st.session_state.cast_lookup_map = clean_cast_map
-
-                        # Clean Roles Map
-                        clean_roles_map = {}
-                        if cast_role_map:
-                            for full_key, role in cast_role_map.items():
-                                base = full_key.split('/')[-1].split('?')[0].replace('.png','').replace('.jpg','').strip()
-                                c_name = base.split(' ')[0]
-                                clean_roles_map[c_name] = role
-                        
-                        st.session_state.clean_roles_map = clean_roles_map
-
-                        # Clean Wardrobe Map (NEW)
-                        clean_wardrobe_map = {}
-                        director_refs = [] # List of {path, label}
-                    
-                        if cast_wardrobe_map:
-                            for full_key, outfit in cast_wardrobe_map.items():
-                                base = full_key.split('/')[-1].split('?')[0].replace('.png','').replace('.jpg','').strip()
-                                c_name = base.split(' ')[0]
-                                clean_wardrobe_map[c_name] = outfit
-                                # FIX: Also store the full base name as a key (e.g. "Shay Blonde Bob")
-                                # This allows precise lookup if we know the specific asset variation
-                                clean_wardrobe_map[base] = outfit 
-                            
-                                # Resolve Wardrobe Path for Multimodal
-                                if outfit != "Default":
-                                    o_path = outfits_data.get(outfit)
-                                    if isinstance(o_path, dict): o_path = o_path.get('default_img')
-                                    if o_path:
-                                        director_refs.append({
-                                            "path": o_path, 
-                                            "label": f"{base}'s Wardrobe: {outfit}"
-                                        })
-                        
-                            # Store Wardrobe Snapshot for Batch Render (After Loop)
-                            st.session_state.cast_wardrobe_map_snapshot = clean_wardrobe_map
-                    
-                        # Also Add Character Faces (Optional but helpful for casting description)
-                        # DEBUG: Visualize the Map Keys
-                        with st.expander("🛠️ Debug: Wardrobe Snapshot Keys", expanded=False):
-                            st.json(clean_wardrobe_map)
-                            st.write("Resolved Director Refs:", director_refs)
-
-                        for c_name, c_path in clean_cast_map.items():
-                             director_refs.append({
-                                 "path": c_path,
-                                 "label": f"Cast Member: {c_name}"
-                             })
-
-                        # V2 API Call (Passing CLEAN NAMES & CLEAN ROLES & WARDROBE & IMAGES)
-                        sb_data = parse_script_to_scenes(
-                            script_text=series_script, 
-                            cast_list=clean_names_list, 
-                            environment_name=series_env,
-                            genre=s_genre,
-                            tone=s_tone,
-                            roles_map=clean_roles_map,
-                            wardrobe_map=clean_wardrobe_map,
-                            ref_images=director_refs, # <--- PASSING THE IMAGES
-                            secondary_environment=sec_env,
-                            # V3 New Params
-                            camera=s_camera,
-                            lens=s_lens,
-                            lighting=s_lighting,
-                            film_stock=s_film_stock,
-                            filter_look=s_filter_look,
-                            movie_style=s_movie_style,
-                            transition_style=s_transition_style
-                        )
-                    
-                        if "error" in sb_data:
-                            st.error(sb_data['error'])
+                    auth_mgr.toggle_allowlist_enforcement(False)
+                    st.warning("Allowlist Disabled: Open Signup Active")
+            
+            with c_add:
+                with st.form("quick_add"):
+                    new_email = st.text_input("Quick Add Email")
+                    if st.form_submit_button("Add Member"):
+                        if "@" in new_email:
+                            auth_mgr.add_to_allowlist(new_email.strip())
+                            st.success(f"Added {new_email}")
+                            st.rerun()
                         else:
-                            st.session_state.series_storyboard = sb_data
-                        
-                            # --- STATE FLUSH (Critical Fix for "Blank Prompt") ---
-                            # We must clear old widget states so the text_areas reload from the new JSON data
-                            keys_to_clear = [k for k in st.session_state.keys() if k.startswith(("p_s", "img_s", "m_s", "btn_s"))]
-                            for k in keys_to_clear:
-                                del st.session_state[k]
-
-                            st.success("Director Vision Generated!")
-
-        # --- STEP 3: DIRECTOR MODE ---
-        if st.session_state.series_storyboard:
-            st.markdown("---")
-            st.markdown("### 🎬 Director Mode & Storyboard")
-        
-            sb = st.session_state.series_storyboard
-            st.caption(f"Episode: {sb.get('title', 'Untitled')}")
-        
-            # Iterating Scenes
-            generated_shots_data = [] 
-        
-            # Ensure lookup map exists (handle refresh case)
-            # FORCE REBUILD: Ensure map is always in sync with Sidebar Selection
-            # This fixes "Stale Map" issues where new selections aren't found.
-            if True: # Always run
-                 # Fallback rebuild if missing - MATCHING WORLD BUILDER LOGIC
-                 char_opts = get_assets_by_category("characters", user_asset_path)
-                 rel_opts = get_assets_by_category("relations", user_asset_path)
-                 all_cast_opts = {**char_opts, **rel_opts}
-             
-                 clean_cast_map = {}
-                 # cast_selection comes from the Sidebar (Line 852 approx)
-                 # If cast_selection is empty, we check if st.session_state has it
-                 current_selection = cast_selection if 'cast_selection' in locals() else st.session_state.get('wiz_cast_param', []) # Fallback to widget key if known
-
-                 if current_selection:
-                     for full_key in current_selection:
-                        c_data = all_cast_opts.get(full_key)
-                        real_path = None
-                        if isinstance(c_data, dict):
-                            real_path = c_data.get('default_img')
-                        else:
-                            real_path = c_data
-                    
-                        # Parse Name
-                        base = full_key.split('/')[-1].split('?')[0].replace('.png','').replace('.jpg','')
-                        clean_name = base.split(' ')[0]
-                    
-                        if real_path:
-                            clean_cast_map[clean_name] = real_path
-                            
-                            # Also map FULL base name for exact matches
-                            clean_cast_map[base] = real_path
-
-                 st.session_state.cast_lookup_map = clean_cast_map
-                 
-                 # FORCE REBUILD WARDROBE MAP TOO (Fixes "Standard Outfit" Bug)
-                 cast_wardrobe_map = cast_wardrobe_map if 'cast_wardrobe_map' in locals() else st.session_state.get('wiz_wardrobe_param', {})
-                 clean_wardrobe_map = {}
-                 
-                 if cast_wardrobe_map:
-                     for full_key, outfit in cast_wardrobe_map.items():
-                         base = full_key.split('/')[-1].split('?')[0].replace('.png','').replace('.jpg','').strip()
-                         c_name = base.split(' ')[0]
-                         clean_wardrobe_map[c_name] = outfit
-                         clean_wardrobe_map[base] = outfit 
-                 
-                 st.session_state.cast_wardrobe_map_snapshot = clean_wardrobe_map
-        
-            cast_map = st.session_state.cast_lookup_map
-
-            for scene_idx, scene in enumerate(sb.get('scenes', [])):
-                with st.container():
-                    st.markdown(f"#### Scene {scene.get('id')}: {scene.get('location')}")
-                
-                    shots = scene.get('shots', [])
-                    for shot_idx, shot in enumerate(shots):
-                        key_base = f"s{scene_idx}_sh{shot_idx}"
-                        motion_type = "Still" # Safe default to prevent UnboundLocalError
-                        mocap_file = None # Safe default for Mocap
-                    
-                        # 2. Resolve Character Asset (Robust Lookup)
-                        char_list = shot.get('characters', [])
-                        # AI might return "Shay" or "Shay (Happy)", try partial match
-                        char_ref_name = char_list[0] if char_list else None
-                        char_full_key = None
-                    
-                        if char_ref_name:
-                            # Try exact match
-                            char_full_key = cast_map.get(char_ref_name)
-                            # Try fuzzy match if exact fail
-                            if not char_full_key:
-                                for c_name, c_key in cast_map.items():
-                                    if c_name in char_ref_name or char_ref_name in c_name:
-                                        char_full_key = c_key
-                                        break
-                    
-                        # Fallback to first selected cast if no match for Shot 1/2
-                        if not char_full_key and cast_selection and not (shot_idx+1 in [3,6,9,12]):
-                             char_full_key = cast_selection[0]
-
-                        # Path Resolution (Strict Validation)
-                        char_path = characters_data.get(char_full_key) or assets.get('relations', {}).get(char_full_key)
-                        if isinstance(char_path, dict): char_path = char_path.get('default_img')
-                    
-                        # Use 'char_full_key' for wardrobe lookup too
-                        outfit_name = cast_wardrobe_map.get(char_full_key, "Default")
-                        outfit_path = outfits_data.get(outfit_name)
-                        if isinstance(outfit_path, dict): outfit_path = outfit_path.get('default_img')
-                        col_txt, col_img = st.columns([1.5, 1])
-                    
-                        with col_txt:
-                            st.markdown(f"**Shot {shot_idx+1}**")
-                        
-                            # V3: Display Cinematic Metadata
-                            meta_cols = st.columns(4)
-                            meta_cols[0].caption(f"📏 {shot.get('shot_size', 'Auto')}")
-                            meta_cols[1].caption(f"🎥 {shot.get('camera_angle', 'Auto')}")
-                            meta_cols[2].caption(f"💡 {shot.get('lighting_type', 'Auto')}")
-                            meta_cols[3].caption(f"🎨 {shot.get('composition', 'Auto')}")
-                        
-                            # V3.7: Editable Cast List (Fixes Ghost Characters / Leaking)
-                            # allow user to remove "Boyfriend" if Gemini put him in Shot 1
-                            all_cast_keys = list(st.session_state.cast_lookup_map.keys())
-                            # Normalize defaults to ensure they exist in options
-                            current_chars = shot.get('characters', [])
-                            valid_defaults = []
-                            for c in current_chars:
-                                # Try exact or normalized
-                                if c in all_cast_keys: valid_defaults.append(c)
-                                elif c.replace('_', ' ').split(' ')[0] in all_cast_keys: 
-                                    valid_defaults.append(c.replace('_', ' ').split(' ')[0])
-                                
-                            selected_chars = st.multiselect(
-                                "Cast in Shot", 
-                                options=all_cast_keys,
-                                key=f"cast_sh_{key_base}",
-                                label_visibility="collapsed",
-                                placeholder="Select Cast..."
-                            )
-                            
-                            # V4: Per-Shot Wardrobe Control (Direct Injection)
-                            shot_wardrobe_map = {}
-                            if selected_chars:
-                                wc1, wc2, wc3 = st.columns(3)
-                                cols = [wc1, wc2, wc3]
-                                for idx, char_name in enumerate(selected_chars):
-                                    with cols[idx % 3]:
-                                        # Default to Global Map Value (Smart Default)
-                                        w_map_snap = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                                        
-                                        # Robust Lookup for Default
-                                        def_val = w_map_snap.get(char_name, "Default")
-                                        if def_val == "Default": def_val = w_map_snap.get(char_name.strip(), "Default")
-                                        if def_val == "Default": def_val = w_map_snap.get(char_name.split(' ')[0], "Default")
-                                        
-                                        outfit_keys = ["Default"] + list(outfits_data.keys())
-                                        
-                                        # Ensure default is valid
-                                        idx_def = 0
-                                        if def_val in outfit_keys:
-                                            idx_def = outfit_keys.index(def_val)
-                                            
-                                        # Render Widget
-                                        s_outfit = st.selectbox(
-                                            f"Outfit: {char_name}",
-                                            outfit_keys,
-                                            index=idx_def,
-                                            key=f"fit_{key_base}_{char_name}",
-                                            label_visibility="collapsed"
-                                        )
-                                        shot_wardrobe_map[char_name] = s_outfit
-                            # UPDATE SHOT DATA so Generator uses this
-                            shot['characters'] = selected_chars
-                        
-                            # V3.8: Time of Day Selector
-                            time_opts = ["Morning", "Noon", "Afternoon", "Golden Hour", "Blue Hour", "Night", "Midnight"]
-                            # AI might have provided a time, otherwise default to Day
-                            ai_time = shot.get('time_of_day', 'Day')
-                        
-                            # Normalize AI output to title case for matching
-                            ai_time_norm = ai_time.title() if ai_time else "Day"
-                            # Find closest match or default
-                            def_idx = 0
-                            for idx, opt in enumerate(time_opts):
-                                if opt.lower() in ai_time_norm.lower():
-                                    def_idx = idx
-                                    break
-                                
-                            selected_time = st.selectbox(
-                                "Time of Day", 
-                                time_opts, 
-                                index=def_idx,
-                                key=f"time_{key_base}",
-                                label_visibility="collapsed"
-                            )
-                            shot['time_of_day'] = selected_time
-
-                            # V3.9: Transition Selector (Editable)
-                            trans_opts = ["None"] + knowledge_base.get("transitions", [])
-                            sel_trans = st.selectbox("Transition", trans_opts, key=f"trans_{key_base}", label_visibility="collapsed")
-                            shot['transition'] = sel_trans
-                        
-                            # Editable Prompt
-                            shot_prompt = st.text_area("Visual Prompt", value=shot.get('visual_prompt'), height=250, key=f"p_{key_base}", label_visibility="collapsed")
-                            st.caption(f"Length: {len(shot_prompt) if shot_prompt else 0} chars (Target: 800+)")
-                        
-                            # Controls
-                            c_gen, c_type = st.columns([1, 1.5])
-                            with c_gen:
-                                if st.button(f"Generate Shot {shot_idx+1}", key=f"btn_{key_base}"):
-                                    user = st.session_state.current_user.get("username")
-                                    if not auth_mgr.deduct_credits(user, 1):
-                                        st.error("❌ No Credits!")
-                                    else:
-                                        with st.spinner("Rolling camera..."):
-                                            # DIRECT INJECTION (Refactored to match World Builder Logic)
-                                            # User selected these characters. They go in. Period.
-                                            final_assets_payload = []
-                                            
-                                            # Use the 'selected_chars' from the widget above (Lines 1225)
-                                            # Note: 'cast_selection' might be stale, 'selected_chars' is what the user just touched.
-                                            active_cast_names = selected_chars 
-                                            
-                                            if active_cast_names:
-                                                for c_name in active_cast_names:
-                                                    # 1. Resolve Path from Map (CRITICAL FIX)
-                                                    # Widget gives "Shay", we need "output/.../Shay.png"
-                                                    c_path = st.session_state.cast_lookup_map.get(c_name)
-                                                    
-                                                    # DEBUG: Show what we found
-                                                    # st.info(f"🔎 Looking up '{c_name}': Found path='{c_path}'")
-                                                    
-                                                    if c_path and (os.path.exists(c_path) or c_path.startswith("http")):
-                                                        # 2. Inject Face
-                                                        final_assets_payload.append({
-                                                            "path": c_path,
-                                                            "label": f"Cast: {c_name}"
-                                                        })
-                                                        
-                                                    # 3. Inject Outfit (Priority: Shot Local > Global Map)
-                                                        o_key = "Default"
-                                                        
-                                                        # A. Try Shot-Specific Map FIRST
-                                                        if 'shot_wardrobe_map' in locals() and c_name in shot_wardrobe_map:
-                                                            o_key = shot_wardrobe_map[c_name]
-                                                        
-                                                        # B. Fallback to Global Map (if Shot Local is Default or Mission)
-                                                        if o_key == "Default":
-                                                            w_map = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                                                            
-                                                            # ROBUST LOOKUP: Exact -> Strip -> First Name
-                                                            o_key = w_map.get(c_name, "Default")
-                                                            if o_key == "Default":
-                                                                o_key = w_map.get(c_name.strip(), "Default")
-                                                            if o_key == "Default":
-                                                                # Try First Name (e.g. "Shay" from "Shay Blonde Bob Front")
-                                                                first_name = c_name.split(' ')[0]
-                                                                o_key = w_map.get(first_name, "Default")
-
-                                                        # DEBUG WARDROBE
-                                                        # st.write(f"DEBUG: {c_name} -> Outfit Key: {o_key}")
-                                                        # st.json(w_map)
-                                                        
-                                                        if o_key and o_key != "Default":
-                                                           o_data = outfits_data.get(o_key)
-                                                           if isinstance(o_data, dict): o_data = o_data.get('default_img')
-                                                           
-                                                           # Also allow HTTP for outfits
-                                                           if o_data and (os.path.exists(o_data) or str(o_data).startswith("http")):
-                                                               final_assets_payload.append({
-                                                                   "path": o_data,
-                                                                   "label": f"Outfit for {c_name}: {o_key}"
-                                                               })
-                                                           else:
-                                                               st.warning(f"⚠️ Outfit Path Invalid: {o_data}")
-                                                        else:
-                                                            # Silent fallback or mild warning if needed
-                                                            pass
-                                                    else:
-                                                        st.error(f"❌ Asset Missing: Could not find file for '{c_name}'. Path: '{c_path}'")
-                                                        # Show debug dump of map to help user
-                                                        with st.expander("Show Cast Map Keys"):
-                                                            st.write(st.session_state.cast_lookup_map.keys())
-
-                                            # 4. Inject Environment (Simple Lookup)
-                                            is_broll = (shot_idx + 1) in [3, 6, 9, 12]
-                                            target_env = sec_env if is_broll and sec_env != "None" else series_env
-                                            env_path = vibes_data.get(target_env) or assets.get('locations', {}).get(target_env)
-                                            if isinstance(env_path, dict): env_path = env_path.get('default_img')
-                                            
-                                            if env_path:
-                                                 final_assets_payload.append({
-                                                     "path": env_path,
-                                                     "label": f"Location: {target_env}"
-                                                 })
-
-                                    
-                                            # Generate Prompt Data
-                                            
-                                            # SAFETY CHECK: Ensure prompt is not empty
-                                            # V3.8: Inject Time of Day & Transition
-                                            time_setting = shot.get('time_of_day', 'Day')
-                                            trans_setting = shot.get('transition', 'None')
-                                            # Transitions in prompts act as style/camera guides
-                                            trans_text = f"Visual Transition Style: {trans_setting}. " if trans_setting and trans_setting != "None" else ""
-
-                                            # V3.9: SUBJECT HEADER (Priority Signal for Nano)
-                                            # We explicitly state WHO is in the scene at the very start.
-                                            subject_header = ""
-                                            if final_assets_payload:
-                                                curr_chars = []
-                                                curr_outfits = {}
-                                                for a in final_assets_payload:
-                                                    lbl = a['label']
-                                                    if "Cast:" in lbl:
-                                                        curr_chars.append(lbl.replace("Cast: ", ""))
-                                                    if "Outfit for" in lbl:
-                                                        # Label: Outfit for NAME: OUTFIT
-                                                        parts = lbl.split(": ")
-                                                        if len(parts) >= 2:
-                                                            c_name = parts[0].replace("Outfit for ", "")
-                                                            o_name = parts[-1]
-                                                            curr_outfits[c_name] = o_name
-                                                
-                                                if curr_chars:
-                                                    header_parts = []
-                                                    for c in curr_chars:
-                                                        o = curr_outfits.get(c, "Standard Outfit")
-                                                        header_parts.append(f"[{c} wearing {o}]")
-                                                    subject_header = " ".join(header_parts) + ". "
-
-                                            subject_footer = " \n\n[CRITICAL: Ensure the characters look exactly like the reference images provided above, specifically matching the [VISUAL ID] tags. Maintain consistent lighting and film stock.]"
-                                            
-                                            final_shot_prompt = f"{subject_header}Time of Day: {time_setting}. {trans_text}{shot_prompt}{subject_footer}"
-                                            if not final_shot_prompt or len(final_shot_prompt.strip()) < 5:
-                                                st.warning("⚠️ Prompt was empty! Using fallback.")
-                                                final_shot_prompt = f"Cinematic shot of {char_ref} in {target_env}, high quality, 8k, detailed."
-                                                                
-                                                                
-                                                                # SYNC PROMPT WITH LABELS (Critical for Identity)
-                                                                # SYNC PROMPT WITH LABELS (Critical for Identity)
-                                                                # REVERTED: Do NOT swap "Chels" -> "Main Character".
-                                                                # Model needs "Cast: Chels" + Prompt "Chels" to map identity.
-                                                                
-                                            # REPAIR LEGACY SCRIPTS: "Default" -> Real Name (e.g. Chels)
-                                            # If script says "Default", we must find who that is (usually Main Char).
-                                            if "Default" in final_shot_prompt:
-                                                # Find the Main Character's name
-                                                mc_repair_name = "Protagonist" # Fallback
-                                                if "clean_roles_map" in st.session_state:
-                                                    for k, v in st.session_state.clean_roles_map.items():
-                                                        if v == "Main Character":
-                                                            mc_repair_name = k
-                                                            break
-                                                # Or use Primary from Highlander check
-                                                if primary_mc_name: mc_repair_name = primary_mc_name
-                                                
-                                                final_shot_prompt = final_shot_prompt.replace("Default", mc_repair_name)
-                                            
-                                            # REPAIR LEGACY ROLES: "Love Interest" -> "Chels"
-                                            # Stale scripts might say "The Love Interest looks at..."
-                                            # We map Role -> Name to ensure Identity Match.
-                                            if "clean_roles_map" in st.session_state:
-                                                 for real_name, role_title in st.session_state.clean_roles_map.items():
-                                                     if role_title and len(role_title) > 3: # Avoid short noise
-                                                         # Replace "The Love Interest" and "Love Interest"
-                                                         final_shot_prompt = final_shot_prompt.replace(f"The {role_title}", real_name)
-                                                         final_shot_prompt = final_shot_prompt.replace(role_title, real_name)
-                
-                                            p_data = {
-                                                 "positive_prompt": final_shot_prompt,
-                                                 "negative_prompt": "blurry, low quality, distortion, ugly face",
-                                                 "aspect_ratio": "16:9",
-                                                 "model_type": "nano", 
-                                                 "assets": final_assets_payload  # <--- UPDATED VARIABLE
-                                            }
-                
-                                            # DEBUG: Show User what we are sending
-                                            with st.expander(f"🛠️ Debug: Shot {shot_idx+1} Payload", expanded=False):
-                                                st.write(final_assets_payload)
-                                                if final_assets_payload:
-                                                    st.caption("Visual Assets Sent to AI:")
-                                                    d_cols = st.columns(min(len(final_assets_payload), 4))
-                                                    for i, asset in enumerate(final_assets_payload):
-                                                        with d_cols[i % 4]:
-                                                             if os.path.exists(asset['path']):
-                                                                 st.image(asset['path'], caption=asset['label'], use_container_width=True)
-                                                             else:
-                                                                 st.warning(f"Missing: {asset['label']}")
-                
-                                            res = generate_image_from_prompt(p_data, get_user_out_dir("Series"))
-                                            if res["status"] == "success":
-                                                st.session_state[f"img_{key_base}"] = res["image_path"]
-                                                st.session_state[f"logs_{key_base}"] = res["logs"] # Save logs for debug
-                                                st.session_state[f"prompt_{key_base}"] = final_shot_prompt # Save prompt for debug
-                                                st.success("Shot Captured!")
-                                                st.rerun()
-                                            else:
-                                                err_msg = str(res.get("logs", "Unknown Error"))
-                                                if "SAFETY" in err_msg or "Refusal" in err_msg:
-                                                    st.warning("🚧 **Action Blocked by Safety Filters**")
-                                                    st.info("💡 **Tip:** Try removing explicit descriptors like 'curves', 'sheer', or 'revealing' from the prompt text area above.")
-                                                    with st.expander("Show Detailed Error"):
-                                                        st.error(err_msg)
-                                                else:
-                                                    st.error(f"Generation Failed: {err_msg}")
-                        
-                            with c_type:
-                                motion_type = st.radio("Media", ["Still", "Kling Video", "Sora 2 Video", "Mocap"], key=f"m_{key_base}", horizontal=True, label_visibility="collapsed")
-                                mocap_file = None
-                                if motion_type == "Mocap":
-                                    mocap_file = st.file_uploader("Ref", type=['mp4'], key=f"up_{key_base}", label_visibility="collapsed")
-
-                        with col_img:
-                            # Display Generated Image or Placeholder
-                            if f"img_{key_base}" in st.session_state:
-                                img_p = st.session_state[f"img_{key_base}"]
-                                st.image(img_p, caption=f"Shot {shot_idx+1} (Ready)", use_container_width=True)
-                            
-                                # V3.7: Download Button
-                                if os.path.exists(img_p):
-                                    with open(img_p, "rb") as file:
-                                        st.download_button(
-                                            label="⬇️ Download Shot",
-                                            data=file,
-                                            file_name=os.path.basename(img_p),
-                                            mime="image/png",
-                                            key=f"dl_{key_base}"
-                                        )
-                                    
-                                    # LOG DISPLAY
-                                    if f"logs_{key_base}" in st.session_state:
-                                        with st.expander("📝 Debug Scope (Logs)"):
-                                            st.write("**Final Prompt:**", st.session_state.get(f"prompt_{key_base}", "N/A"))
-                                            st.write("**Roles Map:**", st.session_state.get("clean_roles_map", "N/A"))
-                                            st.code(st.session_state[f"logs_{key_base}"], language="text")
-                                    st.caption(f"Saved to: {img_p}")
-                            else:
-                                st.info("No Image Generated")
-                    
-                        st.divider()
-
-                        # Store for Batch
-                        generated_shots_data.append({
-                            "scene_id": scene.get('id'),
-                            "shot_id": shot_idx + 1,
-                            "prompt": shot_prompt,
-                            "type": motion_type,
-                            "mocap": mocap_file,
-                            "characters": shot.get('characters'),
-                            "environment": series_env,
-                            "transition": shot.get('transition'),
-                            "generated_still": st.session_state.get(f"img_{key_base}") 
-                        })
-                        
-        # --- STEP 4: PRODUCTION ---
-        st.markdown("---")
-        if st.button("🚀 Produce Episode (Batch Render)", type="primary"):
-            if not st.session_state.series_storyboard:
-                st.error("No storyboard defined.")
+                            st.error("Invalid Email")
+            
+            st.divider()
+            rows = auth_mgr.list_allowlist()
+            if rows:
+                st.dataframe(rows, use_container_width=True, column_config={
+                    "0": "Email", "1": "Name", "2": "Active"
+                })
             else:
-                with st.status("🎬 Production in progress...", expanded=True) as status:
-                    st.write("Initializing Batch Queue...")
+                st.warning("Allowlist is empty.")
+        
+        with tab_users:
+            st.markdown("#### Registered Users")
+            all_users = auth_mgr.get_all_users()
+            st.dataframe(all_users, use_container_width=True)
+            
+            st.divider()
+            st.markdown("#### User Actions")
+            c_u, c_act, c_val = st.columns([2, 2, 2])
+            with c_u:
+                tgt_user = st.selectbox("Select User", [u['username'] for u in all_users])
+            with c_act:
+                action = st.selectbox("Action", ["Add Credits", "Reset Password", "Ban User"])
+            with c_val:
+                val_input = st.text_input("Value (Credits or New Pass)", key="admin_act_val")
                 
-                    # ESTIMATE COST
-                    total_shots = len(generated_shots_data)
-                    user = st.session_state.current_user.get("username")
-                
-                    if not auth_mgr.deduct_credits(user, total_shots):
-                        st.error(f"❌ Insufficient Credits for {total_shots} shots!")
+            if st.button("Execute Action", type="primary"):
+                if action == "Add Credits":
+                    if val_input.isdigit():
+                        auth_mgr.add_credits(tgt_user, int(val_input))
+                        st.success(f"Added {val_input} credits to {tgt_user}")
+                        time.sleep(1)
+                        st.rerun()
                     else:
-                        # Output Setup
-                        ep_title = st.session_state.series_storyboard.get('title', 'Untitled_Ep').replace(" ", "_")
-                    base_out = os.path.join(get_user_out_dir("Series"), series_title.replace(" ", "_"), ep_title)
-                    os.makedirs(base_out, exist_ok=True)
-                
-                    for shot_data in generated_shots_data:
-                        s_id = shot_data['scene_id']
-                        sh_id = shot_data['shot_id']
-                        p_text = shot_data['prompt']
-                        m_type = shot_data['type']
-                    
-                        # SAFETY GUARD: Ensure Prompt Exists
-                        if not p_text or len(p_text.strip()) < 5:
-                             st.warning(f"⚠️ Shot {s_id}-{sh_id} prompt empty! Using fallback.")
-                             p_text = f"Cinematic shot of scene {s_id} shot {sh_id}, high quality, 8k"
-
-                        # V3.8: Inject Time of Day & Transition (Batch)
-                        t_day = shot_data.get('time_of_day', 'Day')
-                        t_trans = shot_data.get('transition', 'None')
-                        t_text = f"Visual Transition Style: {t_trans}. " if t_trans and t_trans != "None" else ""
-                    
-                        p_text = f"Time of Day: {t_day}. {t_text}{p_text}"
-                    
-                        st.write(f"Processing Scene {s_id} Shot {sh_id} ({m_type})...")
-                    
-                        # 1. Image Generation (Always needed as base)
-                        # Resolve Assets for JSON Injection (Mirroring World Builder)
-                        assets_payload = []
-                    
-                        # Environment Injection (V3 Update)
-                        # Define B-Roll status
-                        is_broll = sh_id in [3, 6, 9, 12]
-                    
-                        # Determine env
-                        target_env = sec_env if is_broll and sec_env != "None" else series_env
-                        if 'location' in shot_data: target_env = shot_data['location'] # Override if specific
-                    
-                        env_path = vibes_data.get(target_env) or assets.get('locations', {}).get(target_env)
-                        if isinstance(env_path, dict): env_path = env_path.get('default_img')
-                        if env_path:
-                            assets_payload.append({
-                                "path": env_path,
-                                "label": f"Location: {target_env}"
-                            })
-                    
-                        # A. Character Assets
-                        char_names = shot_data.get('characters', [])
-                        # Use the Clean Map we built earlier to resolve these names
-                        # Note: shot_data['characters'] might be full names or nicknames depending on Gemini
-                        # But we trust our lookup map to handle the mapping.
-                    
-                        for c_name in char_names:
-                            # Try to resolve via cast map
-                            # Logic: Try exact, then try partial
-                            asset_path = None
-                        
-                            # 1. Clean Name Lookup
-                            c_key = c_name.strip().split(' ')[0]
-                            asset_path = st.session_state.cast_lookup_map.get(c_key)
-                        
-                            # FIX: Handle Gemini Snake Case ("Shays_boyfriend" -> "Shays")
-                            if not asset_path and '_' in c_name:
-                                 norm_key = c_name.replace('_', ' ').strip().split(' ')[0]
-                                 fallback_path = st.session_state.cast_lookup_map.get(norm_key)
-                                 if fallback_path:
-                                     c_key = norm_key # Update key for Outfit lookup too
-                                     asset_path = fallback_path
-                        
-                            if asset_path:
-                                 # 1. CHARACTER FACE
-                                 assets_payload.append({
-                                     "path": asset_path,
-                                     "label": f"Cast: {c_name}" # MATCH WORLD BUILDER
-                                 })
-                             
-                                 # 2. OUTFIT (Lookup from Snapshot)
-                                 w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                             
-                                 # Robust Lookup: Full Name -> First Name -> Normalized
-                                 outfit_name = w_snapshot.get(c_name) # 1. Full Name
-                             
-                                 if not outfit_name or outfit_name == "Default":
-                                     outfit_name = w_snapshot.get(c_key, "Default") # 2. First Name
-                                 
-                                 # 3. Normalized if needed (already derived c_key might be normalized, but check map again)
-                                 # Note: c_key was updated above if normalization happened, so step 2 covers it.
-                             
-                                 if outfit_name != "Default":
-                                     # Resolve Outfit Path
-                                     o_path = outfits_data.get(outfit_name)
-                                     if isinstance(o_path, dict): o_path = o_path.get('default_img')
-                                 
-                                     if o_path and os.path.exists(o_path):
-                                         assets_payload.append({
-                                             "path": o_path,
-                                             "label": f"Outfit for {c_name}: {outfit_name}" # MATCH WORLD BUILDER
-                                         })
-                    
-                        # B. Fallback if no assets found but we have a selection (Force Protag)
-                        # Safety Fix: Do not force character on B-Roll shots (3, 6, 9, 12)
-                        is_broll = sh_id in [3, 6, 9, 12]
-                    
-                        if not assets_payload and cast_selection and not is_broll:
-                            # Use first selected cast member (Fallback)
-                            # Fix: Don't use 'all_cast_opts' which might be unbound if cache hit
-                            first_key = cast_selection[0]
-                            # Convert Full Key to Clean Key logic
-                            base = first_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
-                            c_key = base.split(' ')[0]
-                        
-                            path = st.session_state.cast_lookup_map.get(c_key)
-                        
-                            if path:
-                                 assets_payload.append({
-                                     "path": path,
-                                     "label": "Main Character"
-                                 })
-
-                        # Construct Prompt Data with ASSETS
-                        p_data = {
-                             "positive_prompt": p_text,
-                             "negative_prompt": "blurry, low quality, distortion, ugly face",
-                             "width": 1024, "height": 576, # 16:9 Cinematic
-                             "num_images": 1,
-                             "guidance_scale": 7.5,
-                             "model_type": "nano", 
-                             "checkpoint": None,
-                             "assets": assets_payload # <--- THE KEY FIX
-                        }
-                    
-                        # Generate Still
-                        # We don't pass char_path legacy arg anymore
-                        res = generate_image_from_prompt(p_data, base_out)
-                    
-                        if res and res.get('status') == 'success':
-                            img_path = res['image_path']
-                            st.image(img_path, caption=f"Sc{s_id}_Sh{sh_id}")
-                        
-                            # 2. Video Generation
-                            if m_type == "Kling Video":
-                                st.write("⚡ Sending to Kling AI...")
-                                try:
-                                    k_client = KlingClient()
-                                
-                                    # Upload Image to S3 to get Public URL
-                                    with open(img_path, "rb") as f_img:
-                                        sanitized_series = series_title.replace(" ", "_")
-                                        s3_name = f"series_assets/{sanitized_series}/{ep_title}/sc{s_id}_sh{sh_id}.png"
-                                        img_url = upload_file_obj(f_img, object_name=s3_name)
-                                
-                                    if img_url:
-                                        # Send to Kling
-                                        task = k_client.create_video_from_image(img_url, p_text)
-                                        st.success(f"Video Task Started! ID: {task.get('task_id')}")
-                                        st.info("Check 'Video Studio' tab later for results.")
-                                    else:
-                                        st.error("Failed to upload image to S3. Skipping video.")
-                                except Exception as e:
-                                    st.error(f"Kling Error: {e}")
-                                    
-                            elif m_type == "Sora 2 Video":
-                                st.write("✨ Sending to Sora 2 (OpenAI)...")
-                                try:
-                                    sora_client = SoraClient()
-                                    # Reuse Image Upload logic
-                                    with open(img_path, "rb") as f_img:
-                                        sanitized_series = series_title.replace(" ", "_")
-                                        s3_name = f"series_assets/{sanitized_series}/{ep_title}/sc{s_id}_sh{sh_id}.png"
-                                        img_url = upload_file_obj(f_img, object_name=s3_name)
-                                    
-                                    if img_url:
-                                        res_url = sora_client.create_video_from_image(img_url, p_text)
-                                        if isinstance(res_url, dict) and "error" in res_url:
-                                            st.error(f"Sora Error: {res_url['error']}")
-                                        else:
-                                            st.success(f"Video Generated! [Link]({res_url})")
-                                            st.video(res_url)
-                                    else: 
-                                        st.error("S3 Upload Failed")
-                                except Exception as e:
-                                    st.error(f"Sora Error: {e}")
-                                
+                        st.error("Enter a number for credits")
+                elif action == "Reset Password":
+                    if len(val_input) > 3:
+                        auth_mgr.reset_user_password(tgt_user, val_input)
+                        st.success(f"Password reset for {tgt_user}")
+                    else:
+                        st.error("Password too short")
+                elif action == "Ban User":
+                    if st.checkbox(f"Confirm Delete {tgt_user}?"):
+                        if auth_mgr.ban_user(tgt_user):
+                            st.success(f"Banned {tgt_user}")
+                            time.sleep(1)
+                            st.rerun()
                         else:
-                            st.error(f"Failed to render shot {sh_id}")
+                            st.error("Cannot ban admin")
 
-                    status.update(label="Episode Production Complete!", state="complete")
+        with tab_upload:
+            st.markdown("#### Bulk Add Students")
+            uploaded_file = st.file_uploader("Upload CSV (Header: email, name)", type=["csv"])
+            if uploaded_file:
+                import pandas as pd
+                try:
+                    df = pd.read_csv(uploaded_file)
+                    # Normalize headers
+                    df.columns = [c.lower().strip() for c in df.columns]
+                    
+                    if "email" not in df.columns:
+                        st.error("CSV must have an 'email' column.")
+                    else:
+                        if st.button(f"Import {len(df)} Students"):
+                            count = 0
+                            for index, row in df.iterrows():
+                                email = str(row['email']).strip()
+                                name = str(row.get('name', '')).strip()
+                                if "@" in email:
+                                    if auth_mgr.add_to_allowlist(email, name):
+                                        count += 1
+                            st.success(f"Successfully added {count} students to Allowlist!")
+                except Exception as e:
+                    st.error(f"Error parsing CSV: {e}")
 
-
-
-    mini_series_ui(user_asset_path)
-# ==========================================
-# TAB 1.5: WORLD BUILDER
-# ==========================================
-with tab_world:
-    st.markdown("### World Builder")
-    st.info("Construct complex scenes with multiple characters, props, and specific assets.")
+        with tab_stats:
+            st.write("Coming soon: Usage stats per student.")
+if selection == "World Builder":
+    with st.container():
+        st.markdown("### World Builder")
+        st.info("Construct complex scenes with multiple characters, props, and specific assets.")
     
     # Load Real Data
     world_db = load_world_db()
@@ -1918,6 +1242,7 @@ with tab_world:
             assets = st.session_state.global_assets
             temp_selections = {}
             temp_assets = []
+            prompt_engine = "gemini-2.0-flash" # Default for World Builder
             
             col_c1, col_c2 = st.columns(2)
             
@@ -2150,7 +1475,7 @@ with tab_world:
                     sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []), key="wb_cam")
                     sel_lens = st.selectbox("Lens", ["Auto"] + knowledge_base.get("lenses", []), key="wb_lens")
                     sel_shot = st.selectbox("Shot Type", ["Auto", "Close Up", "Medium Shot", "Full Body", "Wide Shot", "Extreme Close Up", "Cowboy Shot", "Overhead"], key="wb_shot") 
-                    sel_ar = st.selectbox("Aspect Ratio", ["9:16", "16:9", "4:5", "1:1", "3:2"], index=0, key="wb_ar")
+                    sel_ar = st.selectbox("Aspect Ratio", ["Auto", "4:5", "16:9", "9:16", "1:1", "3:2"], index=0, key="wb_ar")
     
     
                 with col_light:
@@ -2250,7 +1575,8 @@ with tab_world:
                  final_prompt = final_prompt.replace("[PROTAGONIST]", p_name)
     
             # --- DEBUG: INSPECT STATE BEFORE RUNNING AI ---
-            with st.expander("🕵️‍♂️ Debug: What the Director AI Sees", expanded=False):
+            # Collapsed by default to avoid confusion
+            with st.expander("🛠️ Advanced Debug Info (Inputs)", expanded=False):
                 st.write("**Current Selections:**", current_selections)
                 st.write("**Assets (Visual Refs):**", assets_to_inject)
                 st.write("**Base Context (Prompt):**", final_prompt)
@@ -2285,8 +1611,9 @@ with tab_world:
                              # Friends, Friend Outfits, Pets, Props
                              extras_payload.append(asset)
                     
-                    st.toast(f"Director AI Analyzing: {current_selections.get('PROTAGONIST', 'Character')} + {current_selections.get('OUTFIT', 'Outfit')}...")
-    
+                    st.toast(f"Director AI Analyzing: {current_selections.get('PROTAGONIST', 'Character')} + {current_selections.get('OUTFIT', 'Outfit')}... [Cam: {sel_camera}, Act: {sel_action}]")
+                
+                    prompt_engine = "gemini-2.0-flash" # User requested specifically (Free Tier)
                     # 2. Call Generator with full context
                     # We treat the current draft as 'additional_notes' context
                     enhanced_res = generate_prompt_content(
@@ -2308,15 +1635,16 @@ with tab_world:
                         film_stock=(sel_film_stock if sel_film_stock != "Auto" else None),
                         filter_look=(sel_filter_look if sel_filter_look != "Auto" else None),
                         
-                        additional_notes=f"REWRITE THIS SCENE to be cinematic, high-fashion, and detailed. Keep the character consistent: {final_prompt}. Context Style: {sel_film}. Atmosphere: {current_selections.get('VIBE', 'General')}.",
+                        additional_notes=f"CREATIVE BRIEF: The atmosphere is {current_selections.get('VIBE', 'General')}. Overall style: {sel_film}. CREATE A FRESH, HOLLYWOOD-LEVEL SCENE DESCRIPTION from the visual references and cast list. Do not copy template text.",
                         model_engine=prompt_engine # Use currently selected brain (Gemini 2.0)
                     )
                     
                     if enhanced_res and "positive_prompt" in enhanced_res:
                         # final_prompt = enhanced_res["positive_prompt"] <--- REMOVED to prevent conflict with change detector
                         st.session_state['wb_manual_prompt'] = enhanced_res["positive_prompt"]
-                        st.session_state['last_calculated_prompt'] = enhanced_res["positive_prompt"] # Update this too so it doesn't revert
-                        st.toast("Prompt Upgraded by AI Director!")
+                        # Draft state remains unchanged, so the box won't auto-revert
+                        st.success("🎬 Director Cut Generated! (See Box Below)")
+                        time.sleep(1) # Pause to let user see
                         st.rerun()
     
             # --- STATE MANAGEMENT FOR PROMPT BOX ---
@@ -2325,14 +1653,17 @@ with tab_world:
             # 2. AI Button is clicked (AI rewrites prompt)
             # 3. User types (Manual edit)
             
-            # Store calculated prompt to detect dropdown changes
-            if 'last_calculated_prompt' not in st.session_state:
-                st.session_state['last_calculated_prompt'] = final_prompt
+            # --- STATE MANAGEMENT FOR PROMPT BOX (FIXED) ---
+            # We must track the "Draft" state separately to avoid overwriting AI output
             
-            # Check for dropdown changes (Auto-update box if logic changes)
-            if final_prompt != st.session_state['last_calculated_prompt']:
+            if 'last_draft_state' not in st.session_state:
+                st.session_state['last_draft_state'] = final_prompt
+            
+            # 1. Did the Dropdowns change? (Compare current calculated draft vs last known draft)
+            if final_prompt != st.session_state['last_draft_state']:
+                 # Dropdowns changed -> Reset box to new draft
                  st.session_state['wb_manual_prompt'] = final_prompt
-                 st.session_state['last_calculated_prompt'] = final_prompt
+                 st.session_state['last_draft_state'] = final_prompt
             
             # Initialize key if needed
             if 'wb_manual_prompt' not in st.session_state:
@@ -2343,6 +1674,7 @@ with tab_world:
             final_prompt = final_prompt_val
             
             st.markdown("<br>", unsafe_allow_html=True)
+            wb_queue = st.checkbox("Add to Campaign Queue", key="wb_queue_check")
             # FORM SUBMIT BUTTON (Generate)
             gen_world = st.form_submit_button("Generate Single Scene", type="primary", use_container_width=True)
 
@@ -2355,48 +1687,73 @@ with tab_world:
         
         # Generation Logic triggered by Form Submit
         if gen_world:
-             can_proceed = True
-             if st.session_state.get("authenticated"):
-                 username = st.session_state.current_user.get("username")
-                 if not auth_mgr.deduct_credits(username, 1):
-                     st.error("❌ Not enough credits!")
-                     can_proceed = False
-                 else:
-                     st.toast("🪙 1 Credit Deducted")
-             
-             if can_proceed:
+             # Re-resolve main character path from assets just in case
+             main_char_path = None
+             for a in assets_to_inject:
+                 if "Main Character" in a.get('label', ''):
+                     main_char_path = a.get('path')
+                     break
 
-                 # Magic UI Progress
-                 prog_ph = st.empty()
-                 # from execution.magic_ui import circular_progress
-                 with prog_ph.container():
-                      circular_progress()
-                      st.caption("Generating...")
+             # Check Queue Mode
+             if st.session_state.get("wb_queue_check"):
+                 campaign_mgr.add_job(
+                    name=f"WB_Scene_{int(time.time())}",
+                    description="World Builder Scene",
+                    prompt_data={
+                        "positive_prompt": final_prompt,
+                        "aspect_ratio": sel_ar,
+                        "model_type": "nano",
+                        "assets": assets_to_inject
+                    },
+                    settings={"batch_count": 1},
+                    output_folder=get_user_out_dir("World"),
+                    char_path=main_char_path
+                 )
+                 st.success("✅ Added Scene to Campaign Queue!")
                  
-                 wb_payload = {
-                     "positive_prompt": final_prompt,
-                     "aspect_ratio": sel_ar, 
-                     "model_type": "nano", 
-                     "assets": assets_to_inject
-                 }
-                 res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"))
-                 
-                 prog_ph.empty() # Clear Progress
-                 
-                 with st.expander("Generation Logs", expanded=False):
-                     st.code(res.get("logs", "No logs"))
-                     
-                 if res["status"] == "success":
-                     st.session_state['wb_last_img'] = res["image_path"]
-                     if st.session_state.get("authenticated"):
-                         time.sleep(0.5)
-                         st.rerun()
-                 else:
-                     # Refund Logic
+             else:
+                 can_proceed = True
+                 if st.session_state.get("authenticated"):
                      username = st.session_state.current_user.get("username")
-                     auth_mgr.add_credits(username, 1)
-                     st.error(f"Generation Failed: {res.get('logs')}")
-                     st.toast("Credit Refunded")
+                     if not auth_mgr.deduct_credits(username, 1):
+                         st.error("❌ Not enough credits!")
+                         can_proceed = False
+                     else:
+                         st.toast("🪙 1 Credit Deducted")
+                 
+                 if can_proceed:
+
+                     # Magic UI Progress
+                     prog_ph = st.empty()
+                     # from execution.magic_ui import circular_progress
+                     with prog_ph.container():
+                          circular_progress()
+                          st.caption("Generating...")
+                     
+                     wb_payload = {
+                         "positive_prompt": final_prompt,
+                         "aspect_ratio": sel_ar, 
+                         "model_type": "nano", 
+                         "assets": assets_to_inject
+                     }
+                     res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"))
+                     
+                     prog_ph.empty() # Clear Progress
+                     
+                     with st.expander("Generation Logs", expanded=False):
+                         st.code(res.get("logs", "No logs"))
+                         
+                     if res["status"] == "success":
+                         st.session_state['wb_last_img'] = res["image_path"]
+                         if st.session_state.get("authenticated"):
+                             time.sleep(0.5)
+                             st.rerun()
+                     else:
+                         # Refund Logic
+                         username = st.session_state.current_user.get("username")
+                         auth_mgr.add_credits(username, 1)
+                         st.error(f"Generation Failed: {res.get('logs')}")
+                         st.toast("Credit Refunded")
 
         # Display Result (Persistent)
         if 'wb_last_img' in st.session_state and os.path.exists(st.session_state['wb_last_img']):
@@ -2405,6 +1762,30 @@ with tab_world:
             
             with open(last_img, "rb") as f:
                 st.download_button("⬇️ Download Image", f, file_name=os.path.basename(last_img), mime="image/png")
+            
+            # Save to Assets Button
+            st.divider()
+            with st.form("wb_save_asset"):
+                c_n, c_s = st.columns([2, 1])
+                with c_n:
+                    asset_name = st.text_input("Name this Asset", placeholder="e.g. My Beach House")
+                with c_s:
+                    save_asset = st.form_submit_button("📁 Save to Assets", use_container_width=True)
+                
+                if save_asset:
+                    if asset_name and st.session_state.get("authenticated"):
+                        user = st.session_state.current_user.get("username")
+                        res = promote_image_to_asset(last_img, user, "Locations", asset_name, final_prompt)
+                        if res["status"] == "success":
+                            st.success(f"Added to Locations!")
+                            st.info(res.get("logs", ""))
+                            st.cache_data.clear()
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.error(f"Save Failed: {res.get('error')}")
+                    else:
+                        st.error("Please provide a name.")
     
     with col_act2:
             st.markdown("#### 🎞️ Storyboard Generator")
@@ -2423,25 +1804,54 @@ with tab_world:
                 edited_prompts = []
                 
                 # --- BATCH CONTROL ---
-                if st.button("🎬 Generate All 4 Shots"):
-                     for i, p in enumerate(prompts):
-                         # Credit Check Loop
-                         can_proceed = True
-                         if st.session_state.get("authenticated"):
-                             username = st.session_state.current_user.get("username")
-                             if not auth_mgr.deduct_credits(username, 1):
-                                 st.error(f"❌ Not enough credits to generate Shot {i+1}!")
-                                 can_proceed = False
-                                 break # Stop generation
+                c_sb_q, c_sb_run = st.columns([1, 1])
+                
+                # Re-resolve main char for logic usage
+                main_char_path_sb = None
+                for a in assets_to_inject:
+                     if "Main Character" in a.get('label', ''):
+                         main_char_path_sb = a.get('path')
+                         break
+
+                with c_sb_q:
+                    if st.button("Add All to Queue"):
+                         curr_idx = len(campaign_mgr.queue)
+                         for i, p in enumerate(prompts):
+                             campaign_mgr.add_job(
+                                name=f"SB_Shot_{i+1}_{int(time.time())}",
+                                description=f"Storyboard Shot {i+1}",
+                                prompt_data={
+                                    "positive_prompt": p + f", {final_prompt}", 
+                                    "aspect_ratio": sel_ar,
+                                    "model_type": "nano",
+                                    "assets": assets_to_inject
+                                },
+                                settings={"batch_count": 1},
+                                output_folder=get_user_out_dir("Storyboard"),
+                                char_path=main_char_path_sb
+                             )
+                         st.success(f"Added {len(prompts)} shots to Queue!")
                          
-                         if can_proceed:
-                             with st.spinner(f"Generating Shot {i+1}..."):
-                                 wb_payload = {
-                                     "positive_prompt": p + f", {final_prompt}", # Append full context
-                                     "aspect_ratio": sel_ar, 
-                                     "model_type": "nano", 
-                                     "assets": assets_to_inject
-                                 }
+                with c_sb_run:
+                    if st.button("🎬 Generate All"):
+                         for i, p in enumerate(prompts):
+                             # Credit Check Loop
+                             can_proceed = True
+                             if st.session_state.get("authenticated"):
+                                 username = st.session_state.current_user.get("username")
+                                 if not auth_mgr.deduct_credits(username, 1):
+                                     st.error(f"❌ Not enough credits to generate Shot {i+1}!")
+                                     can_proceed = False
+                                     break # Stop generation
+                             
+                             if can_proceed:
+                                 with st.spinner(f"Generating Shot {i+1}..."):
+                                     wb_payload = {
+                                         "positive_prompt": p + f", {final_prompt}", # Append full context
+                                         "aspect_ratio": sel_ar, 
+                                         "model_type": "nano", 
+                                         "assets": assets_to_inject
+                                     }
                                  res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"))
                                  if res["status"] == "success":
                                      st.toast(f"Shot {i+1} Generated! (-1 Credit)")
@@ -2449,10 +1859,12 @@ with tab_world:
                                  else:
                                      st.error(f"Shot {i+1} Failed")
                                      # Refund 
+                                     username = st.session_state.current_user.get("username")
                                      auth_mgr.add_credits(username, 1)
                                      st.toast(f"Shot {i+1} Refunded")
-                     if st.session_state.get("authenticated"):
-                         st.rerun() # Verify update
+                         
+                         if st.session_state.get("authenticated"):
+                             st.rerun() # Verify update
 
                 for i, p in enumerate(prompts):
                     col_sb_text, col_sb_img = st.columns([2, 1])
@@ -2580,91 +1992,91 @@ with tab_world:
 
 # ==========================================
 # ==========================================
-# TAB 2: CAMPAIGN MANAGER (Renamed from Tab 3)
-# ==========================================
-with tab_campaign:
-    st.markdown("### Campaign Job Queue")
+if selection == "Campaign Queue":
+    with st.container():
+        st.markdown("### Campaign Manager")
+        
+        # Sync with Backend
+        st.session_state.campaign_queue = campaign_mgr.queue
+        
+        pending_count = len([x for x in st.session_state.campaign_queue if x['status'] == 'pending'])
+        
+        st.metric("Pending Jobs", pending_count)
     
-    # 1. Status Dashboard
-    queue = campaign_mgr.queue
-    pending_count = campaign_mgr.get_pending_count()
-    st.metric("Pending Jobs", pending_count)
-    
-    # 2. Controls - Auto-Advancing with Stop Capability
-    if "campaign_running" not in st.session_state:
-        st.session_state.campaign_running = False
-
-    col_run, col_stop, col_clear = st.columns([1, 1, 4])
-    
-    with col_run:
-        # Run Button
-        if st.button("RUN", type="primary", disabled=st.session_state.campaign_running or pending_count == 0):
-            st.session_state.campaign_running = True
-            st.rerun()
-
-    with col_stop:
-        # Stop Button
-        if st.button("STOP", disabled=not st.session_state.campaign_running):
+        # 2. Controls - Auto-Advancing with Stop Capability
+        if "campaign_running" not in st.session_state:
             st.session_state.campaign_running = False
-            st.warning("Stopping after current task...")
-            st.rerun()
-            
-    with col_clear:
-        if st.button("Clear All"):
-            campaign_mgr.clear_queue()
-            st.rerun()
-
-    # --- PROCESSOR LOGIC ---
-    if st.session_state.campaign_running:
-        status_box = st.empty()
+    
+        col_run, col_stop, col_clear = st.columns([1, 1, 4])
         
-        # Check for next job
-        job = campaign_mgr.get_next_pending_job()
-        
-        if job:
-            status_box.info(f"Processing: {job['name']}...")
-            
-            # Execute (Blocking for 1 job)
-            try:
-                campaign_mgr.process_job(job)
-                st.toast(f"Finished: {job['name']}")
-                st.rerun() # Loop for next
-            except Exception as e:
-                st.error(f"Job Failed: {e}")
-                st.session_state.campaign_running = False
-        else:
-            status_box.success("All Jobs Completed.")
-            st.session_state.campaign_running = False
-
-    # 3. Queue Visualization (With Delete)
-    st.markdown("#### Job List")
-    for i, job in enumerate(queue):
-        col_q_info, col_q_del = st.columns([6, 1])
-        
-        with col_q_info:
-            with st.expander(f"{'DONE' if job['status']=='completed' else 'WAITING'} {job['name']} ({job['status']})"):
-                st.write(f"**Description:** {job['description']}")
-                st.write(f"**Created:** {job['created_at']}")
-                if job['status'] == 'completed':
-                    st.write("**Results:**")
-                    cols = st.columns(4)
-                    if 'results' in job:
-                         for idx, res in enumerate(job['results']):
-                             if res and res.get("image_path"):
-                                 cols[idx % 4].image(res["image_path"], width=100)
-        
-        with col_q_del:
-            # Only allow deleting pending or completed tasks, not running ones (to match index)
-            if st.button("DEL", key=f"del_job_{i}", help="Delete this task"):
-                campaign_mgr.remove_job(i)
+        with col_run:
+            # Run Button
+            if st.button("RUN", type="primary", disabled=st.session_state.campaign_running or pending_count == 0):
+                st.session_state.campaign_running = True
                 st.rerun()
+    
+        with col_stop:
+            # Stop Button
+            if st.button("STOP", disabled=not st.session_state.campaign_running):
+                st.session_state.campaign_running = False
+                st.warning("Stopping after current task...")
+                st.rerun()
+                
+        with col_clear:
+            if st.button("Clear All"):
+                campaign_mgr.clear_queue()
+                st.rerun()
+    
+        # --- PROCESSOR LOGIC ---
+        if st.session_state.campaign_running:
+            status_box = st.empty()
+            
+            # Check for next job
+            job = campaign_mgr.get_next_pending_job()
+            
+            if job:
+                status_box.info(f"Processing: {job['name']}...")
+                
+                # Execute (Blocking for 1 job)
+                try:
+                    campaign_mgr.process_job(job)
+                    st.toast(f"Finished: {job['name']}")
+                    st.rerun() # Loop for next
+                except Exception as e:
+                    st.error(f"Job Failed: {e}")
+                    st.session_state.campaign_running = False
+            else:
+                status_box.success("All Jobs Completed.")
+                st.session_state.campaign_running = False
+    
+        # 3. Queue Visualization (With Delete)
+        st.markdown("#### Job List")
+        for i, job in enumerate(st.session_state.campaign_queue):
+            col_q_info, col_q_del = st.columns([6, 1])
+            
+            with col_q_info:
+                with st.expander(f"{'DONE' if job['status']=='completed' else 'WAITING'} {job.get('id', 'Unknown')} ({job['status']})"):
+                    prompt_text = job.get('data', {}).get('prompt_data', {}).get('positive_prompt', 'No Prompt')
+                    st.write(f"**Prompt:** {prompt_text}")
+                    st.write(f"**Created:** {job.get('created_at', 'Unknown')}")
+                    if job['status'] == 'completed':
+                         st.write("**Results:**")
+                         # Display Logic?
+            
+            with col_q_del:
+                # Only allow deleting pending or completed tasks, not running ones (to match index)
+                if st.button("DEL", key=f"del_job_{i}", help="Delete this task"):
+                    campaign_mgr.remove_job(i)
+                    st.rerun()
 
 # ==========================================
-# TAB 4: VIDEO STUDIO
 # ==========================================
-with tab_video:
-    st.markdown("### AI Video Generator (Kling 2.6 / Veo 2.0)")
-    st.info("Transform your generated images into high-motion video clips using the latest 2026 models.")
+# TAB: VIDEO STUDIO
+# ==========================================
+if selection == "Video Studio":
+    with st.container():
+        st.markdown("### AI Video Generator (Kling 2.6 / Veo 2.0)")
+        st.info("Transform your generated images into high-motion video clips using the latest 2026 models.")
     
     # Sub-tabs for Creation vs Gallery
     v_tab_create, v_tab_gallery = st.tabs(["Generate Video", "Video Gallery (Recover)"])
@@ -3023,14 +2435,15 @@ with tab_video:
 # ==========================================
 # TAB 8: CHARACTER STUDIO
 # ==========================================
-with tab_char:
-    st.markdown("### Character Studio")
+if selection == "Character Studio":
+    with st.container():
+        st.markdown("### Character Studio")
     st.info("Design your cast with precision. Used consistently across the platform.")
 
     # Fragment to fix "Tab Jump" bug on generation
     @st.fragment
     def character_studio_fragment():
         from execution.character_studio_ui import render_character_studio
-        render_character_studio(characters_data, get_user_out_dir)
+        render_character_studio(characters_data, get_user_out_dir, campaign_mgr)
         
     character_studio_fragment()

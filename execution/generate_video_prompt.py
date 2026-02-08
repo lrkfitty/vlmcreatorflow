@@ -20,7 +20,7 @@ def generate_motion_prompt(image_path, movement_type="Auto", physics_focus="stan
     try:
         model = genai.GenerativeModel('gemini-2.0-flash')
     except:
-        model = genai.GenerativeModel('gemini-1.5-flash') # Fallback to CHEAP model
+        model = genai.GenerativeModel('gemini-2.0-flash') # Fallback to free model
 
     # Read Image Data
     import PIL.Image

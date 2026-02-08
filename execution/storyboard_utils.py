@@ -12,30 +12,22 @@ def generate_storyboard_prompts(scenario_name, context, model="gemini"):
     """
     
     system_instruction = f"""
-    You are an award-winning Film & Creative Director.
-    Create a 4-step storyboard (4 sequential image prompts) based on the following scenario.
+    ROLE: You are an ACADEMY AWARD-WINNING HOLLYWOOD DIRECTOR. You are creating a 4-shot storyboard for a visual masterpiece.
     
-    SCENARIO NAME: {scenario_name}
-    CONTEXT/DETAILS (AUTHORITATIVE SCRIPT): {context}
+    SCENARIO: {scenario_name}
+    AUTHORITATIVE SCRIPT: {context}
     
-    CRITICAL INSTRUCTION:
-    - The "CONTEXT/DETAILS" provided above is the AUTHORITATIVE SCRIPT. It contains the specific characters, setting, and vibe. 
-    - You MUST follow the "CONTEXT/DETAILS" exactly. If it contradicts the generic "SCENARIO NAME", the CONTEXT wins.
-    - Example: If Scenario is "Coffee Shop" but Context says "On Mars", the scene IS ON MARS.
-    - **DIRECT ATTENTION TO SPECIFIC CHARACTERS**: If the context mentions specific names (e.g., "Chels"), you MUST focus on them. Ensure their visual identity is maintained.
-    - **SPATIAL CONSISTENCY**: If no new location is explicitly described in the context, assume ALL 4 shots occur in the SAME continuous location. Maintain consistent lighting, background elements, and atmosphere across all shots.
+    GOAL: Generate 4 sequential, high-end image prompts that tell a story.
     
-    CRITICAL DIRECTION:
-    - If there are "Friends" or "Cast" mentioned (e.g., Jess, best friend), they are CO-STARS, not extras.
-    - They must be interacting meaningfully with the protagonist (e.g., sharing a laugh, toasting drinks, intense conversation, hugging).
-    - NEVER put friends in the background. They are part of the core narrative.
-    - Treat this like a TV Show scene where the chemistry between characters is the main focus.
+    DIRECTOR'S RULES:
+    1. **CINEMATIC FIDELITY**: Use terms like "Chiaroscuro", "Volumetric Fog", "Arriflex 35mm", "Golden Hour Glow".
+    2. **CHARACTER CHEMISTRY**: If "Friends" or "Cast" are mentioned, they are NOT extras. They are co-leads. They should be looking at each other, interacting, and sharing emotions.
+    3. **VISUAL CONTINUITY**: Keep the setting and outfits consistent across all 4 shots.
+    4. **EVOCATIVE PROMPTS**: Write descriptions that flow like high-end screenplays. Massive detail.
     
     REQUIREMENTS:
-    - Return ONLY a JSON list of 4 strings. Example: ["Prompt 1", "Prompt 2", "Prompt 3", "Prompt 4"]
-    - Style: High-end, cinematic, vivid descriptions.
-    - Include specific camera angles (e.g., "Over-the-shoulder shot", "Low angle") and lighting.
-    - Ensure outfit details are visible in the action.
+    - Return ONLY a JSON list of 4 strings.
+    - Example: ["Prompt 1", "Prompt 2", "Prompt 3", "Prompt 4"]
     """
     
     if model == "gemini":
@@ -62,7 +54,7 @@ def _generate_gemini(prompt):
     }
     
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=30)
+        response = requests.post(url, headers=headers, json=payload, timeout=60)
         res_json = response.json()
         
         # Extract text

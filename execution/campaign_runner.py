@@ -3,6 +3,7 @@ import json
 import time
 from datetime import datetime
 from execution.generate_image import generate_image_from_prompt
+from execution.generate_video import generate_video_kling, generate_video_humo
 
 class CampaignManager:
     def __init__(self, campaign_file="current_campaign.json"):
@@ -35,13 +36,14 @@ class CampaignManager:
             json.dump(self.queue, f, indent=4)
 
     def add_job(self, name, description, prompt_data, settings, output_folder, 
-                char_path=None, outfit_path=None, vibe_path=None):
+                char_path=None, outfit_path=None, vibe_path=None, job_type="image"):
         
         job = {
             "id": f"job_{int(time.time())}_{len(self.queue)}",
             "name": name,
             "description": description,
             "status": "pending", # pending, running, completed, failed
+            "type": job_type, # image, video_kling, video_humo
             "created_at": str(datetime.now()),
             "data": {
                 "prompt_data": prompt_data,
@@ -82,32 +84,69 @@ class CampaignManager:
 
     def process_job(self, job):
         """Runs the generation logic for a specific job."""
-        print(f"🚀 Processing Job: {job['name']}")
+        print(f"🚀 Processing Job: {job['name']} ({job.get('type', 'image')})")
         
         # Extract Data
         p_data = job["data"]["prompt_data"]
         paths = job["data"]["paths"]
-        repeats = job["data"]["settings"].get("batch_count", 1)
+        job_type = job.get("type", "image")
+        settings = job["data"]["settings"]
+        repeats = settings.get("batch_count", 1)
         
         job_results = []
         
         try:
-            # Run the loop
-            for r in range(repeats):
-                print(f"   ... Batch {r+1}/{repeats}")
-                
-                # Call the generator
-                result = generate_image_from_prompt(
-                    p_data, 
-                    output_folder=paths["output_folder"],
-                    reference_image_path=paths["char_path"],
-                    outfit_path=paths["outfit_path"],
-                    vibe_path=paths["vibe_path"]
+            # --- VIDEO JOBS ---
+            if job_type == "video_kling":
+                # Kling Video (Single Run usually, repeats supported but minimal)
+                # p_data expects: { "prompt", "image_path", "duration", "model", "mode", "camera" }
+                result = generate_video_kling(
+                    image_path=p_data.get("image_path"),
+                    prompt=p_data.get("prompt"),
+                    duration=p_data.get("duration", "5s").replace("s",""),
+                    model_version=p_data.get("model", "2.6"),
+                    quality_mode=p_data.get("mode", "pro"),
+                    camera_control=p_data.get("camera"),
+                    ref_video_path=p_data.get("ref_video"),
+                    ref_orientation=p_data.get("ref_orientation", "image"),
+                    output_folder=paths["output_folder"]
                 )
                 job_results.append(result)
                 
+            elif job_type == "video_humo":
+                # HuMo Video
+                result = generate_video_humo(
+                    image_path=p_data.get("image_path"),
+                    prompt=p_data.get("prompt"),
+                    audio_path=p_data.get("audio_path"),
+                    num_frames=p_data.get("num_frames", 49),
+                    output_folder=paths["output_folder"]
+                )
+                job_results.append(result)
+                
+            else:
+                # --- IMAGE JOBS ---
+                for r in range(repeats):
+                    print(f"   ... Batch {r+1}/{repeats}")
+                    
+                    # Call the generator
+                    result = generate_image_from_prompt(
+                        p_data, 
+                        output_folder=paths["output_folder"],
+                        reference_image_path=paths["char_path"],
+                        outfit_path=paths["outfit_path"],
+                        vibe_path=paths["vibe_path"]
+                    )
+                    job_results.append(result)
+                
             # Mark complete
-            job["status"] = "completed"
+            # Check if actual failure occurred in result
+            if job_results and job_results[-1].get("status") == "failed":
+                 job["status"] = "failed"
+                 job["error"] = job_results[-1].get("error", "Unknown Error")
+            else:
+                 job["status"] = "completed"
+                 
             job["results"] = job_results
             job["completed_at"] = str(datetime.now())
             self.save_queue()

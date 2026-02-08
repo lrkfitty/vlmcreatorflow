@@ -132,10 +132,10 @@ def inject_magic_css():
         }
 
         /* --- INPUT FIELDS (Seamless) --- */
-        .stTextInput > div > div > input, 
-        .stSelectbox > div > div, 
-        .stMultiSelect > div > div, 
-        .stTextArea > div > div > textarea {
+        .stTextInput input, 
+        .stSelectbox div[data-baseweb="select"] > div,
+        .stMultiSelect div[data-baseweb="select"] > div,
+        .stTextArea textarea {
             background-color: #0F172A !important; /* Opaque Dark Slate */
             border: 1px solid rgba(255, 255, 255, 0.2) !important;
             color: #FFFFFF !important;
@@ -143,10 +143,10 @@ def inject_magic_css():
             border-radius: 8px !important;
         }
         
-        .stTextInput > div > div > input:focus,
-        .stTextArea > div > div > textarea:focus {
+        .stTextInput input:focus,
+        .stTextArea textarea:focus {
             border-color: #38BDF8 !important; /* Cyan Focus */
-            background-color: rgba(255, 255, 255, 0.1) !important;
+            background-color: #1E293B !important; /* Slightly lighter opaque */
             box-shadow: 0 0 0 1px #38BDF8;
         }
         

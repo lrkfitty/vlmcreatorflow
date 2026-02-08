@@ -8,10 +8,11 @@ import shutil
 from execution.magic_ui import card_begin, card_end, circular_progress
 from execution.character_utils import build_character_prompt, get_character_sheet_prompt
 from execution.generate_image import generate_image_from_prompt
+from load_assets import promote_image_to_asset
 from execution.auth import auth_mgr
 from execution.s3_uploader import upload_file_obj
 
-def render_character_studio(characters_data, get_user_out_dir_func):
+def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr=None):
     """
     Renders the Character Studio UI.
     args:
@@ -22,6 +23,10 @@ def render_character_studio(characters_data, get_user_out_dir_func):
     
     with col_char_ctrl:
         card_begin()
+        
+        # Initialize user early to prevent UnboundLocalError in save block
+        user = st.session_state.current_user.get("username") if st.session_state.get("current_user") else "guest"
+
         st.markdown("#### Design Specs")
         
         with st.form("character_creator_form"):
@@ -114,7 +119,11 @@ def render_character_studio(characters_data, get_user_out_dir_func):
             
             # Submit
             st.markdown("<br>", unsafe_allow_html=True)
-            create_char = st.form_submit_button("✨ Generate Character", type="primary", use_container_width=True)
+            col_q, col_sub = st.columns([1, 2])
+            with col_q:
+                add_to_queue = st.checkbox("Add to Queue", value=False)
+            with col_sub:
+                create_char = st.form_submit_button("✨ Generate Character", type="primary", use_container_width=True)
             
         card_end()
 
@@ -155,8 +164,8 @@ def render_character_studio(characters_data, get_user_out_dir_func):
                 
                 if output_mode == "Character Sheet (7-Angle Views)":
                     full_prompt = get_character_sheet_prompt(base_prompt)
-                    ar = "16:9" # Sheets need width
-                    target_w, target_h = 1344, 768
+                    ar = "4:5" # User requested 4:5 for all Studio generations
+                    target_w, target_h = 896, 1152
                 else:
                     full_prompt = base_prompt
                     ar = "4:5" # Portrait
@@ -167,36 +176,67 @@ def render_character_studio(characters_data, get_user_out_dir_func):
                     st.code(full_prompt)
                 
                 # Generate
-                user = st.session_state.current_user.get("username")
-                if auth_mgr.deduct_credits(user, 1):
-                    with st.spinner("Creating Character in Studio..."):
-                         # Check for Identity Lock Reference
-                         assets = []
-                         if st.session_state.get("lock_identity_path"):
-                             assets.append({
-                                 "path": st.session_state["lock_identity_path"],
-                                 "label": f"Cast: {char_name or 'Main'}"
-                             })
+                if add_to_queue and campaign_mgr:
+                     # QUEUE MODE
+                     job_name = f"Char_{char_name}"
+                     
+                     # Check for Identity Lock Reference
+                     assets = []
+                     if st.session_state.get("lock_identity_path"):
+                         assets.append({
+                             "path": st.session_state["lock_identity_path"],
+                             "label": f"Cast: {char_name or 'Main'}"
+                         })
                          
-                         # Payload
-                         payload = {
+                     campaign_mgr.add_job(
+                        name=job_name,
+                        description=f"Character Concept: {char_name}",
+                        prompt_data={
                              "positive_prompt": full_prompt,
                              "width": target_w, "height": target_h,
+                             "aspect_ratio": ar,
                              "model_type": "nano",
                              "assets": assets
-                         }
-                         
-                         res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
-                         
-                         if res["status"] == "success":
-                             st.session_state['char_preview'] = res['image_path']
-                             st.session_state['char_final_prompt'] = full_prompt
-                             st.toast("Character Generated!")
-                         else:
-                             auth_mgr.add_credits(user, 1) # Refund
-                             st.error(f"Failed: {res.get('logs')}")
+                        },
+                        settings={"batch_count": 1},
+                        output_folder=get_user_out_dir_func("Characters/Concepts"),
+                        char_path=st.session_state.get("lock_identity_path")
+                     )
+                     st.success(f"✅ Added '{char_name}' to Campaign Queue!")
+                     
                 else:
-                    st.error("Not enough credits.")
+                    # SYNC MODE
+                    user = st.session_state.current_user.get("username")
+                    if auth_mgr.deduct_credits(user, 1):
+                        with st.spinner("Creating Character in Studio..."):
+                             # Check for Identity Lock Reference
+                             assets = []
+                             if st.session_state.get("lock_identity_path"):
+                                 assets.append({
+                                     "path": st.session_state["lock_identity_path"],
+                                     "label": f"Cast: {char_name or 'Main'}"
+                                 })
+                             
+                             # Payload
+                             payload = {
+                                 "positive_prompt": full_prompt,
+                                 "width": target_w, "height": target_h,
+                                 "aspect_ratio": ar,
+                                 "model_type": "nano",
+                                 "assets": assets
+                             }
+                             
+                             res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
+                             
+                             if res["status"] == "success":
+                                 st.session_state['char_preview'] = res['image_path']
+                                 st.session_state['char_final_prompt'] = full_prompt
+                                 st.toast("Character Generated!")
+                             else:
+                                 auth_mgr.add_credits(user, 1) # Refund
+                                 st.error(f"Failed: {res.get('logs')}")
+                    else:
+                        st.error("Not enough credits.")
 
         # Display Result
         if 'char_preview' in st.session_state:
@@ -208,49 +248,24 @@ def render_character_studio(characters_data, get_user_out_dir_func):
             with c_save:
                 if st.button("Save as New Asset", use_container_width=True):
                      if char_name:
-                         # Move to User Assets
-                         user = st.session_state.current_user.get("username")
-                         asset_dir = os.path.join("output", "users", user, "Assets", "Characters", char_name)
-                         os.makedirs(asset_dir, exist_ok=True)
+                         # Use Unified Helper
+                         res_save = promote_image_to_asset(
+                             preview_path, 
+                             user, 
+                             "Characters", 
+                             char_name, 
+                             st.session_state.get('char_final_prompt', '')
+                         )
                          
-                         # Copy Image
-                         new_path = os.path.join(asset_dir, "default.png")
-                         import shutil
-                         shutil.copy(preview_path, new_path)
-                         
-                         # Create Metadata
-                         details = {
-                             "name": char_name,
-                             "prompt": st.session_state.get('char_final_prompt', ''),
-                             "created": str(datetime.datetime.now())
-                         }
-                         json_path = os.path.join(asset_dir, "details.json")
-                         with open(json_path, "w") as f:
-                             json.dump(details, f)
-                             
-                         # --- S3 SYNC ---
-                         bucket = os.getenv("S3_BUCKET_NAME")
-                         if bucket:
-                             try:
-                                 # Upload Image
-                                 key_img = f"users/{user}/Assets/Characters/{char_name}/{safe_file_name}"
-                                 with open(new_path, "rb") as f:
-                                     upload_file_obj(f, key_img)
-                                     
-                                 # Upload Details
-                                 key_json = f"users/{user}/Assets/Characters/{char_name}/details.json"
-                                 with open(json_path, "rb") as f:
-                                     upload_file_obj(f, key_json)
-                                 
-                                 st.toast("Synced to Cloud!")
-                             except Exception as e:
-                                 st.error(f"Cloud Sync Failed: {e}")
-                             
-                         st.success(f"Saved {char_name} to Assets!")
-                         # Clear Cache
-                         st.cache_data.clear()
-                         time.sleep(1)
-                         st.rerun()
+                         if res_save["status"] == "success":
+                             st.success(f"Saved {char_name} to Assets!")
+                             st.info(res_save.get("logs", ""))
+                             # Clear Cache
+                             st.cache_data.clear()
+                             time.sleep(1)
+                             st.rerun()
+                         else:
+                             st.error(f"Save Failed: {res_save.get('error')}")
                      else:
                          st.error("Enter a name in the form.")
             

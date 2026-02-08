@@ -13,7 +13,7 @@ from generate_image import generate_image_nano
 # Mock Data
 prompt_data = {
     "positive_prompt": "A cinematic shot of a woman in a cafe.",
-    "aspect_ratio": "9:16",
+    "aspect_ratio": "4:5",
     # Simulate what app.py sends
     "model_type": "nano" 
 }

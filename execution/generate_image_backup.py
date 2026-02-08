@@ -25,7 +25,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
     """
     # Try specific Image Key first (for Paid tier), else fallback to standard key
     api_key = os.getenv("GOOGLE_IMAGE_KEY") or os.getenv("GOOGLE_API_KEY")
-    logs = ["--- Attempting Generation with Nano Banana Pro (Character-Outfit Pairing Enabled) ---"]
+    logs = ["--- Attempting Generation with Nano Banana Pro (Restored) ---"]
     
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -36,7 +36,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
     system_instruction = (
         "SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below "
         "while EXPERTLY matching the visual identities of the provided character reference images. "
-        "You must match their face, hair, and outfit details exactly. Do not hallucinate new features. Pay close attention to character-outfit pairings indicated by binding text. \n\n"
+        "You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\n"
     )
     if "SYSTEM INSTRUCTION" not in positive_prompt:
         positive_prompt = system_instruction + positive_prompt
@@ -45,36 +45,29 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
         # Inject AR into the prompt text as the API does not support the 'aspectRatio' field in generateContent
         positive_prompt = f"IMAGE ASPECT RATIO: {aspect_ratio}. " + positive_prompt
 
-    # --- UNPACK ASSETS (Enhanced Multi-Character Support with Pairing) ---
-    # Collect ALL cast members and outfits
-    all_cast_members = []  # List of {path, label}
-    all_outfits = []  # List of {path, label}
-    location_ref = None
-    
-    if "assets" in prompt_data:
+    # --- UNPACK ASSETS (Fix for World Builder / Char Studio) ---
+    # If explicit args are missing, try to find them in the 'assets' list
+    if not reference_image_path and "assets" in prompt_data:
         for a in prompt_data["assets"]:
             l = a.get("label", "")
             p = a.get("path")
-            
-            # Collect ALL characters (Main + Friends)
+            # Heuristics to map labels to roles
             if "Main Character" in l or "Reference Character" in l or "Cast:" in l:
-                all_cast_members.append({"path": p, "label": l})
-            
-            # Collect ALL outfits
-            elif "Outfit" in l:
-                all_outfits.append({"path": p, "label": l})
-                    
-            # Collect location/vibe
-            elif "Vibe" in l or "Location" in l or "Style" in l:
-                location_ref = p
+                reference_image_path = p
     
-    # Legacy compatibility: use old parameters if provided and lists are empty
-    if reference_image_path and not all_cast_members:
-        all_cast_members.append({"path": reference_image_path, "label": "Main Character"})
-    if outfit_path and not all_outfits:
-        all_outfits.append({"path": outfit_path, "label": "Outfit: Primary"})
-    if vibe_path and not location_ref:
-        location_ref = vibe_path
+    if not outfit_path and "assets" in prompt_data:
+        for a in prompt_data["assets"]:
+            l = a.get("label", "")
+            p = a.get("path")
+            if "Outfit" in l:
+                outfit_path = p
+                
+    if not vibe_path and "assets" in prompt_data:
+        for a in prompt_data["assets"]:
+            l = a.get("label", "")
+            p = a.get("path")
+            if "Vibe" in l or "Location" in l or "Style" in l:
+                vibe_path = p
 
     try:
         # Switching to explicit Image Generation model from list (Nano/1.5 aliases are unstable)
@@ -178,73 +171,36 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
             
             return asset_parts, local_logs
 
-        # --- Main Logic for Google API (WITH CHARACTER-OUTFIT PAIRING) ---
+        # --- Main Logic for Google API ---
         logs.append(f"Prompt sent to Google: '{positive_prompt[:100]}...'")
-        if aspect_ratio:
-            logs.append(f"Aspect Ratio: {aspect_ratio}")
+        logs.append(f"Aspect Ratio: {aspect_ratio}")
         
         if not api_key:
             raise Exception("Missing GOOGLE_API_KEY or GOOGLE_IMAGE_KEY in .env")
 
-        # Prepare multimodal input with PAIRED character+outfit
+        # Prepare multimodal input
         contents = []
         all_asset_logs = []
 
-        # 1. Process Characters + Outfits as INTERLEAVED PAIRS
-        logs.append(f"🎭 Processing {len(all_cast_members)} character(s) with outfit pairing...")
-        for idx, cast_member in enumerate(all_cast_members):
-            char_label = cast_member.get("label", "")
-            
-            # Extract character name for outfit matching
-            char_name = None
-            if "Cast:" in char_label:
-                char_name = char_label.split("Cast:")[-1].strip()
-            elif "Main Character" in char_label:
-                char_name = "Main Character"
-            
-            # Add character reference FIRST
-            cast_parts, cast_logs = process_single_asset(cast_member)
-            contents.extend(cast_parts)
-            all_asset_logs.extend(cast_logs)
-            
-            # DEBUG: Show what we're trying to match
-            logs.append(f"🔍 Trying to find outfit for {char_name} (label: {char_label})")
-            logs.append(f"   Available outfits: {[o.get('label') for o in all_outfits]}")
-            
-            # IMMEDIATELY pair with their outfit (if found)
-            matched_outfit = None
-            for outfit in all_outfits:
-                outfit_label = outfit.get("label", "")
-                # Normalize whitespace (handles "Outfit for  Chels" with extra spaces)
-                normalized_label = ' '.join(outfit_label.split())
-                
-                if char_name and f"Outfit for {char_name}" in normalized_label:
-                    matched_outfit = outfit
-                    break
-                # Case 2: Main character outfit - "Outfit: Name" (no "for")
-                elif idx == 0 and normalized_label.startswith("Outfit:") and "for" not in normalized_label.lower():
-                    matched_outfit = outfit
-                    break
-            
-            if matched_outfit:
-                # Add explicit binding instruction
-                contents.append({
-                    "text": f"⚠️ CRITICAL: THE CHARACTER SHOWN ABOVE ({char_name}) MUST WEAR THIS EXACT OUTFIT:"
-                })
-                outfit_parts, outfit_logs = process_single_asset(matched_outfit)
-                contents.extend(outfit_parts)
-                all_asset_logs.extend(outfit_logs)
-                logs.append(f"✅ Paired {char_name} with {matched_outfit.get('label', 'outfit')}")
-            else:
-                logs.append(f"⚠️ No outfit found for {char_name}")
+        # 1. Reference Image (if provided)
+        if reference_image_path:
+            ref_parts, ref_logs = process_single_asset({"path": reference_image_path, "label": "Reference Character"})
+            contents.extend(ref_parts)
+            all_asset_logs.extend(ref_logs)
 
-        # 2. Location/Vibe (if provided)
-        if location_ref:
-            vibe_parts, vibe_logs = process_single_asset({"path": location_ref, "label": "Scene Location/Vibe"})
+        # 2. Outfit Image (if provided)
+        if outfit_path:
+            outfit_parts, outfit_logs = process_single_asset({"path": outfit_path, "label": "Outfit for Character"})
+            contents.extend(outfit_parts)
+            all_asset_logs.extend(outfit_logs)
+
+        # 3. Vibe Image (if provided)
+        if vibe_path:
+            vibe_parts, vibe_logs = process_single_asset({"path": vibe_path, "label": "Vibe/Style Reference"})
             contents.extend(vibe_parts)
             all_asset_logs.extend(vibe_logs)
 
-        # 3. Add the main text prompt LAST (after all visual refs)
+        # Add the main text prompt
         contents.append({"text": positive_prompt})
         
         # Add all asset processing logs to main logs
@@ -295,15 +251,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                                     if os.getenv("S3_BUCKET_NAME"):
                                         try:
                                             from execution.s3_uploader import upload_file_obj
-                                            
-                                            # Extract user-specific path from output_folder for S3
-                                            # e.g., "output/users/Tytheguyttg/World" -> "users/Tytheguyttg/World/{filename}"
-                                            if "users" in output_folder:
-                                                relative_path = output_folder.replace("output/", "").replace("output\\", "")
-                                                s3_key = f"{relative_path}/{filename}"
-                                            else:
-                                                # Fallback for non-user paths
-                                                s3_key = f"generated/{filename}"
+                                            s3_key = f"generated/{filename}"
                                             with open(filepath, "rb") as f_up:
                                                 s3_url = upload_file_obj(f_up, object_name=s3_key)
                                             logs.append(f"☁️ Uploaded to S3: {s3_key}")

@@ -48,3 +48,20 @@ def upload_file_obj(file_obj, object_name=None):
     except ClientError as e:
         print(f"S3 Upload Error: {e}")
         return None
+
+def delete_file(object_name):
+    """
+    Deletes a file from S3.
+    """
+    if not object_name:
+        return False
+        
+    s3 = boto3.client('s3', region_name=REGION)
+    
+    try:
+        s3.delete_object(Bucket=BUCKET_NAME, Key=object_name)
+        print(f"DEBUG: Deleted from S3: {object_name}")
+        return True
+    except ClientError as e:
+        print(f"S3 Delete Error: {e}")
+        return False

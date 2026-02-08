@@ -1,7 +1,7 @@
 import os
 import sys
 import requests
-import json
+import time
 from dotenv import load_dotenv
 
 # Mock the environment
@@ -27,6 +27,8 @@ prompt_data = {
 }
 
 print("--- STARTING HEAVY LOAD TEST (5 Images) ---")
+start_time = time.time()
+
 result = generate_image_nano(
     prompt_data, 
     "output_test", 
@@ -35,5 +37,11 @@ result = generate_image_nano(
     vibe_path=None
 )
 
+end_time = time.time()
+print(f"\n--- TOTAl TIME: {end_time - start_time:.4f} seconds ---")
+
 print("\n--- RESULT ---")
-print(json.dumps(result, indent=2, default=str))
+# Only print status and logs, not the full massive JSON if successful
+print(f"Status: {result.get('status')}")
+print("Logs:")
+print(result.get("logs"))

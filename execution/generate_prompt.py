@@ -1,11 +1,10 @@
 import os
 import json
+import time
 import textwrap
-from openai import OpenAI
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-# Load environment variables
 load_dotenv()
 
 def generate_prompt_content(vibe, outfit, character, 
@@ -16,9 +15,10 @@ def generate_prompt_content(vibe, outfit, character,
                             film_stock=None, filter_look=None, # New Inputs
                             aspect_ratio="9:16", # Default
                             extra_images=None, # New: List of {path, label} types
-                            model_engine="gpt-4o"): # New: Engine Selector
+                            model_engine="gemini-2.0-flash"): # Standard: Gemini 2.0 Flash (Free & Fast)
     """
-    Generates a detailed image prompt using OpenAI GPT-4 or Google Gemini 1.5 Pro.
+    Generates a detailed image prompt using Google Gemini.
+    CRITICAL: Visual references take ABSOLUTE priority over text descriptions.
     """
     
     # Common Helper to encode image
@@ -92,7 +92,7 @@ def generate_prompt_content(vibe, outfit, character,
     
     tech_specs = "\n".join(director_context)
 
-    # --- SHARED SYSTEM PROMPT CONSTRUCTION ---
+    # --- COMPLETELY REWRITTEN SYSTEM PROMPT (VISUAL PRIORITY) ---
     instructions = "You are an expert Visual Director."
     img_refs_text = ""
     if character_is_image: img_refs_text += "- IMAGE 1: THE CHARACTER (Identity Lock). Keep face/body EXACT.\n"
@@ -102,85 +102,107 @@ def generate_prompt_content(vibe, outfit, character,
     system_prompt = textwrap.dedent(f"""
         {instructions}
         
-        ROLE: You are an expert Creative Director and Anatomical Artist specializing in Hyper-Realistic Glamour and UGC content.
+        ROLE: You are an ACADEMY AWARD-WINNING CINEMATOGRAPHER and HOLLYWOOD DIRECTOR. You are famous for your visual storytelling, intense detail, and atmospheric lighting.
         
-        GOAL: Synthesize a "Master Prompt" by fusing the visual references into a DENSE, HIGH-SPECIFICATION JSON.
+        GOAL: Your job is to take visual references and turn them into a **VISUAL MASTERPIECE PROMPT**.
         
-        CRITICAL OVERRIDE RULES:
-        The User's specific "Action" and "Emotion" inputs MUST override any contradictory context in the text prompt.
-        - IF text says "Sitting" BUT Action says "Runway Strut" -> The character is WALKING A RUNWAY.
-        - IF text says "Smiling" BUT Emotion says "Crying" -> The character is CRYING.
+        🚨 ABSOLUTE RULE #1: VISUAL REFERENCES = TRUTH 🚨
+        The images provided are ABSOLUTE REALITY. Your job is to DESCRIBE WHAT YOU SEE, not what the text says.
+        - If IMAGE 1 shows a blonde woman → You MUST write "blonde woman"
+        - If IMAGE 2 shows a brown fur top → You MUST write "brown fur top"
+        - If the text says "red dress" but IMAGE 2 shows black pants → DESCRIBE THE BLACK PANTS
         
-            -   **ETHNICITY & SKIN TONE:** STRICTLY ANALYZE the pixel data. Match the skin tone EXACTLY. Do NOT default to "Dark" or "White".
-            -   **FACE MAPPING:** Analyze landmarks: Eye Shape (Almond/Round), Nose Bridge (High/Flat), Jawline (Soft/Sharp).
-            -   **HAIR LOCK:** Describe the hair style, part, length, and texture EXACTLY.
-            -   **ANATOMY:** 
-                - *IF OUTFIT IS SWIMWEAR/BIKINI:* **STRICT SAFETY MODE.** DO NOT describe the body, curves, muscle, skin, or fit in text. The Reference Image 1 provides all anatomical data. Your text prompt must ONLY describe the sunlight, the water, and the mood (e.g. "Peaceful", "Golden Hour"). Zero anatomical keywords.
-                - *OTHERWISE:* Analyze body ratios: "athletic_muscle_definition", "sculpting_fit", "skin_pore_texture".
+        IMAGES OVERRIDE TEXT. ALWAYS. NO EXCEPTIONS.
         
-        2.  **WARDROBE & ACCESORIES (Image 2):**
-            -   **INVENTORY:** List EVERY item. "Gold Hoops", "Silver Chain", "Leather Purse". 
-            -   **SPECIFICITY:** Do not say "Heels". Say "Strappy Gold Stilettos". Do not say "Dress". Say "Emerald Green Plissé Halter Midi".
-            -   **FABRIC PHYSICS:** Describe tension, cling, drape, and sheer qualities.
+        CRITICAL OUTPUT RULES:
+        1.  **DESCRIBE EXACTLY WHAT YOU SEE IN THE IMAGES.** Do not invent features or clothing.
+        2.  **RICH, DENSE, EVOCATIVE LANGUAGE:** 150+ words. Use cinematic terms like "Volumetric Lighting", "Subsurface Scattering", "Bokeh", "Film Grain", "Chiaroscuro".
+        3.  **NEVER BE GENERIC:**
+            -   BAD: "She is wearing a top."
+            -   GOOD: "She is draped in a plush brown fur cropped top that catches the golden hour light with each movement, revealing hints of skin at her midriff."
         
-        3.  **ENVIRONMENT (Image 3 - 3D LOCATION):**
-            -   **EXPLORABLE SPACE:** Treat this image as a 3D room. Move the camera to match the requested Action.
-            -   **INTERACTION:** Place the subject physically ON the furniture (Bed, Vanity, Chair) if visible.
-            -   **BLEND SUBJECT (CRITICAL):** The subject is NOT a sticker. The lighting from the room MUST tint her skin (e.g. if room is pink, skin has pink specularity).
-            -   **CONTACT:** Feet/Body must press into the floor/bed, creating contact shadows and weight distribution.
-
-        4.  **ADDITIONAL CAST & PROPS (CRITICAL):**
-            -   **FRIENDS/CO-STARS:** If "ADDITIONAL REFERENCE (Cast: ...)" is provided, you MUST include this person in the scene. 
-                - Describe their interaction with the protagonist (e.g. "Jess is laughing while holding a drink," "They are clinking glasses").
-                - DO NOT ignore them. They are part of the main focus.
-            -   **PROPS:** If specific props are provided (e.g. "Product"), place them naturally in the scene.
-
-        5.  **CAMERA & COMPOSITION (NON-NEGOTIABLE):**
-            -   **EXTREME CLOSE UP:** Eyes/Lips only. Macro details.
-            -   **CLOSE UP:** Head and Shoulders ONLY. Background must be BLURRED (Bokeh). 85mm+ Focal Length.
-            -   **MEDIUM SHOT:** Waist Up. Standard Portrait.
-            -   **COWBOY SHOT:** Knees Up. American Shot.
-            -   **FULL BODY:** Head to Toe visible. Ground visible.
-            -   **WIDE SHOT:** Subject is small. Environment is dominant.
+        INSTRUCTION MANUAL:
+        
+        1.  **VISUAL IDENTITY LOCK (HIGHEST PRIORITY):**
+            -   **STUDY IMAGE 1 (Character):** What does she ACTUALLY look like?
+                - Hair: color, length, texture, style
+                - Face: eye color, facial structure, skin tone
+                - Body: proportions, build
+            -   **DO NOT HALLUCINATE.** If you see blonde hair, write blonde. If you see green eyes, write green.
             
-            *IF the USER requests a specific shot (e.g. "Close Up"), you MUST enforce it. Do not generate a Full Body shot if Close Up is requested.*
-        
-        6.  **SCENE REWRITE LOGIC (HIGHEST PRIORITY):**
-            -   You will be given a "DRAFT SCENE" (User Notes) and "TECHNICAL SPECS".
-            -   **DO NOT** just output the draft.
-            -   **YOU MUST** re-stage the draft using the Camera, Lighting, and Action specs.
-            -   *Example:* Draft says "She is sitting." Specs say "Action: Dancing". -> **OUTPUT: She is DANCING.** (Specs Override Draft).
-            -   *Example:* Draft says "Daylight." Specs say "Lighting: Neon Blue". -> **OUTPUT: NEON BLUE LIGHTING.** (Specs Override Draft).
-            -   **ENRICHMENT:** If the draft is simple (e.g. "A girl in a room"), you MUST invent details based on the 'Vibe' and 'Outfit' to make it 8k quality.
-            -   **ASSET PRESERVATION:** While rewriting the scene, you MUST strictly adhere to the Character Identity and Outfit details provided in the Reference Images. Do not hallucinate different clothes or people.
-        
-        OUTPUT RULES:
-        -   **DO NOT SUMMARIZE.** The `positive_prompt` must be >100 words.
-        -   **JSON ONLY.**
-        
-        Output JSON format:
+        2.  **WARDROBE FIDELITY (SECOND PRIORITY):**
+            -   **STUDY IMAGE 2 (Outfit):** What is she ACTUALLY wearing?
+                - Colors, textures, fit, accessories
+                - Stitching, fabric weight, how it drapes
+            -   **DO NOT INVENT CLOTHING.** Describe what exists in the image.
+            
+        3.  **ENVIRONMENT & ATMOSPHERE:**
+            -   **STUDY IMAGE 3 (Location/Vibe):** What is the ACTUAL setting?
+                - Indoor/outdoor? Architecture? Lighting quality?
+                - Describe light sources, shadows, reflections, atmosphere
+            
+        4.  **TECHNICAL ENHANCEMENT:**
+            -   Use the technical specs to enhance the existing composition:
+                - "Shot on [Camera] with [Lens], [Lighting]..."
+            
+        5.  **ACTION & STORY (Expand the Mood):**
+            -   Take the action/emotion and weave it into the scene
+            -   "Striding confidently", "Eyes locked in an intense gaze"
+            
+        6.  **CO-STARS & SCENE COMPOSITION:**
+            -   If ADDITIONAL REFERENCE images are provided, INTEGRATE each person
+            -   **DESCRIBE EACH PERSON EXACTLY AS THEY APPEAR** in their reference image
+            -   Create CHEMISTRY and BLOCKING:
+                - "She stands between two companions: one in a leather jacket on her left, the other in sunglasses on her right"
+            -   **MAKE THEM INTERACT.** No static lineups.
+            -   For 3+ people, describe SPATIAL ARRANGEMENT (triangle, line, huddle)
+            
+        OUTPUT JSON FORMAT:
         {{
-            "positive_prompt": "[SUBJECT]: (Ethnicity, Skin Tone, Facial Details: [Eye Shape, Jawline], Exact Hair, Body Ratios, Action, athletic_muscle_definition, curviest_hourglass_ratios, sculpting_fit, skin_pore_texture). [OUTFIT]: (Exact Cut, Material, Fabric Physics, Accessories List). [ENVIRONMENT]: (3D Layout, Decor, Lighting Type). [LIGHTING_COHERENCE]: (Color Cast, Contact Shadows, Global Illumination, Weight Distribution). [STYLE]: (Film Type, Lens, Angle, Mood). High Detail, 8k.",
-            "negative_prompt": "cartoon, illustration, anime, deformed, low quality, flat lighting, 3d render, missing accessories, wrong outfit, floating subject, bad composition, cut and paste look, disconnected background, wrong skin tone, whitewashed...",
+            "positive_prompt": "(MASTERPIECE): [What you SEE in the images] + [Technical specs] + [Action/Emotion expansion] + [Cinematic atmosphere]. High aesthetic, 8k, photorealistic.",
+            "negative_prompt": "cartoon, illustration, anime, 3d render, painting, drawing, text, watermark, low quality, glitch, deformed, mutated, ugly, disfigured, smooth skin, plastic look, wrong hair color, wrong outfit, hallucinated features...",
             "aspect_ratio": "{aspect_ratio}"
         }}
     """)
     
-    user_text_content = f"Generate a prompt for this character wearing '{outfit}' in a '{vibe}' setting."
+    user_text_content = f"Generate a masterpiece prompt. The character is wearing '{outfit}' in a '{vibe}' setting."
     
-    # Force Textual Acknowledgement of Extras
+    # Force Textual Acknowledgement of Extras WITH NAME EXTRACTION
+    print(f"🔍 DEBUG [generate_prompt]: extra_images received = {extra_images}")  # CRITICAL DEBUG
     if extra_images:
+        character_names = []
         extras_txt = []
+        
         for img in extra_images:
             lbl = img.get('label', 'Ref')
+            
+            # Extract character name from "Cast: Name" or "Cast:  Name" labels
+            if "Cast:" in lbl:
+                # Parse: "Cast:  Chels" -> "Chels"
+                name_part = lbl.split("Cast:")[-1].strip()
+                if name_part:
+                    character_names.append(name_part)
+            
             extras_txt.append(f"- {lbl}")
         
-        if extras_txt:
-            user_text_content += "\n\nCRITICAL: YOU MUST INCLUDE THE FOLLOWING EXTRA CHARACTERS/ASSETS IN THE SCENE:\n" + "\n".join(extras_txt)
+        cast_count = 1  # Start with the main character
+        if character_names:
+            cast_count += len(character_names)
+            
+            # Build explicit name list
+            names_list = ", ".join(character_names)
+            
+            user_text_content += f"\n\n🎬 CRITICAL: This is a {cast_count}-PERSON SCENE with the following characters: {names_list}."
+            user_text_content += f"\n\n⚠️ YOU MUST USE THESE EXACT NAMES in your description. For example:"
+            for name in character_names:
+                user_text_content += f"\n- '{name}, a [description]...' NOT 'a [description]...'"
+            
+            user_text_content += "\n\nCAST LIST (with reference images):\n" + "\n".join(extras_txt)
+            user_text_content += "\n\nDESCRIBE HOW EACH PERSON LOOKS (from their image), how they're positioned, and how they interact. Create a TABLEAU, not a lineup."
 
     if tech_specs: user_text_content += f"\n\nTECHNICAL SPECS:\n{tech_specs}"
-    if character_bio: user_text_content += f"\n\nSTRICT CHARACTER BIO:\n{character_bio}"
-    if additional_notes: user_text_content += f"\n\nUSER NOTES: {additional_notes}"
+    if character_bio: user_text_content += f"\n\nCHARACTER BIO (context only):\n{character_bio}"
+    if additional_notes: user_text_content += f"\n\nADDITIONAL CONTEXT: {additional_notes}"
 
 
     # ================= GEMINI IMPLEMENTATION =================
@@ -190,7 +212,6 @@ def generate_prompt_content(vibe, outfit, character,
             if not google_key: return {"positive_prompt": "Error: GOOGLE_API_KEY missing", "aspect_ratio": "9:16"}
             
             genai.configure(api_key=google_key)
-            # Use the requested engine dynamically (e.g. gemini-1.5-flash)
             model = genai.GenerativeModel(model_engine)
             
             # Prepare Content List
@@ -217,19 +238,19 @@ def generate_prompt_content(vibe, outfit, character,
             if character_is_image:
                 img = load_pil_image(character)
                 if img:
-                    gemini_content.append("IMAGE 1 (CHARACTER):")
+                    gemini_content.append("IMAGE 1 (CHARACTER - IDENTITY LOCK):")
                     gemini_content.append(img)
                 
             if outfit_is_image:
                 img = load_pil_image(outfit_path)
                 if img:
-                    gemini_content.append("IMAGE 2 (OUTFIT):")
+                    gemini_content.append("IMAGE 2 (OUTFIT - EXACT WARDROBE):")
                     gemini_content.append(img)
                 
             if vibe_is_image:
                 img = load_pil_image(vibe_path)
                 if img:
-                    gemini_content.append("IMAGE 3 (VIBE):")
+                    gemini_content.append("IMAGE 3 (LOCATION/VIBE):")
                     gemini_content.append(img)
                 
             # Process Extra Images (Friends, Props, etc.)
@@ -241,10 +262,23 @@ def generate_prompt_content(vibe, outfit, character,
                     if path:
                         img = load_pil_image(path)
                         if img:
-                            gemini_content.append(f"ADDITIONAL REFERENCE ({label}):")
+                            gemini_content.append(f"ADDITIONAL REFERENCE ({label} - DESCRIBE EXACTLY AS SHOWN):")
                             gemini_content.append(img)
                 
-            response = model.generate_content(gemini_content)
+            # RETRY LOGIC FOR 429 (RATE LIMIT)
+            max_retries = 3
+            retry_delay = 2
+            
+            for attempt in range(max_retries):
+                try:
+                    response = model.generate_content(gemini_content)
+                    break 
+                except Exception as e:
+                    if "429" in str(e) and attempt < max_retries - 1:
+                        time.sleep(retry_delay * (attempt + 1))
+                        continue
+                    else:
+                        raise e
             
             # Parse JSON
             raw_text = response.text
@@ -256,53 +290,11 @@ def generate_prompt_content(vibe, outfit, character,
                 end = raw_text.rfind("}") + 1
                 raw_text = raw_text[start:end]
             
-            return json.loads(raw_text)
-
-        except Exception as e:
-            return {"positive_prompt": f"Gemini Error: {str(e)}", "aspect_ratio": "9:16"}
-
-    # ================= GPT-4o IMPLEMENTATION (Default) =================
-    try:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key: raise ValueError("OPENAI_API_KEY missing")
-        client = OpenAI(api_key=api_key)
-        
-        # Build GPT Messages
-        user_message_content = [{"type": "text", "text": user_text_content}]
-        
-        if character_is_image:
-            user_message_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encode_image(character)}"}})
-        if outfit_is_image:
-            user_message_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encode_image(outfit_path)}"}})
-        if vibe_is_image:
-            user_message_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encode_image(vibe_path)}"}})
-
-        # Process Extra Images
-        if extra_images:
-            for img_obj in extra_images:
-                path = img_obj.get("path")
-                label = img_obj.get("label", "Reference")
-                if path and os.path.exists(path):
-                    user_message_content.append({"type": "text", "text": f"ADDITIONAL REFERENCE ({label}):"})
-                    user_message_content.append({"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{encode_image(path)}"}})
-
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message_content}
-        ]
-
-        response = client.chat.completions.create(
-            model="gpt-4o", 
-            messages=messages,
-            response_format={"type": "json_object"}
-        )
-        
-        content = response.choices[0].message.content
-        if not content:
-            refusal = getattr(response.choices[0].message, 'refusal', None)
-            raise ValueError(f"GPT-4o returned empty content. Refusal: {refusal}")
+            result = json.loads(raw_text)
+            return result
             
-        return json.loads(content)
-        
-    except Exception as e:
-        return {"positive_prompt": f"GPT-4o Error: {str(e)}", "aspect_ratio": "9:16"}
+        except Exception as e:
+            print(f"Gemini Error: {e}")
+            return {"positive_prompt": f"Error generating prompt: {e}", "aspect_ratio": aspect_ratio}
+    
+    return {"positive_prompt": "Unknown model engine", "aspect_ratio": aspect_ratio}

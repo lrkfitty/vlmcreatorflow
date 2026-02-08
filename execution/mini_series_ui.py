@@ -4,195 +4,140 @@ import os
 import json
 from execution.magic_ui import card_begin, card_end
 from execution.character_utils import build_character_prompt
-from execution.generate_image import generate_image_from_prompt, parse_script_to_scenes
+from execution.generate_image import generate_image_from_prompt
+from execution.series_processor import parse_script_to_scenes
 from execution.load_assets import get_assets_by_category
 from execution.kling_client import KlingClient
 from execution.sora_client import SoraClient
 from execution.s3_uploader import upload_file_obj
 
+
+def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_base, auth_mgr, get_user_out_dir_func, campaign_mgr=None):
     # --- STEP 4: PRODUCTION ---
     st.markdown("---")
-    if st.button("🚀 Produce Episode (Batch Render)", type="primary"):
+    st.markdown("---")
+    # Queue Button
+    if st.button("🚀 Add Episode to Campaign Queue", type="primary", help="Add all shots to the Campaign Manager for background processing."):
         if not st.session_state.series_storyboard:
             st.error("No storyboard defined.")
+        elif not campaign_mgr:
+            st.error("Campaign Manager not available.")
         else:
-            with st.status("🎬 Production in progress...", expanded=True) as status:
-                st.write("Initializing Batch Queue...")
+            sb = st.session_state.series_storyboard
+            ep_title = sb.get('title', 'Untitled_Ep').replace(" ", "_")
+            series_name = st.session_state.get('series_title', 'My_Series').replace(" ", "_") # Fallback? 
+            # Actually series_title is local var in Step 1. We might need to fetch it or default.
+            # Usually series_title is not in session state explicitly unless we put it there.
+            # We'll rely on the folder structure or just use ep_title.
+            
+            base_out = get_user_out_dir_func("Series")
+            # We'll let campaign runner handle subfolders or specify full path
+            # Campaign runner treats 'output_folder' as the dest.
+            # We want: output/Series/{SeriesName}/{EpTitle}/
+            
+            # Try to grab title from Form if possible, otherwise generic
+            # st.session_state doesn't have series_title easily accessible if inside a form locally.
+            # But the storyboard has it? No, storyboard has title.
+            
+            full_out_dir = os.path.join(base_out, series_name, ep_title)
+            
+            count = 0
+            
+            for scene_idx, scene in enumerate(sb.get('scenes', [])):
+                s_id = scene.get('id', scene_idx+1)
                 
-                # ESTIMATE COST
-                total_shots = len(generated_shots_data)
-                user = st.session_state.current_user.get("username")
-                
-                if not auth_mgr.deduct_credits(user, total_shots):
-                    st.error(f"❌ Insufficient Credits for {total_shots} shots!")
-                else:
-                    # Output Setup
-                    ep_title = st.session_state.series_storyboard.get('title', 'Untitled_Ep').replace(" ", "_")
-                    base_out = os.path.join(get_user_out_dir_func("Series"), series_title.replace(" ", "_"), ep_title)
-                    os.makedirs(base_out, exist_ok=True)
+                for shot_idx, shot in enumerate(scene.get('shots', [])):
+                    sh_id = shot_idx + 1
                     
-                # Parallel Execution Setup
-                from concurrent.futures import ThreadPoolExecutor, as_completed
-                
-                # 1. PRE-CALCULATE PAYLOADS (Fix for Missing Assets)
-                shot_tasks = []
-                
-                for shot_data in generated_shots_data:
-                    s_id = shot_data['scene_id']
-                    sh_id = shot_data['shot_id']
-                    p_text = shot_data['prompt']
-                    m_type = shot_data['type']
-                    
-                    # SAFETY GUARD: Ensure Prompt Exists
-                    if not p_text or len(str(p_text).strip()) < 5:
-                         p_text = f"Cinematic shot of scene {s_id} shot {sh_id}, high quality, 8k"
-
-                    # V3.8: Inject Time of Day & Transition
-                    t_day = shot_data.get('time_of_day', 'Day')
-                    t_trans = shot_data.get('transition', 'None')
-                    t_text = f"Visual Transition Style: {t_trans}. " if t_trans and t_trans != "None" else ""
-                    
-                    final_prompt = f"Time of Day: {t_day}. {t_text}{p_text}"
-                    
-                    # ROBUST ASSET LOOKUP
+                    # 1. Resolve Assets
                     assets_payload = []
                     
-                    # A. Environment
-                    target_env = shot_data['environment']
-                    # Use existing data maps from outer scope
-                    env_path = vibes_data.get(target_env) or assets.get('locations', {}).get(target_env)
+                    # Location
+                    start_env = scene.get('location', '') # Or get from shot?
+                    # The shot might have specific env logic (B-Roll vs Main)
+                    # We can reuse the logic: Main vs B-Roll
+                    # But for now, let's trust the 'location' key or user selection if we had it.
+                    # Simplified: Use the scene location name as key
+                    
+                    # Resolve Environment Path
+                    # In main UI we allow overriding per shot? 
+                    # The previous code logic:
+                    # target_env = shot_data['environment']
+                    # We need to resolve 'target_env'.
+                    # Let's assume the scene location text matches a key in vibes/locations?
+                    # Or use the lookup.
+                    
+                    env_name = scene.get('location', 'Unknown')
+                    # Try to find path
+                    env_path = vibes_data.get(env_name) or assets.get('locations', {}).get(env_name)
                     if isinstance(env_path, dict): env_path = env_path.get('default_img')
+                    
                     if env_path:
-                        assets_payload.append({ "path": env_path, "label": f"Location: {target_env}" })
-
-                    # B. Characters & Outfits
-                    char_names = shot_data.get('characters', [])
-                    for c_name in char_names:
-                        # Clean Key
+                        assets_payload.append({"path": env_path, "label": f"Location: {env_name}"})
+                        
+                    # Characters
+                    shot_chars = shot.get('characters', [])
+                    for c_name in shot_chars:
+                        # Lookup
                         c_key = c_name.strip().split(' ')[0]
-                        asset_path = st.session_state.cast_lookup_map.get(c_key)
+                        c_path = st.session_state.cast_lookup_map.get(c_key)
                         
-                        # Fallback for complex keys
-                        if not asset_path and '_' in c_name:
-                             norm_key = c_name.replace('_', ' ').strip().split(' ')[0]
-                             fallback_path = st.session_state.cast_lookup_map.get(norm_key)
-                             if fallback_path: asset_path = fallback_path
+                        # Fallback lookup
+                        if not c_path:
+                             # Try full name in map
+                             for k, v in st.session_state.cast_lookup_map.items():
+                                 if k in c_name: 
+                                     c_path = v
+                                     break
                         
-                        if asset_path:
-                             assets_payload.append({ "path": asset_path, "label": f"Cast: {c_name}" })
-                             
-                             # Outfit Lookup (Snapshot)
-                             w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                             outfit_name = w_snapshot.get(c_name)
-                             # Fallback to key
-                             if not outfit_name: outfit_name = w_snapshot.get(c_key, "Default")
-                             
-                             if outfit_name and outfit_name != "Default":
-                                 o_path = outfits_data.get(outfit_name)
-                                 if isinstance(o_path, dict): o_path = o_path.get('default_img')
-                                 if o_path:
-                                     assets_payload.append({ "path": o_path, "label": f"Outfit: {outfit_name}" })
+                        if c_path:
+                            assets_payload.append({"path": c_path, "label": f"Cast: {c_name}"})
+                            
+                            # Outfit
+                            w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                            # Try simple key then full
+                            outfit_name = w_snapshot.get(c_key) or w_snapshot.get(c_name, "Default")
+                            
+                            if outfit_name and outfit_name != "Default":
+                                o_path = outfits_data.get(outfit_name)
+                                if isinstance(o_path, dict): o_path = o_path.get('default_img')
+                                if o_path:
+                                    # Use "Outfit for {character}" format for explicit pairing
+                                    assets_payload.append({"path": o_path, "label": f"Outfit for {c_name}"})
 
-                    # Store Task Data
-                    shot_tasks.append({
-                        "id": f"{s_id}-{sh_id}",
-                        "scene_id": s_id,
-                        "shot_id": sh_id,
-                        "prompt": final_prompt,
-                        "assets": assets_payload,
-                        "type": m_type,
-                        "out_dir": base_out
-                    })
-
-                # 2. EXECUTE PARALLEL BATCH
-                total_shots = len(shot_tasks)
-                completed = 0
-                max_workers = 3 # Speed Limit
-                
-                prog_bar = st.progress(0.0)
-                status_text = st.empty()
-                
-                results_map = {}
-
-                with ThreadPoolExecutor(max_workers=max_workers) as executor:
-                    # Map Future -> Task Data
-                    future_to_task = {}
-                    for task in shot_tasks:
-                        # Construct P_Data
-                        p_data = {
-                             "positive_prompt": task['prompt'],
-                             "negative_prompt": "blurry, low quality, distortion, ugly face",
-                             "width": 1024, "height": 576,
-                             "num_images": 1,
-                             "guidance_scale": 7.5,
-                             "model_type": "nano", 
-                             "assets": task['assets'] 
-                        }
-                        
-                        # Submit
-                        future = executor.submit(generate_image_from_prompt, p_data, task['out_dir'])
-                        future_to_task[future] = task
+                    # Prompt Construction
+                    p_text = shot.get('visual_prompt', '')
+                    t_day = shot.get('time_of_day', 'Day')
+                    t_trans = shot.get('transition', 'None')
+                    t_text = f"Visual Transition Style: {t_trans}. " if t_trans and t_trans != "None" else ""
+                    final_prompt = f"Time of Day: {t_day}. {t_text}{p_text}"
                     
-                    # Process as they complete
-                    for future in as_completed(future_to_task):
-                        task = future_to_task[future]
-                        t_id = task['id']
-                        
-                        try:
-                            res = future.result()
-                            if res and res.get('status') == 'success':
-                                results_map[t_id] = res['image_path']
-                                status_text.write(f"✅ Generated Shot {t_id}")
-                            else:
-                                status_text.error(f"❌ Failed Shot {t_id}")
-                        except Exception as e:
-                            status_text.error(f"⚠️ Error Shot {t_id}: {e}")
-                        
-                        completed += 1
-                        prog_bar.progress(completed / total_shots)
-
-                # 3. RENDER RESULTS & KICKOFF VIDEO (Sequential Video for Safety)
-                st.markdown("### 🎞️ Batch Results")
-                
-                # Sort by Scene/Shot order? The loop for display handles it
-                for shot_data in generated_shots_data:
-                    s_id = shot_data['scene_id']
-                    sh_id = shot_data['shot_id']
-                    key = f"{s_id}-{sh_id}"
-                    m_type = shot_data['type']
-                    p_text = shot_data['prompt'] # Use original text for video prompt
+                    # Add Job
+                    job_name = f"Ep{ep_title}_S{s_id}_Sh{sh_id}"
                     
-                    img_path = results_map.get(key)
-                    
-                    if img_path:
-                        st.image(img_path, caption=f"Scene {s_id} Shot {sh_id}")
-                        
-                        # Video Logic (Sequential to avoid massive API hammer on Kling/Sora)
-                        if m_type in ["Kling Video", "Sora 2 Video"]:
-                             st.caption(f"Generating Video ({m_type})...")
-                             # ... Video logic preserved ...
-                             # For now, let's keep video sequential or just notify user to run video separately
-                             # Re-implementing simplified video call here:
-                             try:
-                                 if m_type == "Kling Video":
-                                      k_client = KlingClient()
-                                      with open(img_path, "rb") as f:
-                                          s3_url = upload_file_obj(f, object_name=f"series_assets/{ep_title}/{key}.png")
-                                      if s3_url:
-                                          k_client.create_video_from_image(s3_url, p_text)
-                                          st.success(f"Video queued for {key}")
-                                          
-                                 elif m_type == "Sora 2 Video":
-                                      s_client = SoraClient()
-                                      with open(img_path, "rb") as f:
-                                          s3_url = upload_file_obj(f, object_name=f"series_assets/{ep_title}/{key}.png")
-                                      if s3_url:
-                                          v_url = s_client.create_video_from_image(s3_url, p_text)
-                                          if isinstance(v_url, str): st.video(v_url)
-                             except Exception as e:
-                                 st.error(f"Video Error {key}: {e}")
-
-                status.update(label="Episode Production Complete!", state="complete")
+                    campaign_mgr.add_job(
+                        name=job_name,
+                        description=f"Scene {s_id} Shot {sh_id}",
+                        prompt_data={
+                            "positive_prompt": final_prompt,
+                            "negative_prompt": "blurry, low quality, distortion, ugly face",
+                            "width": 1024, "height": 576, # 16:9 Cinematic
+                            "num_images": 1,
+                            "guidance_scale": 7.5,
+                            "model_type": "nano",
+                            "assets": assets_payload
+                        },
+                        settings={"batch_count": 1},
+                        output_folder=full_out_dir,
+                        # Pass paths technically redundant if in 'assets' payload but good for reference
+                        char_path=None, 
+                        outfit_path=None, 
+                        vibe_path=None
+                    )
+                    count += 1
+            
+            st.success(f"✅ Added {count} Shots to Campaign Queue!")
+            st.caption("Go to 'Campaign Queue' tab to run them.")
     """
     Renders the Mini Series Studio UI.
     """
@@ -252,10 +197,14 @@ from execution.s3_uploader import upload_file_obj
 
                     # Show Thumbnail
                     with c_img:
-                        if c_path and (os.path.exists(c_path) or c_path.startswith("http")):
-                            st.image(c_path, use_container_width=True)
+                        if c_path:
+                            try:
+                                st.image(c_path, use_container_width=True)
+                            except Exception as e:
+                                st.warning("Image Error")
+                                st.caption(f"{e}")
                         else:
-                             st.warning("No IMG")
+                             st.warning("No IMG Data")
 
                     with c_info:
                         st.write(f"**{member.split('/')[-1]}**")
@@ -605,7 +554,9 @@ from execution.s3_uploader import upload_file_obj
                                                 if o_key != "Default":
                                                     o_path = outfits_data.get(o_key)
                                                     if isinstance(o_path, dict): o_path = o_path.get('default_img')
-                                                    if o_path: final_assets_payload.append({"path": o_path, "label": f"Outfit: {o_key}"})
+                                                    if o_path: 
+                                                        # Use "Outfit for {character}" format for explicit pairing
+                                                        final_assets_payload.append({"path": o_path, "label": f"Outfit for {raw_name}"})
 
                                         # Location
                                         target_env = sec_env if is_broll and sec_env != "None" else series_env

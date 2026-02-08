@@ -4,10 +4,10 @@ import json
 from dotenv import load_dotenv
 
 load_dotenv()
-api_key = os.getenv("GOOGLE_API_KEY")
+api_key = os.getenv("GOOGLE_IMAGE_KEY")
 
 def test_model():
-    model_name = 'nano-banana-pro-preview'
+    model_name = 'gemini-2.0-flash-exp-image-generation' # Potential Level 2?
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
     
     headers = {"Content-Type": "application/json"}
