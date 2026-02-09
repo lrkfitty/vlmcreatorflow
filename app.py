@@ -1613,18 +1613,27 @@ Vibe: {current_selections.get('VIBE', 'neutral')}"""
                 camera_str = ", ".join(camera_summary) if camera_summary else "natural"
                 
                 # Build Director AI prompt
-                director_prompt = f"""You are a professional scene director for image generation. Create a cohesive, detailed, cinematic prompt that incorporates:
+                director_prompt = f"""You are an expert image generation prompt writer. Your job is to create a SINGLE, DIRECT, CONCISE prompt for photorealistic image generation.
 
 SCENARIO: {scenario['template_prompt']}
 
-ASSETS SELECTED:
+ASSETS TO INCORPORATE:
 {assets_summary}
 
-CAMERA SETTINGS: {camera_str}
+CAMERA/TECHNICAL: {camera_str}
 
 CUSTOM DETAILS: {custom_details or 'none'}
 
-Create a detailed image generation prompt that naturally incorporates ALL these elements into the scenario. Make it feel cohesive, professional, and cinematic. Focus on creating a vivid scene description."""
+CRITICAL INSTRUCTIONS:
+1. Output ONLY a single paragraph prompt - NO markdown, NO sections, NO explanations, NO code blocks
+2. Start with "Photorealistic, hyper-detailed" to ensure quality
+3. Naturally weave ALL assets into the scene description
+4. Include camera settings as part of the description (e.g., "Full body shot", "dramatic lighting")
+5. Make it cinematic and vivid but CONCISE (2-4 sentences maximum)
+6. Focus on visual details: lighting, composition, atmosphere, textures
+7. DO NOT explain or justify - just write the direct prompt
+
+Generate the image prompt now:"""
                 
                 # Call Gemini AI to generate contextualized prompt
                 try:
