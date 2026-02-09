@@ -1585,81 +1585,39 @@ if selection == "World Builder":
             # Check if this is a custom scenario (requires Director AI)
             is_custom_scenario = scenario.get("is_custom", False)
             
+            # Prepare prompt based on scenario type
             if is_custom_scenario:
-                # NEW: Director AI for Custom Scenarios
-                # Build comprehensive asset summary
-                assets_summary = f"""Main Character: {current_selections.get('PROTAGONIST', 'character')}
-Outfit: {current_selections.get('OUTFIT', 'casual outfit')}
-Location: {current_selections.get('LOCATION', 'generic location')}
-Cast/Friends: {current_selections.get('RELATIONS', 'nobody')}
-Props: {current_selections.get('PROPS', 'none')}
-Vibe: {current_selections.get('VIBE', 'neutral')}"""
+                # NEW: Prepare data for custom scenario Director AI (will execute on button click)
+                # Store scenario and settings for Director AI button
+                st.session_state['custom_scenario_data'] = {
+                    'scenario_concept': scenario['template_prompt'],
+                    'current_selections': current_selections,
+                    'rel_names': rel_names,
+                    'pet_names': pet_names,
+                    'prop_names': prop_names,
+                    'camera_settings': {
+                        'shot': sel_shot,
+                        'angle': sel_angle,
+                        'lighting': sel_lighting,
+                        'emotion': sel_emotion,
+                        'action': sel_action,
+                        'film': sel_film,
+                        'filter_look': sel_filter_look
+                    },
+                    'custom_details': custom_details
+                }
                 
-                if rel_names:
-                    assets_summary += f"\nFriend Outfits: {current_selections.get('FRIEND_OUTFITS', 'casual')}"
-                if pet_names:
-                    assets_summary += f"\nPets: {', '.join(pet_names)}"
-                
-                # Build camera settings summary
-                camera_summary = []
-                if sel_shot != "Auto": camera_summary.append(f"Shot: {sel_shot}")
-                if sel_angle != "Auto": camera_summary.append(f"Angle: {sel_angle}")
-                if sel_lighting != "Auto": camera_summary.append(f"Lighting: {sel_lighting}")
-                if sel_emotion != "Auto": camera_summary.append(f"Emotion: {sel_emotion}")
-                if sel_action != "Auto": camera_summary.append(f"Action: {sel_action}")
-                if sel_film != "Auto": camera_summary.append(f"Style: {sel_film}")
-                if sel_filter_look != "Auto": camera_summary.append(f"Look: {sel_filter_look}")
-                
-                camera_str = ", ".join(camera_summary) if camera_summary else "natural"
-                
-                # Build Director AI prompt
-                director_prompt = f"""You are a master cinematic prompt writer for photorealistic image generation. Create a rich, immersive, DETAILED scene description.
-
-SCENARIO CONCEPT: {scenario['template_prompt']}
-
-CHARACTERS & ASSETS:
-{assets_summary}
-
-CAMERA & STYLE: {camera_str}
-
-ADDITIONAL DETAILS: {custom_details or 'none'}
-
-CRITICAL REQUIREMENTS:
-1. Output as a SINGLE flowing paragraph (NO markdown, NO sections, NO code blocks, NO bullet points)
-2. Start with "Photorealistic, hyper-detailed, cinematic"
-3. Create a VIVID, IMMERSIVE scene - paint the picture with rich visual details
-4. Incorporate EVERY asset listed above naturally into the scene
-5. Pay special attention to the "ADDITIONAL DETAILS" - these are user-specified and must be included
-6. Include specific details about:
-   - Character appearances, expressions, and poses
-   - Environment atmosphere, lighting quality, and textures
-   - Spatial relationships between characters and props
-   - Color palette and mood
-   - Camera framing and composition
-7. Make it feel like a professional film scene - atmospheric, dimensional, alive
-8. Length: 4-6 detailed sentences that build a cohesive visual narrative
-9. NO explanations, NO justifications - ONLY the direct image prompt
-
-Write an immersive, detailed prompt now:"""
-                
-                # Call Gemini AI to generate contextualized prompt
-                try:
-                    import google.generativeai as genai
-                    model = genai.GenerativeModel("gemini-2.0-flash")
-                    response = model.generate_content(director_prompt)
-                    final_prompt = response.text.strip()
+                # Build a basic template prompt as fallback
+                final_prompt = f"{scenario['template_prompt']} featuring {current_selections.get('PROTAGONIST', 'character')}"
+                if current_selections.get('LOCATION'):
+                    final_prompt += f" at {current_selections.get('LOCATION')}"
+                if current_selections.get('OUTFIT'):
+                    final_prompt += f" wearing {current_selections.get('OUTFIT')}"
+                if custom_details:
+                    final_prompt += f", {custom_details}"
                     
-                    # Show AI result
-                    st.success("✨ Director AI has contextualized your scene!")
-                    with st.expander("🎬 Generated Prompt", expanded=True):
-                        st.write(final_prompt)
-                        
-                except Exception as e:
-                    st.error(f"Director AI error: {e}")
-                    # Fallback to simple concatenation
-                    final_prompt = f"{scenario['template_prompt']}, {assets_summary.replace(chr(10), ', ')}, {camera_str}"
-                    if custom_details:
-                        final_prompt += f", {custom_details}"
+                st.info("ℹ️ Click 'Director Vision AI' below to generate a detailed, immersive prompt for your custom scenario")
+                
             else:
                 # EXISTING: Pre-built template logic
                 # Instead of generic replacement, we prepare the context for the AI
@@ -1730,62 +1688,151 @@ Write an immersive, detailed prompt now:"""
             
             if run_director:
                 with st.spinner("Director is rewriting scene..."):
-                    # 1. Identify Main Assets & Extras
+                    
+                   # CHECK: Is this a custom scenario?
+                    if is_custom_scenario and 'custom_scenario_data' in st.session_state:
+                        # CUSTOM SCENARIO FLOW - Use new detailed Director AI
+                        custom_data = st.session_state['custom_scenario_data']
+                        
+                        # Build comprehensive asset summary
+                        assets_summary = f"""Main Character: {custom_data['current_selections'].get('PROTAGONIST', 'character')}
+Outfit: {custom_data['current_selections'].get('OUTFIT', 'casual outfit')}
+Location: {custom_data['current_selections'].get('LOCATION', 'generic location')}
+Cast/Friends: {custom_data['current_selections'].get('RELATIONS', 'nobody')}
+Props: {custom_data['current_selections'].get('PROPS', 'none')}
+Vibe: {custom_data['current_selections'].get('VIBE', 'neutral')}"""
+                        
+                        if custom_data['rel_names']:
+                            assets_summary += f"\nFriend Outfits: {custom_data['current_selections'].get('FRIEND_OUTFITS', 'casual')}"
+                        if custom_data['pet_names']:
+                            assets_summary += f"\nPets: {', '.join(custom_data['pet_names'])}"
+                        
+                        # Build camera settings summary
+                        cam_settings = custom_data['camera_settings']
+                        camera_summary = []
+                        if cam_settings['shot'] != "Auto": camera_summary.append(f"Shot: {cam_settings['shot']}")
+                        if cam_settings['angle'] != "Auto": camera_summary.append(f"Angle: {cam_settings['angle']}")
+                        if cam_settings['lighting'] != "Auto": camera_summary.append(f"Lighting: {cam_settings['lighting']}")
+                        if cam_settings['emotion'] != "Auto": camera_summary.append(f"Emotion: {cam_settings['emotion']}")
+                        if cam_settings['action'] != "Auto": camera_summary.append(f"Action: {cam_settings['action']}")
+                        if cam_settings['film'] != "Auto": camera_summary.append(f"Style: {cam_settings['film']}")
+                        if cam_settings['filter_look'] != "Auto": camera_summary.append(f"Look: {cam_settings['filter_look']}")
+                        
+                        camera_str = ", ".join(camera_summary) if camera_summary else "natural"
+                        
+                        # Build Director AI prompt for custom scenario
+                        director_prompt = f"""You are a master cinematic prompt writer for photorealistic image generation. Create a rich, immersive, DETAILED scene description.
 
-                    main_char_path = None
-                    main_outfit_path = None
-                    vibe_p = None
-                    extras_payload = []
-                    
-                    for asset in assets_to_inject:
-                        lbl = asset.get('label', '')
-                        path = asset.get('path')
+SCENARIO CONCEPT: {custom_data['scenario_concept']}
+
+CHARACTERS & ASSETS:
+{assets_summary}
+
+CAMERA & STYLE: {camera_str}
+
+ADDITIONAL DETAILS: {custom_data['custom_details'] or 'none'}
+
+CRITICAL REQUIREMENTS:
+1. Output as a SINGLE flowing paragraph (NO markdown, NO sections, NO code blocks, NO bullet points)
+2. Start with "Photorealistic, hyper-detailed, cinematic"
+3. Create a VIVID, IMMERSIVE scene - paint the picture with rich visual details
+4. Incorporate EVERY asset listed above naturally into the scene
+5. Pay special attention to the "ADDITIONAL DETAILS" - these are user-specified and must be included
+6. Include specific details about:
+   - Character appearances, expressions, and poses
+   - Environment atmosphere, lighting quality, and textures
+   - Spatial relationships between characters and props
+   - Color palette and mood
+   - Camera framing and composition
+7. Make it feel like a professional film scene - atmospheric, dimensional, alive
+8. Length: 4-6 detailed sentences that build a cohesive visual narrative
+9. NO explanations, NO justifications - ONLY the direct image prompt
+
+Write an immersive, detailed prompt now:"""
                         
-                        if "Main Character" in lbl:
-                             main_char_path = path
-                        elif lbl.startswith("Outfit: "): # Exact main outfit label format
-                             main_outfit_path = path
-                        elif lbl == "Location":
-                             vibe_p = path
-                        else:
-                             # Friends, Friend Outfits, Pets, Props
-                             extras_payload.append(asset)
-                    
-                    st.toast(f"Director AI Analyzing: {current_selections.get('PROTAGONIST', 'Character')} + {current_selections.get('OUTFIT', 'Outfit')}... [Cam: {sel_camera}, Act: {sel_action}]")
-                
-                    prompt_engine = "gemini-2.0-flash" # User requested specifically (Free Tier)
-                    # 2. Call Generator with full context
-                    # We treat the current draft as 'additional_notes' context
-                    enhanced_res = generate_prompt_content(
-                        vibe=current_selections.get("VIBE", "luxury"),
-                        outfit=current_selections.get("OUTFIT", "fashion"),
-                        character=main_char_path, # Pass the PATH
-                        outfit_path=main_outfit_path, # Pass the PATH
-                        vibe_path=vibe_p, # Pass Location as Image 3 (Vibe Ref)
-                        extra_images=extras_payload, # Pass Friends & Extras
+                        try:
+                            import google.generativeai as genai
+                            model = genai.GenerativeModel("gemini-2.0-flash")
+                            response = model.generate_content(director_prompt)
+                            generated_prompt = response.text.strip()
+                            
+                            # Remove any markdown artifacts if present
+                            if "```" in generated_prompt:
+                                generated_prompt = generated_prompt.replace("```", "").strip()
+                            
+                            st.session_state['wb_manual_prompt'] = generated_prompt
+                            st.success("✨ Custom Scenario Director AI Complete!")
+                            time.sleep(1)
+                            st.rerun()
+                            
+                        except Exception as e:
+                            st.error(f"Director AI error: {e}")
+                            # Fallback to simple concatenation
+                            fallback = f"{custom_data['scenario_concept']}, {assets_summary.replace(chr(10), ', ')}, {camera_str}"
+                            if custom_data['custom_details']:
+                                fallback += f", {custom_data['custom_details']}"
+                            st.session_state['wb_manual_prompt'] = fallback
+                            st.warning("Used fallback prompt generation")
+                            st.rerun()
+                            
+                    else:
+                        # PRE-BUILT TEMPLATE FLOW - Use existing visual reference Director AI
+                        # 1. Identify Main Assets & Extras
+
+                        main_char_path = None
+                        main_outfit_path = None
+                        vibe_p = None
+                        extras_payload = []
                         
-                        # Pass Technical Specs Explicitly
-                        camera=(sel_camera if sel_camera != "Auto" else None),
-                        lens=(sel_lens if sel_lens != "Auto" else None),
-                        shot_type=(sel_shot if sel_shot != "Auto" else None),
-                        angle=(sel_angle if sel_angle != "Auto" else None),
-                        lighting=(sel_lighting if sel_lighting != "Auto" else None),
-                        action=(sel_action if sel_action != "Auto" else None),
-                        emotion=(sel_emotion if sel_emotion != "Auto" else None),
-                        film_stock=(sel_film_stock if sel_film_stock != "Auto" else None),
-                        filter_look=(sel_filter_look if sel_filter_look != "Auto" else None),
+                        for asset in assets_to_inject:
+                            lbl = asset.get('label', '')
+                            path = asset.get('path')
+                            
+                            if "Main Character" in lbl:
+                                 main_char_path = path
+                            elif lbl.startswith("Outfit: "): # Exact main outfit label format
+                                 main_outfit_path = path
+                            elif lbl == "Location":
+                                 vibe_p = path
+                            else:
+                                 # Friends, Friend Outfits, Pets, Props
+                                 extras_payload.append(asset)
                         
-                        additional_notes=f"CREATIVE BRIEF: The atmosphere is {current_selections.get('VIBE', 'General')}. Overall style: {sel_film}. CREATE A FRESH, HOLLYWOOD-LEVEL SCENE DESCRIPTION from the visual references and cast list. Do not copy template text.",
-                        model_engine=prompt_engine # Use currently selected brain (Gemini 2.0)
-                    )
+                        st.toast(f"Director AI Analyzing: {current_selections.get('PROTAGONIST', 'Character')} + {current_selections.get('OUTFIT', 'Outfit')}... [Cam: {sel_camera}, Act: {sel_action}]")
                     
-                    if enhanced_res and "positive_prompt" in enhanced_res:
-                        # final_prompt = enhanced_res["positive_prompt"] <--- REMOVED to prevent conflict with change detector
-                        st.session_state['wb_manual_prompt'] = enhanced_res["positive_prompt"]
-                        # Draft state remains unchanged, so the box won't auto-revert
-                        st.success("🎬 Director Cut Generated! (See Box Below)")
-                        time.sleep(1) # Pause to let user see
-                        st.rerun()
+                        prompt_engine = "gemini-2.0-flash" # User requested specifically (Free Tier)
+                        # 2. Call Generator with full context
+                        # We treat the current draft as 'additional_notes' context
+                        enhanced_res = generate_prompt_content(
+                            vibe=current_selections.get("VIBE", "luxury"),
+                            outfit=current_selections.get("OUTFIT", "fashion"),
+                            character=main_char_path, # Pass the PATH
+                            outfit_path=main_outfit_path, # Pass the PATH
+                            vibe_path=vibe_p, # Pass Location as Image 3 (Vibe Ref)
+                            extra_images=extras_payload, # Pass Friends & Extras
+                            
+                            # Pass Technical Specs Explicitly
+                            camera=(sel_camera if sel_camera != "Auto" else None),
+                            lens=(sel_lens if sel_lens != "Auto" else None),
+                            shot_type=(sel_shot if sel_shot != "Auto" else None),
+                            angle=(sel_angle if sel_angle != "Auto" else None),
+                            lighting=(sel_lighting if sel_lighting != "Auto" else None),
+                            action=(sel_action if sel_action != "Auto" else None),
+                            emotion=(sel_emotion if sel_emotion != "Auto" else None),
+                            film_stock=(sel_film_stock if sel_film_stock != "Auto" else None),
+                            filter_look=(sel_filter_look if sel_filter_look != "Auto" else None),
+                            
+                            additional_notes=f"CREATIVE BRIEF: The atmosphere is {current_selections.get('VIBE', 'General')}. Overall style: {sel_film}. CREATE A FRESH, HOLLYWOOD-LEVEL SCENE DESCRIPTION from the visual references and cast list. Do not copy template text.",
+                            model_engine=prompt_engine # Use currently selected brain (Gemini 2.0)
+                        )
+                        
+                        if enhanced_res and "positive_prompt" in enhanced_res:
+                            # final_prompt = enhanced_res["positive_prompt"] <--- REMOVED to prevent conflict with change detector
+                            st.session_state['wb_manual_prompt'] = enhanced_res["positive_prompt"]
+                            # Draft state remains unchanged, so the box won't auto-revert
+                            st.success("🎬 Director Cut Generated! (See Box Below)")
+                            time.sleep(1) # Pause to let user see
+                            st.rerun()
     
             # --- STATE MANAGEMENT FOR PROMPT BOX ---
             # We need the box to update when:
