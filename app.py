@@ -1585,6 +1585,9 @@ if selection == "World Builder":
             # Check if this is a custom scenario (requires Director AI)
             is_custom_scenario = scenario.get("is_custom", False)
             
+            # CRITICAL: Store flag in session state so it persists on button click
+            st.session_state['is_custom_scenario'] = is_custom_scenario
+            
             # Prepare prompt based on scenario type
             if is_custom_scenario:
                 # NEW: Prepare data for custom scenario Director AI (will execute on button click)
@@ -1689,8 +1692,10 @@ if selection == "World Builder":
             if run_director:
                 with st.spinner("Director is rewriting scene..."):
                     
-                   # CHECK: Is this a custom scenario?
-                    if is_custom_scenario and 'custom_scenario_data' in st.session_state:
+                   # CHECK: Is this a custom scenario? (Use session state flag)
+                    use_custom_flow = st.session_state.get('is_custom_scenario', False) and 'custom_scenario_data' in st.session_state
+                    
+                    if use_custom_flow:
                         # CUSTOM SCENARIO FLOW - Use new detailed Director AI
                         custom_data = st.session_state['custom_scenario_data']
                         
