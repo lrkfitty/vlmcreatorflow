@@ -1275,6 +1275,10 @@ if selection == "World Builder":
             }
             selected_scenario_key = "custom_scenario"
             
+            # CRITICAL: Store these IMMEDIATELY so form can access them
+            st.session_state['wb_current_scenario'] = scenario
+            st.session_state['wb_selected_scenario_key'] = selected_scenario_key
+            
             # Save as template if requested
             if save_as_template and custom_scenario_name and custom_scenario_desc:
                 try:
@@ -1583,6 +1587,9 @@ if selection == "World Builder":
             custom_details = st.text_area("Specific Details / Custom Context", placeholder="e.g. Holding a red cup, Laughing uniquely, Cyberpunk neon colors...", help="These details will be added to the prompt.")
     
             # --- PROMPT GENERATION LOGIC UPDATE ---
+            # CRITICAL: Get scenario from session state (widgets outside form don't persist)
+            scenario = st.session_state.get('wb_current_scenario', scenario)
+            
             # Check if this is a custom scenario (requires Director AI)
             is_custom_scenario = scenario.get("is_custom", False)
             
