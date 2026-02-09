@@ -832,6 +832,22 @@ if selection == "Workflow Wizard":
             with col_count:
                 num_images = st.slider("Generate Count", 1, 4, 1, key="wiz_test_count")
     
+            # CRITICAL: Store all form values in session state for Director AI button (outside form)
+            st.session_state['wiz_sel_camera'] = sel_camera
+            st.session_state['wiz_sel_lens'] = sel_lens
+            st.session_state['wiz_sel_shot'] = sel_shot
+            st.session_state['wiz_sel_angle'] = sel_angle
+            st.session_state['wiz_sel_ar'] = sel_ar
+            st.session_state['wiz_sel_style'] = sel_style
+            st.session_state['wiz_sel_lighting'] = sel_lighting
+            st.session_state['wiz_sel_weather'] = sel_weather
+            st.session_state['wiz_sel_film'] = sel_film
+            st.session_state['wiz_sel_action'] = sel_action
+            st.session_state['wiz_sel_emotion'] = sel_emotion
+            st.session_state['wiz_sel_filter'] = sel_filter
+            st.session_state['wiz_custom_scenario'] = custom_scenario
+            st.session_state['wiz_custom_notes'] = custom_notes
+    
             # --- CAMPAIGN BUTTON ---
             col_c_btn, col_c_batch = st.columns([3, 1])
             with col_c_batch:
@@ -912,6 +928,22 @@ if selection == "Workflow Wizard":
                 s_char = st.session_state.get("wiz_char")
                 s_outfit = st.session_state.get("wiz_outfit")
                 s_vibe = st.session_state.get("wiz_vibe")
+                
+                # Get camera/scene settings from session state (stored in form)
+                sel_camera = st.session_state.get('wiz_sel_camera', 'Auto')
+                sel_lens = st.session_state.get('wiz_sel_lens', 'Auto')
+                sel_shot = st.session_state.get('wiz_sel_shot', 'Auto')
+                sel_angle = st.session_state.get('wiz_sel_angle', 'Auto')
+                sel_ar = st.session_state.get('wiz_sel_ar', 'Auto')
+                sel_style = st.session_state.get('wiz_sel_style', 'Auto')
+                sel_lighting = st.session_state.get('wiz_sel_lighting', 'Auto')
+                sel_weather = st.session_state.get('wiz_sel_weather', 'Auto')
+                sel_film = st.session_state.get('wiz_sel_film', 'Auto')
+                sel_action = st.session_state.get('wiz_sel_action', 'Auto')
+                sel_emotion = st.session_state.get('wiz_sel_emotion', 'Auto')
+                sel_filter = st.session_state.get('wiz_sel_filter', 'Auto')
+                custom_scenario = st.session_state.get('wiz_custom_scenario', '')
+                custom_notes = st.session_state.get('wiz_custom_notes', '')
 
                 # Get path for Vision
                 char_path = characters_data.get(s_char, s_char)
