@@ -205,7 +205,8 @@ with st.sidebar:
             st.rerun()
 
         if st.button("Logout"):
-            cookie_manager.delete("auth_token")
+            # Clear cookie by setting it with past expiration
+            cookie_manager.set("auth_token", "", expires_at=datetime.datetime.now() - datetime.timedelta(days=1))
             # Fully clear session state to preventing lingering variables
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
