@@ -1213,26 +1213,84 @@ if selection == "World Builder":
         st.error(f"Failed to import storyboard utils: {e}")
         def generate_storyboard_prompts(s, c, m): return [f"Error: {e}"]
 
-    # 1. Select Scenario
+    # 1. Scenario Mode Selection
     with st.container():
         card_begin()
         st.markdown("#### Scenario Director")
         
-        # Sort by Category then Name
-        scenario_keys = sorted(
-            list(scenarios.keys()),
-            key=lambda k: (scenarios[k].get('category', 'Uncategorized'), scenarios[k].get('name', ''))
+        # Mode Toggle
+        scenario_mode = st.radio(
+            "Scenario Mode",
+            ["📚 Pre-built Templates", "✏️ Custom Scenario"],
+            horizontal=True,
+            help="Choose a pre-built scenario template or create your own custom scene"
         )
         
-        selected_scenario_key = st.selectbox(
-            "Select Scenario Template", 
-            scenario_keys, 
-            format_func=lambda x: f"[{scenarios[x].get('category', 'General').upper()}] {scenarios[x]['name']}"
-        )
+        if scenario_mode == "📚 Pre-built Templates":
+            # Existing pre-built scenario logic
+            # Sort by Category then Name
+            scenario_keys = sorted(
+                list(scenarios.keys()),
+                key=lambda k: (scenarios[k].get('category', 'Uncategorized'), scenarios[k].get('name', ''))
+            )
+            
+            selected_scenario_key = st.selectbox(
+                "Select Scenario Template", 
+                scenario_keys, 
+                format_func=lambda x: f"[{scenarios[x].get('category', 'General').upper()}] {scenarios[x]['name']}"
+            )
+            
+            if selected_scenario_key:
+                scenario = scenarios[selected_scenario_key]
+                st.caption(f"💡 Template: {scenario['template_prompt']}")
+        else:
+            # NEW: Custom Scenario Builder
+            st.markdown("##### Create Your Own Scene")
+            
+            custom_scenario_name = st.text_input(
+                "Scenario Name (Optional)", 
+                placeholder="e.g., Girls' Night Out, Birthday Celebration, Beach Day..."
+            )
+            
+            custom_scenario_desc = st.text_area(
+                "Describe Your Scene",
+                placeholder="Describe the scene you want to create. The Director AI will automatically incorporate all your selected assets (characters, outfits, locations, props, etc.) into this scene description.\n\nExample: 'A fun photoshoot at the beach during golden hour' or 'Celebrating a friend's birthday at a rooftop restaurant'",
+                height=120,
+                help="The Director AI will contextualize all your selected assets into this scenario"
+            )
+            
+            save_as_template = st.checkbox(
+                "💾 Save as template for future use",
+                help="This will add your custom scenario to the pre-built templates"
+            )
+            
+            
+            # Create a mock scenario object for downstream logic
+            scenario = {
+                "name": custom_scenario_name or "Custom Scene",
+                "category": "custom",
+                "template_prompt": custom_scenario_desc or "Custom scene with selected assets",
+                "is_custom": True  # Flag to trigger Director AI
+            }
+            selected_scenario_key = "custom_scenario"
+            
+            # Save as template if requested
+            if save_as_template and custom_scenario_name and custom_scenario_desc:
+                try:
+                    from world_manager import add_asset
+                    scenario_key = custom_scenario_name.lower().replace(" ", "_")
+                    add_asset("scenarios", scenario_key, {
+                        "name": custom_scenario_name,
+                        "category": "custom",
+                        "template_prompt": custom_scenario_desc
+                    })
+                    st.success(f"✅ Saved '{custom_scenario_name}' as a template! It will appear in pre-built templates after refresh.")
+                except Exception as e:
+                    st.error(f"Failed to save template: {e}")
+            
+            if custom_scenario_desc:
+                st.caption(f"✨ Your scene: {custom_scenario_desc[:100]}{'...' if len(custom_scenario_desc) > 100 else ''}")
         
-        if selected_scenario_key:
-            scenario = scenarios[selected_scenario_key]
-            st.caption(f"Template: {scenario['template_prompt']}")
         card_end()
     
     if selected_scenario_key:
@@ -1524,63 +1582,128 @@ if selection == "World Builder":
             custom_details = st.text_area("Specific Details / Custom Context", placeholder="e.g. Holding a red cup, Laughing uniquely, Cyberpunk neon colors...", help="These details will be added to the prompt.")
     
             # --- PROMPT GENERATION LOGIC UPDATE ---
-            # Instead of generic replacement, we prepare the context for the AI
-            base_template = scenario['template_prompt']
-            for k, v in current_selections.items():
-                base_template = base_template.replace(f"[{k}]", v)
+            # Check if this is a custom scenario (requires Director AI)
+            is_custom_scenario = scenario.get("is_custom", False)
+            
+            if is_custom_scenario:
+                # NEW: Director AI for Custom Scenarios
+                # Build comprehensive asset summary
+                assets_summary = f"""Main Character: {current_selections.get('PROTAGONIST', 'character')}
+Outfit: {current_selections.get('OUTFIT', 'casual outfit')}
+Location: {current_selections.get('LOCATION', 'generic location')}
+Cast/Friends: {current_selections.get('RELATIONS', 'nobody')}
+Props: {current_selections.get('PROPS', 'none')}
+Vibe: {current_selections.get('VIBE', 'neutral')}"""
                 
-            extras = rel_names + pet_names + prop_names
-            extras_str = ", ".join(extras) if extras else "background details"
-            base_template = base_template.replace("[PROPS_AND_CAST]", extras_str)
-            
-            # We pass this 'base_template' as the "Scenario Context" to the generator
-            custom_scenario = base_template # Renaming for clarity in next step pass
-            
-            # st.info(f"**Base Context:** {custom_scenario[:100]}...") # Hidden inside form to reduce clutter
-            
-            final_prompt = custom_scenario # Start with the base scenario
-            final_prompt = final_prompt.replace("[RELATION]", current_selections.get("RELATIONS", "friend"))
-            final_prompt = final_prompt.replace("[OUTFIT]", current_selections.get("OUTFIT", "casual outfit"))
-    
-            # Append Custom Details
-            if custom_details:
-                final_prompt += f", {custom_details}"
-    
-            # Append Friend Outfits
-            if "FRIEND_OUTFITS" in current_selections:
-                 final_prompt += f", {current_selections['FRIEND_OUTFITS']}"
-    
-            # Append Camera Settings
-            cam_details = []
-            if sel_camera != "Auto": cam_details.append(f"shot on {sel_camera}")
-            if sel_lens != "Auto": cam_details.append(f"{sel_lens} lens")
-            if sel_shot != "Auto": cam_details.append(sel_shot) # Restored Logic
-            # sel_shot removed in favor of AR + Angle <-- REMOVING THIS COMMENT
-            if sel_lighting != "Auto": cam_details.append(f"{sel_lighting} lighting")
-            if sel_angle != "Auto": cam_details.append(f"{sel_angle} angle")
-            if sel_film != "Auto": cam_details.append(f"{sel_film} style")
-            if sel_film_stock != "Auto": cam_details.append(f"Film Stock: {sel_film_stock}")
-            if sel_filter_look != "Auto": cam_details.append(f"Look: {sel_filter_look}")
-            
-            # New Logic
-            if sel_emotion != "Auto": cam_details.append(f"Expression: {sel_emotion}")
-            if sel_action != "Auto": cam_details.append(f"Action: {sel_action}")
-            
-            if cam_details:
-                final_prompt += ", " + ", ".join(cam_details)
+                if rel_names:
+                    assets_summary += f"\nFriend Outfits: {current_selections.get('FRIEND_OUTFITS', 'casual')}"
+                if pet_names:
+                    assets_summary += f"\nPets: {', '.join(pet_names)}"
                 
-            # Fallback for Protagonist if replacement failed (e.g. key mismatch)
-            if "[PROTAGONIST]" in final_prompt:
-                 # Try to find it again or default
-                 p_name = current_selections.get("PROTAGONIST", "The Influencer")
-                 final_prompt = final_prompt.replace("[PROTAGONIST]", p_name)
+                # Build camera settings summary
+                camera_summary = []
+                if sel_shot != "Auto": camera_summary.append(f"Shot: {sel_shot}")
+                if sel_angle != "Auto": camera_summary.append(f"Angle: {sel_angle}")
+                if sel_lighting != "Auto": camera_summary.append(f"Lighting: {sel_lighting}")
+                if sel_emotion != "Auto": camera_summary.append(f"Emotion: {sel_emotion}")
+                if sel_action != "Auto": camera_summary.append(f"Action: {sel_action}")
+                if sel_film != "Auto": camera_summary.append(f"Style: {sel_film}")
+                if sel_filter_look != "Auto": camera_summary.append(f"Look: {sel_filter_look}")
+                
+                camera_str = ", ".join(camera_summary) if camera_summary else "natural"
+                
+                # Build Director AI prompt
+                director_prompt = f"""You are a professional scene director for image generation. Create a cohesive, detailed, cinematic prompt that incorporates:
+
+SCENARIO: {scenario['template_prompt']}
+
+ASSETS SELECTED:
+{assets_summary}
+
+CAMERA SETTINGS: {camera_str}
+
+CUSTOM DETAILS: {custom_details or 'none'}
+
+Create a detailed image generation prompt that naturally incorporates ALL these elements into the scenario. Make it feel cohesive, professional, and cinematic. Focus on creating a vivid scene description."""
+                
+                # Call Gemini AI to generate contextualized prompt
+                try:
+                    import google.generativeai as genai
+                    model = genai.GenerativeModel("gemini-2.0-flash")
+                    response = model.generate_content(director_prompt)
+                    final_prompt = response.text.strip()
+                    
+                    # Show AI result
+                    st.success("✨ Director AI has contextualized your scene!")
+                    with st.expander("🎬 Generated Prompt", expanded=True):
+                        st.write(final_prompt)
+                        
+                except Exception as e:
+                    st.error(f"Director AI error: {e}")
+                    # Fallback to simple concatenation
+                    final_prompt = f"{scenario['template_prompt']}, {assets_summary.replace(chr(10), ', ')}, {camera_str}"
+                    if custom_details:
+                        final_prompt += f", {custom_details}"
+            else:
+                # EXISTING: Pre-built template logic
+                # Instead of generic replacement, we prepare the context for the AI
+                base_template = scenario['template_prompt']
+                for k, v in current_selections.items():
+                    base_template = base_template.replace(f"[{k}]", v)
+                    
+                extras = rel_names + pet_names + prop_names
+                extras_str = ", ".join(extras) if extras else "background details"
+                base_template = base_template.replace("[PROPS_AND_CAST]", extras_str)
+                
+                # We pass this 'base_template' as the "Scenario Context" to the generator
+                custom_scenario = base_template # Renaming for clarity in next step pass
+                
+                # st.info(f"**Base Context:** {custom_scenario[:100]}...") # Hidden inside form to reduce clutter
+                
+                final_prompt = custom_scenario # Start with the base scenario
+                final_prompt = final_prompt.replace("[RELATION]", current_selections.get("RELATIONS", "friend"))
+                final_prompt = final_prompt.replace("[OUTFIT]", current_selections.get("OUTFIT", "casual outfit"))
+        
+                # Append Custom Details
+                if custom_details:
+                    final_prompt += f", {custom_details}"
+        
+                # Append Friend Outfits
+                if "FRIEND_OUTFITS" in current_selections:
+                     final_prompt += f", {current_selections['FRIEND_OUTFITS']}"
+        
+                # Append Camera Settings
+                cam_details = []
+                if sel_camera != "Auto": cam_details.append(f"shot on {sel_camera}")
+                if sel_lens != "Auto": cam_details.append(f"{sel_lens} lens")
+                if sel_shot != "Auto": cam_details.append(sel_shot) # Restored Logic
+                # sel_shot removed in favor of AR + Angle <-- REMOVING THIS COMMENT
+                if sel_lighting != "Auto": cam_details.append(f"{sel_lighting} lighting")
+                if sel_angle != "Auto": cam_details.append(f"{sel_angle} angle")
+                if sel_film != "Auto": cam_details.append(f"{sel_film} style")
+                if sel_film_stock != "Auto": cam_details.append(f"Film Stock: {sel_film_stock}")
+                if sel_filter_look != "Auto": cam_details.append(f"Look: {sel_filter_look}")
+                
+                # New Logic
+                if sel_emotion != "Auto": cam_details.append(f"Expression: {sel_emotion}")
+                if sel_action != "Auto": cam_details.append(f"Action: {sel_action}")
+                
+                if cam_details:
+                    final_prompt += ", " + ", ".join(cam_details)
+                    
+                # Fallback for Protagonist if replacement failed (e.g. key mismatch)
+                if "[PROTAGONIST]" in final_prompt:
+                     # Try to find it again or default
+                     p_name = current_selections.get("PROTAGONIST", "The Influencer")
+                     final_prompt = final_prompt.replace("[PROTAGONIST]", p_name)
     
             # --- DEBUG: INSPECT STATE BEFORE RUNNING AI ---
             # Collapsed by default to avoid confusion
             with st.expander("🛠️ Advanced Debug Info (Inputs)", expanded=False):
+                st.write("**Scenario Type:**", "Custom" if is_custom_scenario else "Pre-built Template")
                 st.write("**Current Selections:**", current_selections)
                 st.write("**Assets (Visual Refs):**", assets_to_inject)
-                st.write("**Base Context (Prompt):**", final_prompt)
+                st.write("**Final Prompt:**", final_prompt)
                 st.write("**Session State Keys:**", list(st.session_state.keys()))
 
             # --- AI DIRECTOR BUTTON ---
