@@ -1218,11 +1218,12 @@ if selection == "World Builder":
         card_begin()
         st.markdown("#### Scenario Director")
         
-        # Mode Toggle
+        # Mode Toggle - CRITICAL: Use key to persist across form submissions
         scenario_mode = st.radio(
             "Scenario Mode",
             ["📚 Pre-built Templates", "✏️ Custom Scenario"],
             horizontal=True,
+            key="wb_scenario_mode",  # PERSIST SELECTION
             help="Choose a pre-built scenario template or create your own custom scene"
         )
         
