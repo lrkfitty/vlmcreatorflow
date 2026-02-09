@@ -1613,27 +1613,34 @@ Vibe: {current_selections.get('VIBE', 'neutral')}"""
                 camera_str = ", ".join(camera_summary) if camera_summary else "natural"
                 
                 # Build Director AI prompt
-                director_prompt = f"""You are an expert image generation prompt writer. Your job is to create a SINGLE, DIRECT, CONCISE prompt for photorealistic image generation.
+                director_prompt = f"""You are a master cinematic prompt writer for photorealistic image generation. Create a rich, immersive, DETAILED scene description.
 
-SCENARIO: {scenario['template_prompt']}
+SCENARIO CONCEPT: {scenario['template_prompt']}
 
-ASSETS TO INCORPORATE:
+CHARACTERS & ASSETS:
 {assets_summary}
 
-CAMERA/TECHNICAL: {camera_str}
+CAMERA & STYLE: {camera_str}
 
-CUSTOM DETAILS: {custom_details or 'none'}
+ADDITIONAL DETAILS: {custom_details or 'none'}
 
-CRITICAL INSTRUCTIONS:
-1. Output ONLY a single paragraph prompt - NO markdown, NO sections, NO explanations, NO code blocks
-2. Start with "Photorealistic, hyper-detailed" to ensure quality
-3. Naturally weave ALL assets into the scene description
-4. Include camera settings as part of the description (e.g., "Full body shot", "dramatic lighting")
-5. Make it cinematic and vivid but CONCISE (2-4 sentences maximum)
-6. Focus on visual details: lighting, composition, atmosphere, textures
-7. DO NOT explain or justify - just write the direct prompt
+CRITICAL REQUIREMENTS:
+1. Output as a SINGLE flowing paragraph (NO markdown, NO sections, NO code blocks, NO bullet points)
+2. Start with "Photorealistic, hyper-detailed, cinematic"
+3. Create a VIVID, IMMERSIVE scene - paint the picture with rich visual details
+4. Incorporate EVERY asset listed above naturally into the scene
+5. Pay special attention to the "ADDITIONAL DETAILS" - these are user-specified and must be included
+6. Include specific details about:
+   - Character appearances, expressions, and poses
+   - Environment atmosphere, lighting quality, and textures
+   - Spatial relationships between characters and props
+   - Color palette and mood
+   - Camera framing and composition
+7. Make it feel like a professional film scene - atmospheric, dimensional, alive
+8. Length: 4-6 detailed sentences that build a cohesive visual narrative
+9. NO explanations, NO justifications - ONLY the direct image prompt
 
-Generate the image prompt now:"""
+Write an immersive, detailed prompt now:"""
                 
                 # Call Gemini AI to generate contextualized prompt
                 try:
