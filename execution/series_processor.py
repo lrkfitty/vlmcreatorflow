@@ -167,6 +167,7 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
         import base64
         import concurrent.futures
         import time
+        import streamlit as st
 
         def load_single_ref(img_data):
             path = img_data.get('path')
@@ -178,7 +179,7 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
             try:
                 # Case A: URL
                 if path and path.startswith("http"):
-                    resp = requests.get(path, timeout=10)
+                    resp = requests.get(path, timeout=5)  # Reduced from 10s to 5s
                     if resp.status_code == 200:
                         b64 = base64.b64encode(resp.content).decode('utf-8')
                         result_parts.append({ "text": f"VISUAL REFERENCE - {label}:" })
@@ -200,6 +201,7 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
             return result_parts
 
         print(f"⚡ Director AI: fetching {len(ref_images)} assets in parallel...")
+        st.toast(f"📥 Loading {len(ref_images)} reference images...")
         t_batch_start = time.time()
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
@@ -209,7 +211,9 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
         for res in results:
             parts.extend(res)
             
-        print(f"⚡ Director AI assets ready in {time.time() - t_batch_start:.2f}s")
+        load_time = time.time() - t_batch_start
+        print(f"⚡ Director AI assets ready in {load_time:.2f}s")
+        st.toast(f"✅ References loaded ({load_time:.1f}s). Generating storyboard...")
 
     # 3. Script
     parts.append({ "text": "\n\nSCRIPT:\n" + script_text })
@@ -225,6 +229,9 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
     
     try:
         # Timeout increased to 120s for Director AI Stability
+        import streamlit as st
+        st.toast("🎬 Waiting for Gemini AI response (may take 30-120s)...")
+        
         response = requests.post(url, headers=headers, json=payload, timeout=120)
         res_json = response.json()
         
@@ -241,8 +248,11 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
         
         # Parse
         data = json.loads(text)
+        st.toast("✅ Storyboard generated successfully!")
         return data
 
+    except requests.exceptions.Timeout:
+        return {"error": "API Timeout (120s exceeded). Try reducing cast size or simplifying script."}
     except Exception as e:
         return {"error": str(e)}
 
