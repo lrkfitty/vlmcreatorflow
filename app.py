@@ -434,11 +434,19 @@ if selection == "My Gallery":
                 # We want images that are NOT in "Assets" folder
                 # Assets are managed in Tab 3. Gallery is for outputs.
                 
+                # PERFORMANCE: Limit to most recent 100 images to avoid slow loads
+                MAX_GALLERY_IMAGES = 100
+                
                 paginator = s3.get_paginator('list_objects_v2')
                 pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
                 
+                image_count = 0
                 for page in pages:
                     for obj in page.get('Contents', []):
+                        # Early break if we hit limit
+                        if image_count >= MAX_GALLERY_IMAGES:
+                            break
+                            
                         key = obj['Key']
                         # key: users/{user}/Series/Ep1/img.png
                         # Filter valid images
@@ -457,9 +465,18 @@ if selection == "My Gallery":
                                     "name": os.path.basename(key),
                                     "time": obj.get('LastModified').timestamp()
                                 })
+                                image_count += 1
+                    
+                    # Break outer loop if limit reached
+                    if image_count >= MAX_GALLERY_IMAGES:
+                        break
                                 
                 # Sort S3 by time (Newest First)
                 my_images.sort(key=lambda x: x["time"], reverse=True)
+                
+                if image_count >= MAX_GALLERY_IMAGES:
+                    st.info(f"📊 Showing {MAX_GALLERY_IMAGES} most recent images. Use filters or search to find older content.")
+                
                 
             except Exception as e:
                 st.error(f"Gallery S3 Scan Error: {e}")

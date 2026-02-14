@@ -17,7 +17,15 @@ def upload_file_obj(file_obj, object_name=None):
     if object_name is None:
         object_name = f"uploads/{uuid.uuid4()}_{file_obj.name}"
     
-    s3 = boto3.client('s3', region_name=REGION)
+    # Add timeout config to prevent hanging
+    from botocore.config import Config
+    config = Config(
+        connect_timeout=5,
+        read_timeout=60,
+        retries={'max_attempts': 2}
+    )
+    
+    s3 = boto3.client('s3', region_name=REGION, config=config)
     
     # Reset pointer
     file_obj.seek(0)
@@ -55,8 +63,15 @@ def delete_file(object_name):
     """
     if not object_name:
         return False
-        
-    s3 = boto3.client('s3', region_name=REGION)
+    
+    from botocore.config import Config
+    config = Config(
+        connect_timeout=5,
+        read_timeout=30,
+        retries={'max_attempts': 2}
+    )
+    
+    s3 = boto3.client('s3', region_name=REGION, config=config)
     
     try:
         s3.delete_object(Bucket=BUCKET_NAME, Key=object_name)
