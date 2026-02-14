@@ -93,8 +93,8 @@ def get_age_description(value):
 
 def get_character_sheet_prompt(base_prompt):
     """Wraps the prompt to generate a reference sheet."""
-    # Strong weights for sheet structure
-    suffix = "(character reference sheet:1.5), (7 angles:1.4), front view, side view, back view, three quarter view, full body, white background, consistent character, detailed anatomy, 8k"
+    # Strong weights for sheet structure + High Fidelity Enforcement
+    suffix = "(character reference sheet:1.5), (4 angles:1.5), (front view:1.3), (side view:1.3), (back view:1.3), (three quarter view:1.3), full body, white background, consistent character, detailed anatomy, 8k, (photorealistic:1.4), (raw photo:1.3), (hyperrealistic:1.3), (not illustration:1.5), (not cartoon:1.5), (not 3d render:1.5)"
     return f"{base_prompt}, {suffix}"
 
 def build_character_prompt(attributes):

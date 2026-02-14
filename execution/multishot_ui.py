@@ -39,7 +39,7 @@ def render_multishot_ui(get_user_out_dir_func):
         multishot_mode = st.selectbox(
             "Generation Mode",
             [
-                "Character Sheet (7 Angles)", 
+                "Character Sheet (4 Angles)", 
                 "Individual Shots (Batch)", 
                 "Single Custom Angle"
             ]
@@ -108,13 +108,13 @@ def render_multishot_ui(get_user_out_dir_func):
                 base_prompt += f", {additional_prompt}"
             
             # Handle different modes
-            if multishot_mode == "Character Sheet (7 Angles)":
-                # Generate 7-angle character sheet
+            if multishot_mode == "Character Sheet (4 Angles)":
+                # Generate 4-angle character sheet
                 full_prompt = get_character_sheet_prompt(base_prompt)
                 
                 # Credit check
                 if auth_mgr.deduct_credits(user, 1):
-                    with st.spinner("Generating 7-angle character sheet..."):
+                    with st.spinner("Generating 4-angle character sheet..."):
                         assets = [{"path": temp_ref_path, "label": "Reference Character"}]
                         payload = {
                             "positive_prompt": full_prompt,
