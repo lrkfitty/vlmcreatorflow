@@ -77,18 +77,97 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             
 
             with st.expander("Face & Details", expanded=False):
+                # Hair
+                st.markdown("**Hair**")
                 c1, c2 = st.columns(2)
                 with c1:
-                    c_hair_col = st.selectbox("Hair Color", ["Any", "Blonde", "Brunette", "Black", "Red", "Platinum", "Pastel Pink", "Grey", "White"])
-                    c_eye = st.selectbox("Eye Color", ["Any", "Blue", "Green", "Brown", "Hazel", "Grey", "Amber"])
-                    c_tat_style = st.selectbox("Tattoo Style", ["None", "Minimalist", "Traditional", "Tribal", "Geometric", "Full Sleeve", "Henna", "Face Tats"])
+                    hair_color_opts = [
+                        "Any", "Blonde", "Platinum Blonde", "Honey Blonde", "Dirty Blonde",
+                        "Brunette", "Dark Brown", "Chestnut", "Auburn", 
+                        "Black", "Jet Black", "Red", "Ginger", "Copper Red",
+                        "Pastel Pink", "Lavender", "Blue", "Green",
+                        "Grey", "Silver", "White", "Salt and Pepper"
+                    ]
+                    c_hair_col = st.selectbox("Hair Color", hair_color_opts)
                 with c2:
-                    c_hair_style = st.selectbox("Hair Style", ["Any", "Long Straight", "Wavy", "Curly", "Bob Cut", "Pixie", "Braids", "Messy Bun", "Ponytail", "Buzz Cut", "Afro", "Dreads"])
-                    c_facial = st.selectbox("Facial Hair", ["None", "Stubble", "Beard", "Goatee", "Mustache", "Clean Shaven"])
-                    c_tat_place = st.multiselect("Tattoo Placement", ["Arms", "Chest", "Neck", "Back", "Face", "Legs", "Lower Back"])
+                    hair_style_opts = [
+                        "Any", "Long Straight", "Long Wavy", "Long Curly", 
+                        "Medium Length", "Shoulder Length", "Wavy", "Curly", "Coily",
+                        "Bob Cut", "Lob", "Pixie", "Undercut", "Fade",
+                        "Braids", "Box Braids", "Cornrows", "French Braids",
+                        "Messy Bun", "Top Knot", "Ponytail", "Pigtails",
+                        "Buzz Cut", "Crew Cut", "Afro", "Dreads", "Locs",
+                        "Mohawk", "Mullet", "Shag", "Layers"
+                    ]
+                    c_hair_style = st.selectbox("Hair Style", hair_style_opts)
                 
-                c_makeup = st.selectbox("Makeup", ["None", "Natural", "Minimal", "Soft Glam", "Heavy Glam", "Goth", "Vintage"])
-                c_skin = st.multiselect("Skin Details", ["Freckles", "Beauty Marks", "Vitiligo", "Tattoos", "Scarring", "Perfect Skin", "Textured Skin", "Wrinkles"])
+                # Custom Hairstyle Override
+                c_hair_custom = st.text_input("Custom Hairstyle (Optional)", placeholder="e.g. asymmetrical bob with bangs", help="Override the dropdown with your own description")
+                
+                st.divider()
+                
+                # Facial Hair (Enhanced)
+                st.markdown("**Facial Hair**")
+                cf1, cf2 = st.columns(2)
+                with cf1:
+                    facial_opts = [
+                        "None", "Clean Shaven",
+                        "Stubble", "Light Stubble", "Heavy Stubble",
+                        "Goatee", "Van Dyke", "Soul Patch",
+                        "Mustache", "Handlebar Mustache", "Pencil Mustache",
+                        "Beard", "Short Beard", "Medium Beard", "Long Beard", "Full Beard",
+                        "Mutton Chops", "Sideburns", "Chinstrap"
+                    ]
+                    c_facial = st.selectbox("Facial Hair Style", facial_opts)
+                with cf2:
+                    c_facial_color = st.selectbox("Facial Hair Color", ["Same as Hair"] + hair_color_opts[1:], help="Can differ from head hair")
+                
+                if c_facial not in ["None", "Clean Shaven"]:
+                    c_facial_length = st.select_slider("Facial Hair Length", ["Stubble", "Short", "Medium", "Long"], value="Short")
+                else:
+                    c_facial_length = "None"
+                
+                st.divider()
+                
+                # Eyes
+                st.markdown("**Eyes**")
+                c_eye = st.selectbox("Eye Color", ["Any", "Blue", "Green", "Brown", "Hazel", "Grey", "Amber", "Heterochromia (Two Colors)"])
+                
+                st.divider()
+                
+                # Tattoos
+                st.markdown("**Tattoos**")
+                c_tat_style = st.selectbox("Tattoo Style", ["None", "Minimalist", "Traditional", "Tribal", "Geometric", "Full Sleeve", "Japanese", "Henna", "Face Tats", "Blackwork", "Watercolor"])
+                
+                if c_tat_style != "None":
+                    tat_place_opts = [
+                        "Arms", "Forearms", "Upper Arms", "Full Sleeve",
+                        "Chest", "Stomach", "Ribs", "Lower Back",
+                        "Shoulders", "Traps", "Neck", "Back", "Full Back",
+                        "Face", "Hands", "Fingers",
+                        "Legs", "Thighs", "Calves", "Ankles"
+                    ]
+                    c_tat_place = st.multiselect("Tattoo Placement", tat_place_opts)
+                else:
+                    c_tat_place = []
+                
+                st.divider()
+                
+                # Skin
+                c_skin = st.multiselect("Skin Details", ["Freckles", "Beauty Marks", "Moles", "Vitiligo", "Scarring", "Acne", "Perfect Skin", "Textured Skin", "Wrinkles", "Dimples"])
+
+            with st.expander("Makeup (Granular)", expanded=False):
+                st.caption("Fine-tune makeup details")
+                
+                cm1, cm2 = st.columns(2)
+                with cm1:
+                    c_lashes = st.selectbox("Lashes", ["None", "Natural", "Mascara", "False Lashes", "Dramatic Lashes", "Wispy Lashes"])
+                    c_eyebrows = st.selectbox("Eyebrows", ["Natural", "Defined", "Arched", "Bold", "Thin", "Bushy", "Microbladed", "Laminated"])
+                    c_foundation = st.selectbox("Foundation/Base", ["None", "Natural", "Light Coverage", "Full Coverage", "Matte", "Dewy", "Contoured"])
+                with cm2:
+                    c_lipgloss = st.selectbox("Lips", ["None", "Natural", "Subtle Gloss", "High Gloss", "Matte Lipstick", "Bold Lipstick", "Lip Liner", "Ombre Lips"])
+                    c_eyeshadow = st.selectbox("Eye Shadow", ["None", "Neutral", "Smokey Eye", "Winged Liner", "Cat Eye", "Colorful", "Glitter", "Cut Crease"])
+                    c_blush = st.selectbox("Blush/Bronzer", ["None", "Subtle", "Natural", "Bronzed", "Heavy Contour"])
 
             with st.expander("Body Composition", expanded=False):
                 st.caption("Customize physique details (0-100)")
@@ -112,9 +191,19 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 with c4:
                     c_glute_type = st.selectbox("Glute Type", ["Soft / Natural", "Athletic / Hard", "BBL / Surgical"])
 
+            # Character Description
+            st.divider()
+            st.markdown("**4. Character Description (Optional)**")
+            c_description = st.text_area(
+                "Nuanced Details",
+                placeholder="Add subtle character details... e.g. 'slightly crooked smile', 'scar above left eyebrow', 'confident posture'",
+                height=80,
+                help="This text will be added to the prompt for fine-tuned customization"
+            )
+            
             # Name
             st.divider()
-            st.markdown("**4. Finalize**")
+            st.markdown("**5. Finalize**")
             char_name = st.text_input("Character Name", placeholder="e.g. Sarah")
             
             # Submit
@@ -150,13 +239,21 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                    "glutes": c_glutes,
                    "glute_type": c_glute_type,
                    "hair_color": c_hair_col,
-                   "hair_style": c_hair_style,
+                   "hair_style": c_hair_custom if c_hair_custom else c_hair_style,
                    "eye_color": c_eye,
                    "facial_hair": c_facial,
-                   "makeup": c_makeup,
+                   "facial_hair_color": c_facial_color,
+                   "facial_hair_length": c_facial_length,
+                   "lashes": c_lashes,
+                   "eyebrows": c_eyebrows,
+                   "foundation": c_foundation,
+                   "lipgloss": c_lipgloss,
+                   "eyeshadow": c_eyeshadow,
+                   "blush": c_blush,
                    "skin_details": c_skin,
                    "tattoo_style": c_tat_style,
-                   "tattoo_places": c_tat_place
+                   "tattoo_places": c_tat_place,
+                   "description": c_description
                 }
                 st.session_state['char_last_attrs'] = attrs 
                 
@@ -280,7 +377,9 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             st.session_state["trigger_lock_sheet"] = False # Reset
             
             attrs = st.session_state.get("char_last_attrs")
-            if attrs:
+            lock_path = st.session_state.get("lock_identity_path")
+            
+            if attrs and lock_path:
                 # Re-import not needed as we imported at top
                 base_prompt = build_character_prompt(attrs)
                 full_prompt = get_character_sheet_prompt(base_prompt)
@@ -295,7 +394,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                          st.caption("Creating in Studio...")
                          
                     assets = [{
-                        "path": st.session_state["lock_identity_path"],
+                        "path": lock_path,
                         "label": f"Cast: {char_name or 'Main'}"
                     }]
                     payload = {
@@ -313,4 +412,6 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                     else:
                         auth_mgr.add_credits(user, 1)
                         st.error("Failed to generate sheet.")
+            elif not lock_path:
+                st.error("No identity locked. Please generate a character first.")
         card_end()

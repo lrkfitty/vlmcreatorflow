@@ -111,8 +111,20 @@ def build_character_prompt(attributes):
     hair_color = attributes.get("hair_color", "Any")
     hair_style = attributes.get("hair_style", "Any")
     eye_color = attributes.get("eye_color", "Any")
-    makeup = attributes.get("makeup", "None")
+    
+    # Granular Makeup
+    lashes = attributes.get("lashes", "None")
+    eyebrows = attributes.get("eyebrows", "Natural")
+    foundation = attributes.get("foundation", "None")
+    lipgloss = attributes.get("lipgloss", "None")
+    eyeshadow = attributes.get("eyeshadow", "None")
+    blush = attributes.get("blush", "None")
+    
+    # Facial Hair (Enhanced)
     facial_hair = attributes.get("facial_hair", "None")
+    facial_hair_color = attributes.get("facial_hair_color", "Same as Hair")
+    facial_hair_length = attributes.get("facial_hair_length", "None")
+    
     skin_details = attributes.get("skin_details", [])
     
     # Extract Body
@@ -128,6 +140,9 @@ def build_character_prompt(attributes):
     # Extract Tattoos (List)
     tattoo_style = attributes.get("tattoo_style", "None")
     tattoo_places = attributes.get("tattoo_places", []) # List now
+    
+    # Character Description
+    description = attributes.get("description", "")
 
     # Map Sliders to Weighted Strings
     age_desc = get_age_description(age_val)
@@ -162,8 +177,27 @@ def build_character_prompt(attributes):
 
     # Eyes & Face
     if eye_color != "Any": traits.append(f"{eye_color} eyes")
-    if makeup != "None" and makeup != "Any": traits.append(f"{makeup} makeup")
-    if facial_hair != "None" and facial_hair != "Any": traits.append(f"{facial_hair}")
+    
+    # Facial Hair (Enhanced)
+    if facial_hair not in ["None", "Clean Shaven"]:
+        fh_str = facial_hair
+        if facial_hair_length != "None":
+            fh_str = f"{facial_hair_length} {facial_hair}"
+        if facial_hair_color != "Same as Hair":
+            fh_str = f"{facial_hair_color} {fh_str}"
+        traits.append(fh_str)
+    
+    # Makeup (Granular)
+    makeup_parts = []
+    if lashes != "None": makeup_parts.append(lashes)
+    if eyebrows != "Natural": makeup_parts.append(f"{eyebrows} eyebrows")
+    if foundation != "None": makeup_parts.append(f"{foundation} foundation")
+    if lipgloss != "None": makeup_parts.append(f"{lipgloss} lips")
+    if eyeshadow != "None": makeup_parts.append(eyeshadow)
+    if blush != "None": makeup_parts.append(blush)
+    
+    if makeup_parts:
+        traits.append(", ".join(makeup_parts))
     
     # Tattoos (Multi-Placement)
     if tattoo_style != "None":
@@ -199,5 +233,10 @@ def build_character_prompt(attributes):
     # Combine
     full_prompt = f"{subject}, {traits_str}, wearing {outfit}, {env}, {lighting}, full body shot"
     
+    # Append Character Description if provided
+    if description:
+        full_prompt += f", {description}"
+    
     return full_prompt
+
 

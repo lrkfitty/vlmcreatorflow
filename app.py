@@ -376,7 +376,8 @@ nav_options = [
     "World Builder",
     "Campaign Queue", 
     "Video Studio",
-    "Character Studio"
+    "Character Studio",
+    "Multi-Shot Generator"
 ]
 
 # Admin Panel visibility
@@ -2684,3 +2685,12 @@ if selection == "Character Studio":
         render_character_studio(characters_data, get_user_out_dir, campaign_mgr)
         
     character_studio_fragment()
+
+
+# ==========================================
+# TAB: MULTI-SHOT GENERATOR
+# ==========================================
+if selection == "Multi-Shot Generator":
+    from execution.multishot_ui import render_multishot_ui
+    render_multishot_ui(get_user_out_dir)
+
