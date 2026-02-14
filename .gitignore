@@ -4,6 +4,7 @@
 # Environments
 .env
 venv/
+.venv/
 __pycache__/
 
 # Intermediate/Temp files
@@ -15,7 +16,22 @@ token.json
 
 # Outputs
 output/
+output_test/
 sd_local/
 users.json
-.venv/
-output_test/
+
+# Database files (local only)
+users.db
+users.db-shm
+users.db-wal
+*.db-shm
+*.db-wal
+
+# Debug files
+debug_*.py
+debug_*.png
+test_*.py
+
+# Campaign and world state (local only)
+current_campaign.json
+world_db.json

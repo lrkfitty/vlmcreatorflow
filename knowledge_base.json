@@ -44,7 +44,10 @@
         "Over the Shoulder",
         "Point of View (POV)",
         "Selfie Angle (High)",
-        "Mirror Selfie"
+        "Mirror Selfie",
+        "Straight On (Talking Head)",
+        "Slightly Off-Center (Interview)",
+        "3/4 View (Flattering Angle)"
     ],
     "shot_types": [
         "Extreme Close-Up (Eyes/Lips)",
@@ -55,7 +58,13 @@
         "Wide Shot (Environment Focus)",
         "Low Angle (Heroic)",
         "High Angle (Vulnerable)",
-        "Selfie"
+        "Selfie",
+        "Talking Head Close-Up (Face to Shoulders)",
+        "Talking Head Medium (Waist Up)",
+        "Interview Style (2-Shot)",
+        "Vlog Talking Head (Arm's Length)",
+        "Announcement / Direct Address",
+        "Monologue (Centered Frame)"
     ],
     "lighting": [
         "Golden Hour (Warm/Soft)",
@@ -106,7 +115,13 @@
         "Yoga Pose",
         "Unboxing Package",
         "Holding Coffee Cup (Starbucks)",
-        "Mirror Selfie (Phone in hand)"
+        "Mirror Selfie (Phone in hand)",
+        "Speaking to Camera (Talking Head)",
+        "Explaining Concept (Hand Gestures)",
+        "Making Announcement (Direct Address)",
+        "Telling Story (Animated Expression)",
+        "Sharing Thoughts (Thoughtful Pause)",
+        "Vlog Style Update (Casual Talk)"
     ],
     "emotions": [
         "Neutral / Model Face",
