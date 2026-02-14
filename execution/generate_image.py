@@ -263,9 +263,9 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
         
         logs.append(f"Sending request to Google API for model: {model_name}")
         
-        # Extended Retry Logic for High Load (User requested)
-        max_retries = 10
-        retry_delay = 2 # Start with 2 seconds
+        # Extended Retry Logic for High Load (Optimized for UX)
+        max_retries = 3  # Reduced from 10 to avoid excessive wait times
+        retry_delay = 2  # Start with 2 seconds
         
         for attempt in range(max_retries + 1):
             try:
@@ -326,7 +326,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                     if attempt < max_retries:
                         logs.append(f"⚠️ Server Overloaded (503). Retrying in {retry_delay}s... ({attempt+1}/{max_retries})")
                         time.sleep(retry_delay)
-                        retry_delay = min(retry_delay * 2, 30) # Cap delay at 30s
+                        retry_delay = min(retry_delay * 2, 10)  # Cap delay at 10s instead of 30s
                         continue
                     else:
                         raise Exception("Model Overloaded (503) after multiple retries. Try again later.")
@@ -339,7 +339,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                 if attempt < max_retries:
                      logs.append(f"⚠️ Network Error: {e}. Retrying in {retry_delay}s...")
                      time.sleep(retry_delay)
-                     retry_delay = min(retry_delay * 2, 30)
+                     retry_delay = min(retry_delay * 2, 10)  # Cap at 10s
                      continue
                 else:
                      raise Exception(f"Network Error after retries: {e}")
