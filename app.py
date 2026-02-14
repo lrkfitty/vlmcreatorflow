@@ -419,6 +419,8 @@ if selection == "My Gallery":
                      st.caption(f"📂 Gallery Path: `{abs_root}`")
             with col_gal_ref:
                  if st.button("🔄 Refresh"):
+                     if "gallery_all_images_meta" in st.session_state:
+                         del st.session_state.gallery_all_images_meta
                      st.rerun()
         
         my_images = []
@@ -431,72 +433,99 @@ if selection == "My Gallery":
                 s3 = boto3.client('s3', region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
                 prefix = f"users/{username}/"
                 
-                # We want images that are NOT in "Assets" folder
-                # Assets are managed in Tab 3. Gallery is for outputs.
+                # PAGINATION LOGIC
+                IMAGES_PER_PAGE = 50
                 
-                # PERFORMANCE: Limit to most recent 100 images to avoid slow loads
-                MAX_GALLERY_IMAGES = 100
-                
-                paginator = s3.get_paginator('list_objects_v2')
-                pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
-                
-                image_count = 0
-                for page in pages:
-                    for obj in page.get('Contents', []):
-                        # Early break if we hit limit
-                        if image_count >= MAX_GALLERY_IMAGES:
-                            break
-                            
-                        key = obj['Key']
-                        # key: users/{user}/Series/Ep1/img.png
-                        # Filter valid images
-                        if key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                            # Exclude Assets folder
-                            if "/Assets/" not in key:
-                                # Generate URL
-                                url = s3.generate_presigned_url(
-                                    'get_object',
-                                    Params={'Bucket': bucket, 'Key': key},
-                                    ExpiresIn=2592000  # 30 days
-                                )
-                                # Store tuple (path/url, is_cloud, name)
-                                my_images.append({
-                                    "src": url,
-                                    "name": os.path.basename(key),
-                                    "time": obj.get('LastModified').timestamp()
-                                })
-                                image_count += 1
+                if "gallery_page" not in st.session_state:
+                    st.session_state.gallery_page = 0
                     
-                    # Break outer loop if limit reached
-                    if image_count >= MAX_GALLERY_IMAGES:
-                        break
-                                
-                # Sort S3 by time (Newest First)
-                my_images.sort(key=lambda x: x["time"], reverse=True)
+                # 1. Fetch Metadata (cached in session state to avoid re-scanning on every interaction)
+                # We only re-scan if explicitly refreshed or if cache is missing
+                if "gallery_all_images_meta" not in st.session_state:
+                    all_images_meta = []
+                    
+                    paginator = s3.get_paginator('list_objects_v2')
+                    pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+                    
+                    for page in pages:
+                        for obj in page.get('Contents', []):
+                            key = obj['Key']
+                            if key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                                if "/Assets/" not in key:
+                                    # Store ONLY metadata, not the signed URL yet
+                                    all_images_meta.append({
+                                        "key": key,
+                                        "name": os.path.basename(key),
+                                        "time": obj.get('LastModified').timestamp()
+                                    })
+                    
+                    # Sort Newest First
+                    all_images_meta.sort(key=lambda x: x["time"], reverse=True)
+                    st.session_state.gallery_all_images_meta = all_images_meta
                 
-                if image_count >= MAX_GALLERY_IMAGES:
-                    st.info(f"📊 Showing {MAX_GALLERY_IMAGES} most recent images. Use filters or search to find older content.")
+                # 2. Slice for Current Page
+                meta_list = st.session_state.gallery_all_images_meta
+                total_images = len(meta_list)
+                total_pages = max(1, (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE)
                 
+                # Ensure page is valid
+                current_page = st.session_state.gallery_page
+                if current_page >= total_pages:
+                    current_page = total_pages - 1
+                    st.session_state.gallery_page = current_page
+                if current_page < 0:
+                    current_page = 0
+                    st.session_state.gallery_page = 0
+                    
+                start_idx = current_page * IMAGES_PER_PAGE
+                end_idx = start_idx + IMAGES_PER_PAGE
+                page_meta = meta_list[start_idx:end_idx]
                 
+                # 3. Generate URLs ONLY for current page
+                for item in page_meta:
+                    url = s3.generate_presigned_url(
+                        'get_object',
+                        Params={'Bucket': bucket, 'Key': item['key']},
+                        ExpiresIn=3600 # 1 hour is enough for view
+                    )
+                    my_images.append({
+                        "src": url,
+                        "name": item['name'],
+                        "time": item['time']
+                    })
+                    
+                # Pagination Controls
+                st.caption(f"Showing {start_idx+1}-{min(end_idx, total_images)} of {total_images} images")
+                
+                col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
+                with col_p1:
+                    if st.button("⬅️ Previous", disabled=(current_page == 0)):
+                        st.session_state.gallery_page -= 1
+                        st.rerun()
+                with col_p2:
+                    st.markdown(f"<div style='text-align: center'>Page {current_page + 1} of {total_pages}</div>", unsafe_allow_html=True)
+                with col_p3:
+                    if st.button("Next ➡️", disabled=(current_page >= total_pages - 1)):
+                        st.session_state.gallery_page += 1
+                        st.rerun()
+
             except Exception as e:
                 st.error(f"Gallery S3 Scan Error: {e}")
                 
         # --- LOCAL SCAN (Fallback or Hybrid) ---
-        # --- LOCAL SCAN (Fallback or Hybrid) ---
         elif os.path.exists(user_root):
+            # ... (Local scan logic) ...
             local_imgs = []
             for root, dirs, files in os.walk(user_root):
                 for file in files:
                     if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and "Assets" not in root:
                         full_path = os.path.join(root, file)
                         local_imgs.append({
-                            "src": full_path, # Local Path for st.image
+                            "src": full_path, 
                             "name": file,
                             "time": os.path.getmtime(full_path),
                             "is_local": True
                         })
-            
-            # Sort Local
             local_imgs.sort(key=lambda x: x["time"], reverse=True)
             my_images.extend(local_imgs)
 
