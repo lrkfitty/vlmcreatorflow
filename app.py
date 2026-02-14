@@ -421,6 +421,12 @@ if selection == "My Gallery":
                  if st.button("🔄 Refresh"):
                      if "gallery_all_images_meta" in st.session_state:
                          del st.session_state.gallery_all_images_meta
+                     
+                     # Clear scan key to force re-fetch
+                     scan_key = f"gallery_scan_done_{username}"
+                     if scan_key in st.session_state:
+                         del st.session_state[scan_key]
+                         
                      st.rerun()
         
         my_images = []
@@ -436,12 +442,15 @@ if selection == "My Gallery":
                 # PAGINATION LOGIC
                 IMAGES_PER_PAGE = 50
                 
+                # Check scan state to prevent loops
+                scan_key = f"gallery_scan_done_{username}"
+                
                 if "gallery_page" not in st.session_state:
                     st.session_state.gallery_page = 0
                     
                 # 1. Fetch Metadata (cached in session state to avoid re-scanning on every interaction)
                 # We only re-scan if explicitly refreshed or if cache is missing
-                if "gallery_all_images_meta" not in st.session_state:
+                if "gallery_all_images_meta" not in st.session_state or not st.session_state.get(scan_key):
                     all_images_meta = []
                     
                     paginator = s3.get_paginator('list_objects_v2')
@@ -462,6 +471,7 @@ if selection == "My Gallery":
                     # Sort Newest First
                     all_images_meta.sort(key=lambda x: x["time"], reverse=True)
                     st.session_state.gallery_all_images_meta = all_images_meta
+                    st.session_state[scan_key] = True  # Mark scan as done for this user
                 
                 # 2. Slice for Current Page
                 meta_list = st.session_state.gallery_all_images_meta
