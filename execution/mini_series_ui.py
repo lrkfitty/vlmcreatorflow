@@ -79,7 +79,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                     shot_chars = shot.get('characters', [])
                     for c_name in shot_chars:
                         # Lookup
-                        c_key = c_name.strip().split(' ')[0]
+                        c_key = c_name.strip() #.split(' ')[0] -- FIXED: Use full key for lookup
                         c_path = st.session_state.cast_lookup_map.get(c_key)
                         
                         # Fallback lookup
@@ -341,11 +341,15 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                             real_path = c_data
                             
                         base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
-                        clean_name = base.split(' ')[0]
                         
                         if real_path:
-                            clean_cast_map[clean_name] = real_path
-                            clean_names_list.append(clean_name)
+                            clean_cast_map[base] = real_path
+                            clean_names_list.append(base)
+                            
+                            # Add first word key
+                            first_word = base.replace('_', ' ').split(' ')[0]
+                            if first_word and first_word != base:
+                                clean_cast_map[first_word] = real_path
                     
                     st.session_state.cast_lookup_map = clean_cast_map
 
@@ -354,7 +358,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                     if cast_role_map:
                         for full_key, role in cast_role_map.items():
                             base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
-                            c_name = base.split(' ')[0]
+                            c_name = base #.split(' ')[0] -- FIXED
                             clean_roles_map[c_name] = role
 
                     # Clean Wardrobe Map
@@ -364,9 +368,11 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                     if cast_wardrobe_map:
                         for full_key, outfit in cast_wardrobe_map.items():
                             base = full_key.split('/')[-1].replace('.png','').replace('.jpg','').strip()
-                            c_name = base.split(' ')[0]
-                            clean_wardrobe_map[c_name] = outfit
                             clean_wardrobe_map[base] = outfit 
+                            # Add first word as key for robust LLM matching (e.g. "Shay_v1" -> "Shay")
+                            first_word = base.replace('_', ' ').split(' ')[0]
+                            if first_word and first_word != base:
+                                clean_wardrobe_map[first_word] = outfit 
                             
                             if outfit != "Default":
                                 o_path = outfits_data.get(outfit)
@@ -438,7 +444,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                     real_path = c_data.get('default_img') if isinstance(c_data, dict) else c_data
                     
                     base = full_key.split('/')[-1].replace('.png','').replace('.jpg','')
-                    clean_name = base.split(' ')[0]
+                    clean_name = base #.split(' ')[0] -- FIXED
                     if real_path: clean_cast_map[clean_name] = real_path
                  st.session_state.cast_lookup_map = clean_cast_map
         
@@ -546,11 +552,23 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
 
                                         for raw_name in target_chars:
                                             c_path = st.session_state.cast_lookup_map.get(raw_name)
+                                            if not c_path:
+                                                 # Try first word
+                                                 first_w = raw_name.replace('_', ' ').split(' ')[0]
+                                                 c_path = st.session_state.cast_lookup_map.get(first_w)
+                                            
                                             if c_path:
                                                 final_assets_payload.append({"path": c_path, "label": f"Cast: {raw_name}"})
                                                 # Outfit
                                                 w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                                                o_key = w_snapshot.get(raw_name, "Default")
+                                                o_key = w_snapshot.get(raw_name)
+                                                
+                                                if not o_key:
+                                                    # Try first word
+                                                    first_w = raw_name.replace('_', ' ').split(' ')[0]
+                                                    o_key = w_snapshot.get(first_w)
+                                                
+                                                if not o_key: o_key = "Default"
                                                 if o_key != "Default":
                                                     o_path = outfits_data.get(o_key)
                                                     if isinstance(o_path, dict): o_path = o_path.get('default_img')
