@@ -173,166 +173,162 @@ def load_assets(base_path="assets", user_assets_dir=None, skip_base=False, targe
             if not data["vibes"]:
                 data["vibes"] = data["locations"]
 
-        if user_assets_dir:
-            # Check if this is a path like "output/users/{user}/Assets"
-            # We need the username to build the S3 key: users/{user}/Assets
-            try:
-                username = target_username
-                if not username:
-                    # Use heuristic: check if "users" is in path
-                    parts = user_assets_dir.split(os.sep)
-                    if "users" in parts:
-                        u_idx = parts.index("users")
-                        username = parts[u_idx + 1]
+    # --- 2. USER ASSETS (Cloud or Local Cache) ---
+    if user_assets_dir:
+        # Check if this is a path like "output/users/{user}/Assets"
+        # We need the username to build the S3 key: users/{user}/Assets
+        try:
+            username = target_username
+            if not username:
+                # Use heuristic: check if "users" is in path
+                parts = user_assets_dir.split(os.sep)
+                if "users" in parts:
+                    u_idx = parts.index("users")
+                    username = parts[u_idx + 1]
+            
+            if username:
                 
-                if username:
-                    
-                    user_manifest_path = os.path.join(user_assets_dir, "user_manifest.json")
-                    bucket = os.getenv("S3_BUCKET_NAME")
-                    
-                    # A. Try Loading from Cached Manifest (FAST)
-                    loaded_from_cache = False
-                    if os.path.exists(user_manifest_path):
-                         try:
-                             # Check age (optional validity check could go here)
-                             with open(user_manifest_path, "r") as f:
-                                 cached_items = json.load(f)
-                                 
-                             # Initialize S3 for re-signing
-                             import boto3
-                             from botocore.config import Config
-                             s3 = boto3.client(
-                                 's3', 
-                                 region_name=os.getenv("AWS_REGION", "ap-southeast-2"),
-                                 config=Config(s3={'addressing_style': 'virtual', 'signature_version': 's3v4'})
-                             )
-
-                             # Reconstruct Data Structure
-                             for item in cached_items:
-                                 cat_key = item.get("category")
-                                 name = item.get("name")
-                                 url = item.get("url")
-                                 key = item.get("key")
-
-                                 # RE-SIGN URL IF KEY EXISTS (Fix Expiry)
-                                 if key and bucket:
-                                     try:
-                                         url = s3.generate_presigned_url(
-                                             'get_object',
-                                             Params={'Bucket': bucket, 'Key': key},
-                                             ExpiresIn=3600
-                                         )
-                                     except Exception:
-                                         pass # Fallback to cached URL if signing fails
-                                 
-                                 if cat_key in data and name and url:
-                                      data[cat_key][name] = url
-                                      
-                             loaded_from_cache = True
-                             # print(f"🚀 Loaded {len(cached_items)} User Assets from Cache")
-                         except Exception as e:
-                             print(f"⚠️ Corrupt User Manifest: {e}")
+                user_manifest_path = os.path.join(user_assets_dir, "user_manifest.json")
+                bucket = os.getenv("S3_BUCKET_NAME")
+                
+                # A. Try Loading from Cached Manifest (FAST)
+                loaded_from_cache = False
+                if os.path.exists(user_manifest_path):
+                     try:
+                         # Check age (optional validity check could go here)
+                         with open(user_manifest_path, "r") as f:
+                             cached_items = json.load(f)
                              
-                    # B. Fallback to S3 Scan (SLOW) -> Then Cache It
-                    if not loaded_from_cache and bucket and username:
-                        import boto3
-                        from botocore.config import Config
-                        s3 = boto3.client(
-                            's3', 
-                            region_name=os.getenv("AWS_REGION", "ap-southeast-2"),
-                            config=Config(s3={'addressing_style': 'virtual', 'signature_version': 's3v4'})
-                        )
-                        prefix = f"users/{username}/Assets/"
-                        
-                        # List all objects in user folder
-                        paginator = s3.get_paginator('list_objects_v2')
-                        pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
-                        
-                        user_cats = {
-                            "characters": "characters",
-                            "environments": "locations", "locations": "locations",
-                            "outfits": "outfits", "wardrobe": "outfits", "clothing": "outfits", "influencer clothing": "outfits",
-                            "vibes": "vibes",
-                            "friends": "relations", "relations": "relations",
-                            "pets": "pets",
-                            "props": "props",
-                            "vehicles": "vehicles",
-                            "foods": "foods"
-                        }
-                        
-                        new_cache_list = []
-                        
-                        for page in pages:
-                            for obj in page.get('Contents', []):
-                                key = obj['Key']
-                                # key format: users/{user}/Assets/{Category}/{Asset Name...}
-                                k_parts = key.split("/")
-                                if len(k_parts) < 5: continue # Need Category + Name
-                                if "clothing" in key.lower():
-                                    print(f"DEBUG: Checking {key}")
-                                
-                                # k_parts[0]=users, [1]=user, [2]=Assets, [3]=Category, [4:]=Rest
-                                cat_folder_raw = k_parts[3]
-                                cat_folder = cat_folder_raw.lower().strip() # Normalize
-                                target_key = user_cats.get(cat_folder)
-                                
-                                if target_key and key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                                    # Name
-                                    sub_parts = k_parts[4:-1]
-                                    filename = k_parts[-1]
-                                    
-                                    # --- HEURISTIC FIX: Re-classify based on sub-folders ---
-                                    # If user put "Clothing" folder inside "Characters", move it to Outfits
-                                    sub_str = " ".join(sub_parts).lower()
-                                    if "clothing" in sub_str or "outfit" in sub_str or "wardrobe" in sub_str:
-                                        target_key = "outfits"
-                                        print(f"DEBUG: Moved {filename} to Outfits based on path.")
-                                    elif "environment" in sub_str or "location" in sub_str:
-                                        target_key = "locations"
-                                    # --------------------------------------------------------
+                         # Initialize S3 for re-signing
+                         import boto3
+                         from botocore.config import Config
+                         s3 = boto3.client(
+                             's3', 
+                             region_name=os.getenv("AWS_REGION", "ap-southeast-2"),
+                             config=Config(s3={'addressing_style': 'virtual', 'signature_version': 's3v4'})
+                         )
 
-                                    name_base = os.path.splitext(filename)[0].replace('_', ' ').title()
-                                    
-                                    if not sub_parts:
-                                        final_name = f"(My) {name_base}"
-                                    else:
-                                        p_str = " / ".join([p.replace('_', ' ').title() for p in sub_parts])
-                                        final_name = f"(My) {p_str} / {name_base}"
-                                    
-                                    # Generate Signed URL (valid 1 hour)
-                                    url = s3.generate_presigned_url(
-                                        'get_object',
-                                        Params={'Bucket': bucket, 'Key': key},
-                                        ExpiresIn=3600
-                                    )
-                                    data[target_key][final_name] = url
-                                    
-                                    # Add to List for Cache
-                                    new_cache_list.append({
-                                        "category": target_key,
-                                        "name": final_name,
-                                        "url": url,
-                                        "key": key # Store key for future checks if needed
-                                    })
-                                    
-                        # WRITE CACHE
-                        if new_cache_list:
-                             try:
-                                 os.makedirs(user_assets_dir, exist_ok=True)
-                                 with open(user_manifest_path, "w") as f:
-                                     json.dump(new_cache_list, f)
-                                 print(f"✅ Generated & Saved User Manifest for {username}")
-                             except Exception as e:
-                                 print(f"⚠️ Failed to save user manifest: {e}")
-                                 
-                        print(f"✅ Loaded User Assets from S3 for {username} (Live Scan)")
-            except Exception as e:
-                 print(f"S3 User Asset Scan Error: {e}")
-                 import traceback
-                 traceback.print_exc()
+                         # Reconstruct Data Structure
+                         for item in cached_items:
+                             cat_key = item.get("category")
+                             name = item.get("name")
+                             url = item.get("url")
+                             key = item.get("key")
+
+                             # RE-SIGN URL IF KEY EXISTS (Fix Expiry)
+                             if key and bucket:
+                                 try:
+                                     url = s3.generate_presigned_url(
+                                         'get_object',
+                                         Params={'Bucket': bucket, 'Key': key},
+                                         ExpiresIn=3600
+                                     )
+                                 except Exception:
+                                     pass # Fallback to cached URL if signing fails
+                             
+                             if cat_key in data and name and url:
+                                  data[cat_key][name] = url
+                                  
+                         loaded_from_cache = True
+                     except Exception as e:
+                         print(f"⚠️ Corrupt User Manifest: {e}")
+                         
+                # B. Fallback to S3 Scan (SLOW) -> Then Cache It
+                if not loaded_from_cache and bucket and username:
+                    import boto3
+                    from botocore.config import Config
+                    s3 = boto3.client(
+                        's3', 
+                        region_name=os.getenv("AWS_REGION", "ap-southeast-2"),
+                        config=Config(s3={'addressing_style': 'virtual', 'signature_version': 's3v4'})
+                    )
+                    prefix = f"users/{username}/Assets/"
+                    
+                    # List all objects in user folder
+                    paginator = s3.get_paginator('list_objects_v2')
+                    pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
+                    
+                    user_cats = {
+                        "characters": "characters",
+                        "environments": "locations", "locations": "locations",
+                        "outfits": "outfits", "wardrobe": "outfits", "clothing": "outfits", "influencer clothing": "outfits",
+                        "vibes": "vibes",
+                        "friends": "relations", "relations": "relations",
+                        "pets": "pets",
+                        "props": "props",
+                        "vehicles": "vehicles",
+                        "foods": "foods"
+                    }
+                    
+                    new_cache_list = []
+                    
+                    for page in pages:
+                        for obj in page.get('Contents', []):
+                            key = obj['Key']
+                            # key format: users/{user}/Assets/{Category}/{Asset Name...}
+                            k_parts = key.split("/")
+                            if len(k_parts) < 5: continue # Need Category + Name
+                            
+                            # k_parts[0]=users, [1]=user, [2]=Assets, [3]=Category, [4:]=Rest
+                            cat_folder_raw = k_parts[3]
+                            cat_folder = cat_folder_raw.lower().strip() # Normalize
+                            target_key = user_cats.get(cat_folder)
+                            
+                            if target_key and key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+                                # Name
+                                sub_parts = k_parts[4:-1]
+                                filename = k_parts[-1]
+                                
+                                # --- HEURISTIC FIX: Re-classify based on sub-folders ---
+                                # If user put "Clothing" folder inside "Characters", move it to Outfits
+                                sub_str = " ".join(sub_parts).lower()
+                                if "clothing" in sub_str or "outfit" in sub_str or "wardrobe" in sub_str:
+                                    target_key = "outfits"
+                                elif "environment" in sub_str or "location" in sub_str:
+                                    target_key = "locations"
+                                # --------------------------------------------------------
+
+                                name_base = os.path.splitext(filename)[0].replace('_', ' ').title()
+                                
+                                if not sub_parts:
+                                    final_name = f"(My) {name_base}"
+                                else:
+                                    p_str = " / ".join([p.replace('_', ' ').title() for p in sub_parts])
+                                    final_name = f"(My) {p_str} / {name_base}"
+                                
+                                # Generate Signed URL (valid 1 hour)
+                                url = s3.generate_presigned_url(
+                                    'get_object',
+                                    Params={'Bucket': bucket, 'Key': key},
+                                    ExpiresIn=3600
+                                )
+                                data[target_key][final_name] = url
+                                
+                                # Add to List for Cache
+                                new_cache_list.append({
+                                    "category": target_key,
+                                    "name": final_name,
+                                    "url": url,
+                                    "key": key # Store key for future checks if needed
+                                })
+                                
+                    # WRITE CACHE
+                    if new_cache_list:
+                         try:
+                             os.makedirs(user_assets_dir, exist_ok=True)
+                             with open(user_manifest_path, "w") as f:
+                                 json.dump(new_cache_list, f)
+                             print(f"✅ Generated & Saved User Manifest for {username}")
+                         except Exception as e:
+                             print(f"⚠️ Failed to save user manifest: {e}")
+                             
+                    print(f"✅ Loaded User Assets from S3 for {username} (Live Scan)")
+        except Exception as e:
+             print(f"S3 User Asset Scan Error: {e}")
+             import traceback
+             traceback.print_exc()
 
     
-
     # --- LOCAL FALLBACK (Existing Logic) ---
     if not skip_base:
         # --- ROBUST PATH DETECTION ---
