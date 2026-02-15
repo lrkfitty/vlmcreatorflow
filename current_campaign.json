@@ -1,1 +1,1689 @@
-[]
+[
+    {
+        "id": "job_1769948517_0",
+        "name": "Athleticwear / Black Pink  Biker Set  - Almafi Coast 1",
+        "description": "Engine: nano",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 19:21:57.560316",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "[SUBJECT]: (A woman with medium-tan skin, almond-shaped eyes, defined cheekbones and jawline, and a high nose bridge, athletic_muscle_definition, sculpting_fit, skin_pore_texture). Her dark hair is styled in a high bun with slicked-back edges. She is standing on the stairs in Almafi Coast, looking down at the camera with a confident pose. [OUTFIT]: (She is wearing a 'Black Pink Biker Set'. The cropped polo shirt has a short-sleeved, form-fitting cut, a half-zip closure, pink piping along the seams, and 'Girls' written in pink leopard print on the front. It features a small '21' on the back. The matching biker shorts have pink piping and XXX detailing on the sides, with 'Girls' in pink leopard print on the back and '21' on the front. The fabric has a corduroy texture that clings to her figure.) [ENVIRONMENT]: (The Amalfi Coast setting features white buildings clinging to a hillside overlooking the turquoise ocean. Pink bougainvillea cascades over the walls. The stairs are made of rough-hewn stone. The sky is a bright blue with fluffy white clouds). [LIGHTING_COHERENCE]: (The sunlight casts strong shadows and highlights the textures of the stone stairs and the fabric of her outfit. The turquoise water reflects light onto the buildings. Her skin has a warm, sun-kissed glow.) [STYLE]: (Candid, Full Body Shot, Fujifilm Superia Xtra 400, 35mm lens, a vibrant and energetic mood). High Detail, 8k.",
+                "negative_prompt": "cartoon, illustration, anime, deformed, low quality, flat lighting, 3d render, missing accessories, wrong outfit, floating subject, bad composition, cut and paste look, disconnected background, wrong skin tone, whitewashed...",
+                "aspect_ratio": "9:16",
+                "likeness_strength": 0.5,
+                "model_type": "nano"
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Campaign",
+                "char_path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Shay.So.Fine/SHAY%20STOCK%20Photo/SHay%20High%20Bun%20front.png",
+                "outfit_path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Black%20Pink%20%20Biker%20Set%20.jpg",
+                "vibe_path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Environments/Almafi%20Coast%201.jpg"
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Campaign/gen_nano_1769948680_811d2733.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Campaign/gen_nano_1769948680_811d2733.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=tJxQJ86uqhX3f93lCHtxhinwvgM%3D&Expires=1769952281",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 3 assets in parallel...\nmultimodal: Resized Character to 1147x1536\nmultimodal: Downloaded Character from URL (7.56s)\n\u26a0\ufe0f Slow Asset Processing for Character: 7.70s\nmultimodal: Downloaded Outfit from URL (1.90s)\nmultimodal: Resized Vibe to 864x1536\nmultimodal: Downloaded Vibe from URL (2.82s)\n\u26a0\ufe0f Slow Asset Processing for Vibe: 2.90s\n\u26a1 Assets processed in 7.70s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\n[SUBJECT]: (A woman with medium-tan skin, almond-shaped eyes, defined cheekbones and jawline, and a high nose bridge, athletic_muscle_definition, sculpting_fit, skin_pore_texture). Her dark hair is styled in a high bun with slicked-back edges. She is standing on the stairs in Almafi Coast, looking down at the camera with a confident pose. [OUTFIT]: (She is wearing a 'Black Pink Biker Set'. The cropped polo shirt has a short-sleeved, form-fitting cut, a half-zip closure, pink piping along the seams, and 'Girls' written in pink leopard print on the front. It features a small '21' on the back. The matching biker shorts have pink piping and XXX detailing on the sides, with 'Girls' in pink leopard print on the back and '21' on the front. The fabric has a corduroy texture that clings to her figure.) [ENVIRONMENT]: (The Amalfi Coast setting features white buildings clinging to a hillside overlooking the turquoise ocean. Pink bougainvillea cascades over the walls. The stairs are made of rough-hewn stone. The sky is a bright blue with fluffy white clouds). [LIGHTING_COHERENCE]: (The sunlight casts strong shadows and highlights the textures of the stone stairs and the fabric of her outfit. The turquoise water reflects light onto the buildings. Her skin has a warm, sun-kissed glow.) [STYLE]: (Candid, Full Body Shot, Fujifilm Superia Xtra 400, 35mm lens, a vibrant and energetic mood). High Detail, 8k.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Campaign/gen_nano_1769948680_811d2733.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 19:24:41.616421"
+    },
+    {
+        "id": "job_1769948637_1",
+        "name": "Athleticwear / Black Pink  Biker Set  - Almafi Coast 1",
+        "description": "Engine: nano",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 19:23:57.068004",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "[SUBJECT]: (Ebony skin, Deep-tan skin tone, Facial Details: [Almond Eyes, High Nose Bridge, Sharp Jawline], Black Hair in a high bun with gelled edges, athletic_muscle_definition, sculpting_fit, skin_pore_texture). [OUTFIT]: (Black cropped polo shirt with pink 'Girls' graphic, pink trim, XXX lacing detail; Matching black shorts with pink 'Girls' graphic, pink trim, XXX lacing detail; Silver Hoop Earrings). [ENVIRONMENT]: (Amalfi Coast balcony overlooking the turquoise sea, bright daylight, white stucco walls, bougainvillea flowers). [LIGHTING_COHERENCE]: (Warm sunlight, soft shadows, blue color cast from the sea, global illumination reflecting off the white walls, weight distribution on stone steps). [STYLE]: (Fashion photography, 35mm lens, full body shot, peaceful mood). High Detail, 8k.",
+                "negative_prompt": "cartoon, illustration, anime, deformed, low quality, flat lighting, 3d render, missing accessories, wrong outfit, floating subject, bad composition, cut and paste look, disconnected background, wrong skin tone, whitewashed, disfigured, unrealistic skin texture",
+                "aspect_ratio": "9:16",
+                "likeness_strength": 0.5,
+                "model_type": "nano"
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Campaign",
+                "char_path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Shay.So.Fine/SHAY%20STOCK%20Photo/SHay%20High%20Bun%20front.png",
+                "outfit_path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Black%20Pink%20%20Biker%20Set%20.jpg",
+                "vibe_path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Environments/Almafi%20Coast%201.jpg"
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Campaign/gen_nano_1769948723_7a76894c.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Campaign/gen_nano_1769948723_7a76894c.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=clElRk8xJXpEk4FmEMVa9V8eo2A%3D&Expires=1769952325",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 3 assets in parallel...\nmultimodal: Resized Character to 1147x1536\nmultimodal: Downloaded Character from URL (15.34s)\n\u26a0\ufe0f Slow Asset Processing for Character: 15.49s\nmultimodal: Downloaded Outfit from URL (1.08s)\nmultimodal: Resized Vibe to 864x1536\nmultimodal: Downloaded Vibe from URL (1.08s)\n\u26a1 Assets processed in 15.49s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\n[SUBJECT]: (Ebony skin, Deep-tan skin tone, Facial Details: [Almond Eyes, High Nose Bridge, Sharp Jawline], Black Hair in a high bun with gelled edges, athletic_muscle_definition, sculpting_fit, skin_pore_texture). [OUTFIT]: (Black cropped polo shirt with pink 'Girls' graphic, pink trim, XXX lacing detail; Matching black shorts with pink 'Girls' graphic, pink trim, XXX lacing detail; Silver Hoop Earrings). [ENVIRONMENT]: (Amalfi Coast balcony overlooking the turquoise sea, bright daylight, white stucco walls, bougainvillea flowers). [LIGHTING_COHERENCE]: (Warm sunlight, soft shadows, blue color cast from the sea, global illumination reflecting off the white walls, weight distribution on stone steps). [STYLE]: (Fashion photography, 35mm lens, full body shot, peaceful mood). High Detail, 8k.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Campaign/gen_nano_1769948723_7a76894c.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 19:25:25.089394"
+    },
+    {
+        "id": "job_1769949038_2",
+        "name": "Storyboard Shot 1",
+        "description": "Scene: Beauty Product Application (Close-Up)",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 19:30:38.946891",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "EXTREME CLOSE-UP. Angeil 1, casual attire, soft commercial lighting, spa backdrop. Dewy skin. Focus on hand delicately applying serum to cheek, macro details of skin texture, pores., Extreme close-up of  Angeil 1  applying serum or cream to cheek, background details, wearing casual outfit, dewy skin texture, macro details, soft commercial lighting, spa-like generic location background.",
+                "aspect_ratio": "9:16",
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Angeil 1 /Angeil 1 .png",
+                        "label": "Main Character"
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Campaign",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Campaign/gen_nano_1769949076_18d440b1.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Campaign/gen_nano_1769949076_18d440b1.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=GpOlZmomSL0CKE3sanzM2qUgsfA%3D&Expires=1769952679",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 1 assets in parallel...\nmultimodal: Included Main Character reference (Local)\n\u26a1 Assets processed in 0.01s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nEXTREME CLOSE-UP. Angeil 1, casual attire, soft commercial lighting, spa backdrop. Dewy skin. Focus on hand delicately applying serum to cheek, macro details of skin texture, pores., Extreme close-up of  Angeil 1  applying serum or cream to cheek, background details, wearing casual outfit, dewy skin texture, macro details, soft commercial lighting, spa-like generic location background.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Campaign/gen_nano_1769949076_18d440b1.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 19:31:19.557267"
+    },
+    {
+        "id": "job_1769949038_3",
+        "name": "Storyboard Shot 2",
+        "description": "Scene: Beauty Product Application (Close-Up)",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 19:30:38.950343",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "CLOSE UP. Angeil 1, side profile, casual outfit, soft lighting. Applying serum to cheek. Spa setting. One hand mid-application, eyes closed in serenity. Spa-like background with blurred details., Extreme close-up of  Angeil 1  applying serum or cream to cheek, background details, wearing casual outfit, dewy skin texture, macro details, soft commercial lighting, spa-like generic location background.",
+                "aspect_ratio": "9:16",
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Angeil 1 /Angeil 1 .png",
+                        "label": "Main Character"
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Campaign",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Campaign/gen_nano_1769949098_1cac1b64.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Campaign/gen_nano_1769949098_1cac1b64.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=xnNBIAOSKrZg%2BOpjP2ePClG8XJk%3D&Expires=1769952699",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 1 assets in parallel...\nmultimodal: Included Main Character reference (Local)\n\u26a1 Assets processed in 0.01s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nCLOSE UP. Angeil 1, side profile, casual outfit, soft lighting. Applying serum to cheek. Spa setting. One hand mid-application, eyes closed in serenity. Spa-like background with blurred details., Extreme close-up of  Angeil 1  applying serum or cream to cheek, background details, wearing casual outfit, dewy skin texture, macro details, soft commercial lighting, spa-like generic location background.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Campaign/gen_nano_1769949098_1cac1b64.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 19:31:39.589494"
+    },
+    {
+        "id": "job_1769949038_4",
+        "name": "Storyboard Shot 3",
+        "description": "Scene: Beauty Product Application (Close-Up)",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 19:30:38.951382",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "MEDIUM SHOT. Angeil 1 in casual outfit, soft lighting, spa environment. Applying serum to both cheeks, hands moving rhythmically. Background is a blur of spa elements. Focus on relaxed expression., Extreme close-up of  Angeil 1  applying serum or cream to cheek, background details, wearing casual outfit, dewy skin texture, macro details, soft commercial lighting, spa-like generic location background.",
+                "aspect_ratio": "9:16",
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Angeil 1 /Angeil 1 .png",
+                        "label": "Main Character"
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Campaign",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Campaign/gen_nano_1769949120_8bfc18d5.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Campaign/gen_nano_1769949120_8bfc18d5.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=IaSwr5Wd7%2F%2Bz%2FNjFF8nkUspcL8k%3D&Expires=1769952723",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 1 assets in parallel...\nmultimodal: Included Main Character reference (Local)\n\u26a1 Assets processed in 0.01s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nMEDIUM SHOT. Angeil 1 in casual outfit, soft lighting, spa environment. Applying serum to both cheeks, hands moving rhythmically. Background is a blur of spa elements. Focus on relaxed expression., Extreme close-up of  Angeil 1  applying serum or cream to cheek, background details, wearing casual outfit, dewy skin texture, macro details, soft commercial lighting, spa-like generic location background.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Campaign/gen_nano_1769949120_8bfc18d5.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 19:32:03.600297"
+    },
+    {
+        "id": "job_1769949038_5",
+        "name": "Storyboard Shot 4",
+        "description": "Scene: Beauty Product Application (Close-Up)",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 19:30:38.951902",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "CLOSE UP. Angeil 1, casual outfit, spa-like setting, soft commercial lighting. Angeil 1 looks directly at the camera with dewy skin after serum application, showcasing a radiant glow. Background softly blurred., Extreme close-up of  Angeil 1  applying serum or cream to cheek, background details, wearing casual outfit, dewy skin texture, macro details, soft commercial lighting, spa-like generic location background.",
+                "aspect_ratio": "9:16",
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Angeil 1 /Angeil 1 .png",
+                        "label": "Main Character"
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Campaign",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Campaign/gen_nano_1769949140_cc59bc15.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Campaign/gen_nano_1769949140_cc59bc15.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=63u2v3dJzf078VxlhkKFiBI9Lz8%3D&Expires=1769952743",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 1 assets in parallel...\nmultimodal: Included Main Character reference (Local)\n\u26a1 Assets processed in 0.01s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nCLOSE UP. Angeil 1, casual outfit, spa-like setting, soft commercial lighting. Angeil 1 looks directly at the camera with dewy skin after serum application, showcasing a radiant glow. Background softly blurred., Extreme close-up of  Angeil 1  applying serum or cream to cheek, background details, wearing casual outfit, dewy skin texture, macro details, soft commercial lighting, spa-like generic location background.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Campaign/gen_nano_1769949140_cc59bc15.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 19:32:23.895693"
+    },
+    {
+        "id": "job_1769949044_6",
+        "name": "WB_Scene_1769949044",
+        "description": "World Builder Scene",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 19:30:44.634186",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Extreme close-up of  Angeil 1  applying serum or cream to cheek, background details, wearing casual outfit, dewy skin texture, macro details, soft commercial lighting, spa-like generic location background.",
+                "aspect_ratio": "9:16",
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Angeil 1 /Angeil 1 .png",
+                        "label": "Main Character"
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/World",
+                "char_path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Angeil 1 /Angeil 1 .png",
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/World/gen_nano_1769949162_d4832dfa.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/World/gen_nano_1769949162_d4832dfa.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=kIeH4SY3jiSgu2D%2FwljwO5uDqvY%3D&Expires=1769952765",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 1 assets in parallel...\nmultimodal: Included Main Character reference (Local)\n\u26a1 Assets processed in 0.01s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nExtreme close-up of  Angeil 1  applying serum or cream to cheek, background details, wearing casual outfit, dewy skin texture, macro details, soft commercial lighting, spa-like generic location background.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/World/gen_nano_1769949162_d4832dfa.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 19:32:45.398971"
+    },
+    {
+        "id": "job_1769951001_7",
+        "name": "EpTropical_Getaway_S1_Sh1",
+        "description": "Scene 1 Shot 1",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.770986",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Morning. Wide Shot, High Angle. (My) and Chels walk along a white sand beach, the crystal-clear turquoise water shimmering in the sun. The sun highlights their form. Morning, Golden Hour Hard Light, Deep focus. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. White sand reflects the vibrant light. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Relaxed, serene.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Grey%20Bodysuit%20.jpg",
+                        "label": "Outfit: Lounge Wear / Grey Bodysuit "
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Pink%20athletic%20Hoodie%20.jpg",
+                        "label": "Outfit: Athleticwear / Pink Athletic Hoodie "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951047_84ea2690.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951047_84ea2690.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=dlRKzWuuTH9Q2WcRxGWfMnbw8lA%3D&Expires=1769954649",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 4 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Grey Bodysuit  from URL (0.91s)\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Downloaded Outfit: Athleticwear / Pink Athletic Hoodie  from URL (0.94s)\n\u26a1 Assets processed in 0.95s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Morning. Wide Shot, High Angle. (My) and Chels walk along a white sand beach, the crystal-clear turquoise water shimmering in the sun. The sun highlights their form. Morning, Golden Hour Hard Light, Deep focus. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. White sand reflects the vibrant light. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Relaxed, serene.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951047_84ea2690.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:04:09.227092"
+    },
+    {
+        "id": "job_1769951001_8",
+        "name": "EpTropical_Getaway_S1_Sh2",
+        "description": "Scene 1 Shot 2",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.772544",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Morning. Medium Shot, Eye Level. Chels laughs, tilting her head back as (My) says something funny. Sun shines down on them. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Soft, white beach towel with subtle patterns. Chels wearing the Pink Athletic Hoodie. (My) wearing the Grey Bodysuit. Atmosphere: Joyful, carefree.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Grey%20Bodysuit%20.jpg",
+                        "label": "Outfit: Lounge Wear / Grey Bodysuit "
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Pink%20athletic%20Hoodie%20.jpg",
+                        "label": "Outfit: Athleticwear / Pink Athletic Hoodie "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951085_35d34008.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951085_35d34008.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=hTEzLgVJYIVukWnhJUJ08ZP6iMg%3D&Expires=1769954689",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 4 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Grey Bodysuit  from URL (0.71s)\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Downloaded Outfit: Athleticwear / Pink Athletic Hoodie  from URL (0.70s)\n\u26a1 Assets processed in 0.73s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Morning. Medium Shot, Eye Level. Chels laughs, tilting her head back as (My) says something funny. Sun shines down on them. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Soft, white beach towel with subtle patterns. Chels wearing the Pink Athletic Hoodie. (My) wearing the Grey Bodysuit. Atmosphere: Joyful, carefree.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951085_35d34008.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:04:49.183344"
+    },
+    {
+        "id": "job_1769951001_9",
+        "name": "EpTropical_Getaway_S1_Sh3",
+        "description": "Scene 1 Shot 3",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.773497",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Morning. Close Up, Eye Level. Close-up of Chels's hand holding a vibrant tropical drink. Condensation glistens on the glass, catching the light. Her rings sparkle. Day, Rembrandt lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Colorful drink with fruit garnish. Chels's hand with subtle tattoos and jewelry. Atmosphere: Refreshing, indulgent.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Pink%20athletic%20Hoodie%20.jpg",
+                        "label": "Outfit: Athleticwear / Pink Athletic Hoodie "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951108_dbd9df5c.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951108_dbd9df5c.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=dFSp%2F3g6Vf0eMYy9E03R%2F97CGKo%3D&Expires=1769954710",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 2 assets in parallel...\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Downloaded Outfit: Athleticwear / Pink Athletic Hoodie  from URL (0.72s)\n\u26a1 Assets processed in 0.73s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Morning. Close Up, Eye Level. Close-up of Chels's hand holding a vibrant tropical drink. Condensation glistens on the glass, catching the light. Her rings sparkle. Day, Rembrandt lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Colorful drink with fruit garnish. Chels's hand with subtle tattoos and jewelry. Atmosphere: Refreshing, indulgent.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951108_dbd9df5c.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:05:10.513775"
+    },
+    {
+        "id": "job_1769951001_10",
+        "name": "EpTropical_Getaway_S1_Sh4",
+        "description": "Scene 1 Shot 4",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.774558",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Golden Hour. Wide Shot, Low Angle. (My) and Chels silhouetted against the vibrant sunset, arms around each other, enjoying the moment. The sun paints the sky with rich colors. Golden Hour, Golden Hour Hard Light, Deep focus. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Ocean reflecting the sunset's colors. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Romantic, peaceful.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Grey%20Bodysuit%20.jpg",
+                        "label": "Outfit: Lounge Wear / Grey Bodysuit "
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Pink%20athletic%20Hoodie%20.jpg",
+                        "label": "Outfit: Athleticwear / Pink Athletic Hoodie "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951143_a9275939.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951143_a9275939.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=QlotsRHMT%2B0zcrjx%2BJkE%2F8yzOls%3D&Expires=1769954745",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 4 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Grey Bodysuit  from URL (0.94s)\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Downloaded Outfit: Athleticwear / Pink Athletic Hoodie  from URL (0.74s)\n\u26a1 Assets processed in 0.96s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Golden Hour. Wide Shot, Low Angle. (My) and Chels silhouetted against the vibrant sunset, arms around each other, enjoying the moment. The sun paints the sky with rich colors. Golden Hour, Golden Hour Hard Light, Deep focus. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Ocean reflecting the sunset's colors. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Romantic, peaceful.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951143_a9275939.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:05:45.037608"
+    },
+    {
+        "id": "job_1769951001_11",
+        "name": "EpTropical_Getaway_S1_Sh5",
+        "description": "Scene 1 Shot 5",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.775738",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Morning. Medium Shot, Eye Level. (My) carefully applying sunscreen to Chels's back, her touch gentle and caring. The sun illuminates their skin. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Bottle of sunscreen with water droplets. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Intimate, tender.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Grey%20Bodysuit%20.jpg",
+                        "label": "Outfit: Lounge Wear / Grey Bodysuit "
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Pink%20athletic%20Hoodie%20.jpg",
+                        "label": "Outfit: Athleticwear / Pink Athletic Hoodie "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951177_58b39680.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951177_58b39680.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=hErrHDzy5akW6xl%2Fr7U1NSRHZ0I%3D&Expires=1769954778",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 4 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Grey Bodysuit  from URL (0.71s)\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Downloaded Outfit: Athleticwear / Pink Athletic Hoodie  from URL (0.81s)\n\u26a1 Assets processed in 0.82s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Morning. Medium Shot, Eye Level. (My) carefully applying sunscreen to Chels's back, her touch gentle and caring. The sun illuminates their skin. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Bottle of sunscreen with water droplets. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Intimate, tender.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951177_58b39680.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:06:18.715340"
+    },
+    {
+        "id": "job_1769951001_12",
+        "name": "EpTropical_Getaway_S1_Sh6",
+        "description": "Scene 1 Shot 6",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.776804",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Morning. Close Up, High Angle. Close-up of (My) face, relaxed and content, with a subtle smile. The sun kisses her skin, highlighting her features. Day, Neon lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Beach sand with seashell fragments. (My) wearing the Grey Bodysuit. Atmosphere: Peaceful, serene.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Grey%20Bodysuit%20.jpg",
+                        "label": "Outfit: Lounge Wear / Grey Bodysuit "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951204_a48cf8e3.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951204_a48cf8e3.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=oOnkPNg4LyySnmzhpe6yNO3zYyM%3D&Expires=1769954806",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 2 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Grey Bodysuit  from URL (0.68s)\n\u26a1 Assets processed in 0.70s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Morning. Close Up, High Angle. Close-up of (My) face, relaxed and content, with a subtle smile. The sun kisses her skin, highlighting her features. Day, Neon lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Beach sand with seashell fragments. (My) wearing the Grey Bodysuit. Atmosphere: Peaceful, serene.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951204_a48cf8e3.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:06:46.380493"
+    },
+    {
+        "id": "job_1769951001_13",
+        "name": "EpTropical_Getaway_S1_Sh7",
+        "description": "Scene 1 Shot 7",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.777765",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Morning. Medium Shot, Eye Level. Chels and (My) are talking and laughing. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Joyful, carefree.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Grey%20Bodysuit%20.jpg",
+                        "label": "Outfit: Lounge Wear / Grey Bodysuit "
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Pink%20athletic%20Hoodie%20.jpg",
+                        "label": "Outfit: Athleticwear / Pink Athletic Hoodie "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951238_545f716a.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951238_545f716a.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=A93QSQev1pln1mqOqcuS3FDeNfE%3D&Expires=1769954839",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 4 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Grey Bodysuit  from URL (0.71s)\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Downloaded Outfit: Athleticwear / Pink Athletic Hoodie  from URL (0.70s)\n\u26a1 Assets processed in 0.73s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Morning. Medium Shot, Eye Level. Chels and (My) are talking and laughing. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Joyful, carefree.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951238_545f716a.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:07:19.831323"
+    },
+    {
+        "id": "job_1769951001_14",
+        "name": "EpTropical_Getaway_S1_Sh8",
+        "description": "Scene 1 Shot 8",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.778829",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Morning. Close Up, Eye Level. Chels looks directly at the camera and smiles. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Joyful, carefree.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Pink%20athletic%20Hoodie%20.jpg",
+                        "label": "Outfit: Athleticwear / Pink Athletic Hoodie "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951257_bd6f8ba1.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951257_bd6f8ba1.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=0Mby%2BYf%2BDHbj8USZTk4dhnygPQE%3D&Expires=1769954859",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 2 assets in parallel...\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Downloaded Outfit: Athleticwear / Pink Athletic Hoodie  from URL (0.69s)\n\u26a1 Assets processed in 0.71s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Morning. Close Up, Eye Level. Chels looks directly at the camera and smiles. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Joyful, carefree.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951257_bd6f8ba1.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:07:39.093281"
+    },
+    {
+        "id": "job_1769951001_15",
+        "name": "EpTropical_Getaway_S1_Sh9",
+        "description": "Scene 1 Shot 9",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.780034",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Morning. Medium Shot, Eye Level. Chels hugs (My). Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Joyful, carefree.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Grey%20Bodysuit%20.jpg",
+                        "label": "Outfit: Lounge Wear / Grey Bodysuit "
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Pink%20athletic%20Hoodie%20.jpg",
+                        "label": "Outfit: Athleticwear / Pink Athletic Hoodie "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951294_2a36a45d.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951294_2a36a45d.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=sbrSPIXoiyUgT6ipgTyFcH9ZToU%3D&Expires=1769954899",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 4 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Grey Bodysuit  from URL (0.70s)\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Downloaded Outfit: Athleticwear / Pink Athletic Hoodie  from URL (0.83s)\n\u26a1 Assets processed in 0.84s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Morning. Medium Shot, Eye Level. Chels hugs (My). Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Joyful, carefree.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951294_2a36a45d.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:08:19.184696"
+    },
+    {
+        "id": "job_1769951001_16",
+        "name": "EpTropical_Getaway_S1_Sh10",
+        "description": "Scene 1 Shot 10",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.781264",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Morning. Close Up, Eye Level. (My) looks directly at the camera and smiles. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Joyful, carefree.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Grey%20Bodysuit%20.jpg",
+                        "label": "Outfit: Lounge Wear / Grey Bodysuit "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951319_68af8d95.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951319_68af8d95.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=418QXF%2FjAp1VQYM7LLmyU7nAUmc%3D&Expires=1769954920",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 2 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Grey Bodysuit  from URL (0.78s)\n\u26a1 Assets processed in 0.81s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Morning. Close Up, Eye Level. (My) looks directly at the camera and smiles. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Joyful, carefree.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951319_68af8d95.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:08:40.408126"
+    },
+    {
+        "id": "job_1769951001_17",
+        "name": "EpTropical_Getaway_S1_Sh11",
+        "description": "Scene 1 Shot 11",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.782902",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Morning. Wide Shot, Eye Level. (My) and Chels are laying on the sand. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Joyful, carefree.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Grey%20Bodysuit%20.jpg",
+                        "label": "Outfit: Lounge Wear / Grey Bodysuit "
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Pink%20athletic%20Hoodie%20.jpg",
+                        "label": "Outfit: Athleticwear / Pink Athletic Hoodie "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951349_bf6f090d.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951349_bf6f090d.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=OjhoB1YHpKmCbxalfx4aWlGNim8%3D&Expires=1769954951",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 4 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Grey Bodysuit  from URL (0.71s)\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Downloaded Outfit: Athleticwear / Pink Athletic Hoodie  from URL (0.71s)\n\u26a1 Assets processed in 0.73s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Morning. Wide Shot, Eye Level. (My) and Chels are laying on the sand. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. (My) wearing the Grey Bodysuit. Chels wearing the Pink Athletic Hoodie. Atmosphere: Joyful, carefree.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951349_bf6f090d.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:09:11.092868"
+    },
+    {
+        "id": "job_1769951001_18",
+        "name": "EpTropical_Getaway_S1_Sh12",
+        "description": "Scene 1 Shot 12",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:03:21.784412",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Morning. Wide Shot, Eye Level. A serene shot of tropical paradise beach, untouched by footprints. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Atmosphere: Joyful, carefree.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": []
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951368_65c603d0.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951368_65c603d0.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=AvEG3r%2FM3Tt8qr9noK8CdVaA79U%3D&Expires=1769954971",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Morning. Wide Shot, Eye Level. A serene shot of tropical paradise beach, untouched by footprints. Day, Soft Box lighting, Shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still, raw photography. Atmosphere: Joyful, carefree.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Tropical_Getaway/gen_nano_1769951368_65c603d0.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:09:31.661905"
+    },
+    {
+        "id": "job_1769953861_19",
+        "name": "Athleticwear / Orange With Black Zip Up  - (My) Atlanta Braves Game",
+        "description": "Engine: nano",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 20:51:01.893137",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "[SUBJECT]: (Fair-Skinned Eastern European woman, almond eyes, high nose bridge, sharp jawline, blonde hair in a messy bun with face-framing strands, smiling wide, full upper-body selfie, sculpting_fit, skin_pore_texture). [OUTFIT]: (Orange athletic shorts with a fitted silhouette, black long-sleeve zip-up athletic jacket, white Nike socks, white Nike Metcon sneakers, black headband, gold hoop earrings, Apple Watch with a black band, Stanley tumbler with a straw). [ENVIRONMENT]: (Outside the 'Atlanta Braves' stadium at night, bright neon lights casting a pink and blue glow, large open plaza with concrete flooring). [LIGHTING_COHERENCE]: (Pink and blue color cast from neon signs, soft contact shadows under feet, global illumination reflecting off skin, weight distribution appears natural). [STYLE]: (iPhone 15 Pro Max selfie, selfie angle from slightly above, social media aesthetic, cheerful and energetic mood). High Detail, 8k.",
+                "negative_prompt": "cartoon, illustration, anime, deformed, low quality, flat lighting, 3d render, missing accessories, wrong outfit, floating subject, bad composition, cut and paste look, disconnected background, wrong skin tone, whitewashed, blurry image.",
+                "aspect_ratio": "9:16",
+                "likeness_strength": 0.5,
+                "model_type": "nano"
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Campaign",
+                "char_path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Gemma /Gemma .png",
+                "outfit_path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Orange%20with%20black%20zip%20up%20.png",
+                "vibe_path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Environments/Atlanta Braves Game.jpg"
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Campaign/gen_nano_1769953927_b24d1779.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Campaign/gen_nano_1769953927_b24d1779.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=C%2FXplilagIeGAqBAzLDY7uKMK8I%3D&Expires=1769957529",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 3 assets in parallel...\nmultimodal: Included Character reference (Local)\nmultimodal: Resized Outfit to 864x1536\nmultimodal: Downloaded Outfit from URL (9.95s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: 10.00s\nmultimodal: Included Vibe reference (Local)\n\u26a1 Assets processed in 10.00s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\n[SUBJECT]: (Fair-Skinned Eastern European woman, almond eyes, high nose bridge, sharp jawline, blonde hair in a messy bun with face-framing strands, smiling wide, full upper-body selfie, sculpting_fit, skin_pore_texture). [OUTFIT]: (Orange athletic shorts with a fitted silhouette, black long-sleeve zip-up athletic jacket, white Nike socks, white Nike Metcon sneakers, black headband, gold hoop earrings, Apple Watch with a black band, Stanley tumbler with a straw). [ENVIRONMENT]: (Outside the 'Atlanta Braves' stadium at night, bright neon lights casting a pink and blue glow, large open plaza with concrete flooring). [LIGHTING_COHERENCE]: (Pink and blue color cast from neon signs, soft contact shadows under feet, global illumination reflecting off skin, weight distribution appears natural). [STYLE]: (iPhone 15 Pro Max selfie, selfie angle from slightly above, social media aesthetic, cheerful and energetic mood). High Detail, 8k.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Campaign/gen_nano_1769953927_b24d1779.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 20:52:09.090297"
+    },
+    {
+        "id": "job_1769956596_20",
+        "name": "EpThrouple's_Delight_S1_Sh1",
+        "description": "Scene 1 Shot 1",
+        "status": "failed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.278816",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Wide shot, eye level. Chels, (My), and Shays stand in a modern kitchen, bathed in soft LED and natural light. Chels wearing Boots And Boyshorts Fur, (My) wearing Lounge Wear / Beige Bodysuit, and Shays wearing Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit, share a laugh. Night, Rembrandt lighting, shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Modern kitchen with stainless steel appliances and marble countertops. Chels outfit showing textures of camo material, (My)'s lounge wear draped softly, Shay's outfit showing texture and movement. Warm atmosphere.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Outfits/boots and boyshorts fur.png",
+                        "label": "Outfit: (My) Boots And Boyshorts Fur"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Beige%20Bodysuit.jpg",
+                        "label": "Outfit: Lounge Wear / Beige Bodysuit"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/assets/AI Content Creators/Friends/Mens Friends/Shays bofriend full view .png",
+                        "label": "Cast: Shays"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Mens%20clothing/Mens%20High%20Fashion/Cowprint%20SLide%20Brown%20Fit%20.png",
+                        "label": "Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "failed",
+                "image_path": null,
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 6 assets in parallel...\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Resized Outfit: (My) Boots And Boyshorts Fur to 864x1536\nmultimodal: Included Outfit: (My) Boots And Boyshorts Fur reference (Local)\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Beige Bodysuit from URL (2.62s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: Lounge Wear / Beige Bodysuit: 2.64s\nmultimodal: Resized Cast: Shays to 1237x1536\nmultimodal: Included Cast: Shays reference (Local)\nmultimodal: Resized Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  to 864x1536\nmultimodal: Downloaded Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  from URL (5.73s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit : 5.82s\n\u26a1 Assets processed in 5.84s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Wide shot, eye level. Chels, (My), and Shays stand in a modern kitchen, bathed in soft LED and natural light. Chels wearing Boots And Boyshorts Fur, (My) wearing Lounge Wear / Beige Bodysuit, and Shays wearing Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit, share a laugh. Night, Rembrandt lighting, shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Modern kitchen with stainless steel appliances and marble countertops. Chels outfit showing textures of camo material, (My)'s lounge wear draped softly, Shay's outfit showing texture and movement. Warm atmosphere.'\n\u26a0\ufe0f Model Overloaded (503). Retrying in 1s... (1/3)\n\u26a0\ufe0f Model Overloaded (503). Retrying in 2s... (2/3)\n\u26a0\ufe0f Model Overloaded (503). Retrying in 4s... (3/3)\n\u274c Nano Model Failed: Model Overloaded (503) after 3 retries."
+            }
+        ],
+        "error": "Unknown Error",
+        "completed_at": "2026-02-01 21:43:48.251320"
+    },
+    {
+        "id": "job_1769956596_21",
+        "name": "EpThrouple's_Delight_S1_Sh2",
+        "description": "Scene 1 Shot 2",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.280857",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Medium shot, slightly high angle. (My) chopping vegetables at the kitchen island, Chels leans against the counter, and Shays watches with a warm smile. Night, soft box lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Modern kitchen with stainless steel appliances and marble countertops. (My)'s outfit showing the textures of the fabrics, warm atmosphere, golden hour light.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Beige%20Bodysuit.jpg",
+                        "label": "Outfit: Lounge Wear / Beige Bodysuit"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Outfits/boots and boyshorts fur.png",
+                        "label": "Outfit: (My) Boots And Boyshorts Fur"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/assets/AI Content Creators/Friends/Mens Friends/Shays bofriend full view .png",
+                        "label": "Cast: Shays"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Mens%20clothing/Mens%20High%20Fashion/Cowprint%20SLide%20Brown%20Fit%20.png",
+                        "label": "Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957075_5ee6de35.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Throuple%27s_Delight/gen_nano_1769957075_5ee6de35.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=cVe454ODYYcB6tFU9jK5FmktKLI%3D&Expires=1769960679",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 6 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Beige Bodysuit from URL (0.79s)\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Resized Outfit: (My) Boots And Boyshorts Fur to 864x1536\nmultimodal: Included Outfit: (My) Boots And Boyshorts Fur reference (Local)\nmultimodal: Resized Cast: Shays to 1237x1536\nmultimodal: Included Cast: Shays reference (Local)\nmultimodal: Resized Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  to 864x1536\nmultimodal: Downloaded Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  from URL (6.38s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit : 6.47s\n\u26a1 Assets processed in 6.49s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Medium shot, slightly high angle. (My) chopping vegetables at the kitchen island, Chels leans against the counter, and Shays watches with a warm smile. Night, soft box lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Modern kitchen with stainless steel appliances and marble countertops. (My)'s outfit showing the textures of the fabrics, warm atmosphere, golden hour light.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957075_5ee6de35.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 21:44:39.328025"
+    },
+    {
+        "id": "job_1769956596_22",
+        "name": "EpThrouple's_Delight_S1_Sh3",
+        "description": "Scene 1 Shot 3",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.282341",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Close up, eye level. Shays listens intently to Chels, his expression warm and engaged, soft smile playing on his lips. Night, Rembrandt lighting, shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. The texture of his outfit is sharp and contrasted against his face.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/assets/AI Content Creators/Friends/Mens Friends/Shays bofriend full view .png",
+                        "label": "Cast: Shays"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Mens%20clothing/Mens%20High%20Fashion/Cowprint%20SLide%20Brown%20Fit%20.png",
+                        "label": "Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957132_7a025e19.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Throuple%27s_Delight/gen_nano_1769957132_7a025e19.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=sIeYhE7WFUmEc6WCV7GNVNqXnEo%3D&Expires=1769960734",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 2 assets in parallel...\nmultimodal: Resized Cast: Shays to 1237x1536\nmultimodal: Included Cast: Shays reference (Local)\nmultimodal: Resized Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  to 864x1536\nmultimodal: Downloaded Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  from URL (1.49s)\n\u26a1 Assets processed in 1.58s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Close up, eye level. Shays listens intently to Chels, his expression warm and engaged, soft smile playing on his lips. Night, Rembrandt lighting, shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. The texture of his outfit is sharp and contrasted against his face.'\n\u26a0\ufe0f Model Overloaded (503). Retrying in 1s... (1/3)\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957132_7a025e19.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 21:45:34.511097"
+    },
+    {
+        "id": "job_1769956596_23",
+        "name": "EpThrouple's_Delight_S1_Sh4",
+        "description": "Scene 1 Shot 4",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.283847",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Medium shot, eye level. Chels and (My) burst into laughter, throwing their heads back, Shays joins in. Night, soft box lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Kitchen ambiance showing modern decor, Chels' outfit showing camo texture.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Outfits/boots and boyshorts fur.png",
+                        "label": "Outfit: (My) Boots And Boyshorts Fur"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Beige%20Bodysuit.jpg",
+                        "label": "Outfit: Lounge Wear / Beige Bodysuit"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/assets/AI Content Creators/Friends/Mens Friends/Shays bofriend full view .png",
+                        "label": "Cast: Shays"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Mens%20clothing/Mens%20High%20Fashion/Cowprint%20SLide%20Brown%20Fit%20.png",
+                        "label": "Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957212_c7ab5bd4.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Throuple%27s_Delight/gen_nano_1769957212_c7ab5bd4.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=uLjeAIAMGrronyQ7wMDVhgvjptw%3D&Expires=1769960814",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 6 assets in parallel...\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Resized Outfit: (My) Boots And Boyshorts Fur to 864x1536\nmultimodal: Included Outfit: (My) Boots And Boyshorts Fur reference (Local)\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Beige Bodysuit from URL (0.72s)\nmultimodal: Resized Cast: Shays to 1237x1536\nmultimodal: Included Cast: Shays reference (Local)\nmultimodal: Resized Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  to 864x1536\nmultimodal: Downloaded Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  from URL (3.02s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit : 3.11s\n\u26a1 Assets processed in 3.12s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Medium shot, eye level. Chels and (My) burst into laughter, throwing their heads back, Shays joins in. Night, soft box lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Kitchen ambiance showing modern decor, Chels' outfit showing camo texture.'\n\u26a0\ufe0f Model Overloaded (503). Retrying in 1s... (1/3)\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957212_c7ab5bd4.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 21:46:54.335709"
+    },
+    {
+        "id": "job_1769956596_24",
+        "name": "EpThrouple's_Delight_S2_Sh1",
+        "description": "Scene 2 Shot 1",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.285244",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Wide shot, high angle. (My), Chels, and Shays seated at an elegantly set table, surrounded by the soft chatter of other diners. Night, ambient lighting, deep focus. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. High-end restaurant with soft ambient light and elegantly set tables.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Beige%20Bodysuit.jpg",
+                        "label": "Outfit: Lounge Wear / Beige Bodysuit"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Outfits/boots and boyshorts fur.png",
+                        "label": "Outfit: (My) Boots And Boyshorts Fur"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/assets/AI Content Creators/Friends/Mens Friends/Shays bofriend full view .png",
+                        "label": "Cast: Shays"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Mens%20clothing/Mens%20High%20Fashion/Cowprint%20SLide%20Brown%20Fit%20.png",
+                        "label": "Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957263_d1d45204.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Throuple%27s_Delight/gen_nano_1769957263_d1d45204.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=th9Uu23QzB4911Kuc57U7Av9czI%3D&Expires=1769960865",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 6 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Beige Bodysuit from URL (0.72s)\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Resized Outfit: (My) Boots And Boyshorts Fur to 864x1536\nmultimodal: Included Outfit: (My) Boots And Boyshorts Fur reference (Local)\nmultimodal: Resized Cast: Shays to 1237x1536\nmultimodal: Included Cast: Shays reference (Local)\nmultimodal: Resized Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  to 864x1536\nmultimodal: Downloaded Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  from URL (5.63s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit : 5.72s\n\u26a1 Assets processed in 5.74s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Wide shot, high angle. (My), Chels, and Shays seated at an elegantly set table, surrounded by the soft chatter of other diners. Night, ambient lighting, deep focus. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. High-end restaurant with soft ambient light and elegantly set tables.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957263_d1d45204.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 21:47:45.068692"
+    },
+    {
+        "id": "job_1769956596_25",
+        "name": "EpThrouple's_Delight_S2_Sh2",
+        "description": "Scene 2 Shot 2",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.286935",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Medium shot, eye level. (My), Chels, and Shays raise their glasses in a toast, faces illuminated by candlelight. Night, Rembrandt lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with elegant table settings and soft candlelight.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Beige%20Bodysuit.jpg",
+                        "label": "Outfit: Lounge Wear / Beige Bodysuit"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Outfits/boots and boyshorts fur.png",
+                        "label": "Outfit: (My) Boots And Boyshorts Fur"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/assets/AI Content Creators/Friends/Mens Friends/Shays bofriend full view .png",
+                        "label": "Cast: Shays"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Mens%20clothing/Mens%20High%20Fashion/Cowprint%20SLide%20Brown%20Fit%20.png",
+                        "label": "Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957302_41ca235d.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Throuple%27s_Delight/gen_nano_1769957302_41ca235d.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=vrHbAlxAB8LGcVlBq%2Fh8o2KZf9E%3D&Expires=1769960905",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 6 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Beige Bodysuit from URL (0.70s)\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Resized Outfit: (My) Boots And Boyshorts Fur to 864x1536\nmultimodal: Included Outfit: (My) Boots And Boyshorts Fur reference (Local)\nmultimodal: Resized Cast: Shays to 1237x1536\nmultimodal: Included Cast: Shays reference (Local)\nmultimodal: Resized Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  to 864x1536\nmultimodal: Downloaded Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  from URL (5.08s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit : 5.18s\n\u26a1 Assets processed in 5.19s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Medium shot, eye level. (My), Chels, and Shays raise their glasses in a toast, faces illuminated by candlelight. Night, Rembrandt lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with elegant table settings and soft candlelight.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957302_41ca235d.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 21:48:25.038439"
+    },
+    {
+        "id": "job_1769956596_26",
+        "name": "EpThrouple's_Delight_S2_Sh3",
+        "description": "Scene 2 Shot 3",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.288827",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Close up, slightly low angle. Chels's face, eyes sparkling with joy as she smiles at (My). Night, specular lighting, shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Her outfit is contrasted against candle lights.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Outfits/boots and boyshorts fur.png",
+                        "label": "Outfit: (My) Boots And Boyshorts Fur"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Beige%20Bodysuit.jpg",
+                        "label": "Outfit: Lounge Wear / Beige Bodysuit"
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957340_de44dccc.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Throuple%27s_Delight/gen_nano_1769957340_de44dccc.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=e2ubFeXQ%2BtinTBijhlb%2FtSL09SY%3D&Expires=1769960943",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 4 assets in parallel...\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Resized Outfit: (My) Boots And Boyshorts Fur to 864x1536\nmultimodal: Included Outfit: (My) Boots And Boyshorts Fur reference (Local)\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Beige Bodysuit from URL (0.70s)\n\u26a1 Assets processed in 0.72s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Close up, slightly low angle. Chels's face, eyes sparkling with joy as she smiles at (My). Night, specular lighting, shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Her outfit is contrasted against candle lights.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957340_de44dccc.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 21:49:03.813743"
+    },
+    {
+        "id": "job_1769956596_27",
+        "name": "EpThrouple's_Delight_S2_Sh4",
+        "description": "Scene 2 Shot 4",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.290474",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Medium shot, eye level. Shays leans forward, engaging (My) in conversation, while Chels listens, smile on her lips. Night, soft box lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with soft lighting and elegant decor, Shay's outfit texture.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/assets/AI Content Creators/Friends/Mens Friends/Shays bofriend full view .png",
+                        "label": "Cast: Shays"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Mens%20clothing/Mens%20High%20Fashion/Cowprint%20SLide%20Brown%20Fit%20.png",
+                        "label": "Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit "
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Beige%20Bodysuit.jpg",
+                        "label": "Outfit: Lounge Wear / Beige Bodysuit"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Outfits/boots and boyshorts fur.png",
+                        "label": "Outfit: (My) Boots And Boyshorts Fur"
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957376_c95d9da5.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Throuple%27s_Delight/gen_nano_1769957376_c95d9da5.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=oSb4lihTwpNeofSTfFqzmLRYd2M%3D&Expires=1769960978",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 6 assets in parallel...\nmultimodal: Resized Cast: Shays to 1237x1536\nmultimodal: Included Cast: Shays reference (Local)\nmultimodal: Resized Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  to 864x1536\nmultimodal: Downloaded Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  from URL (5.15s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit : 5.24s\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Beige Bodysuit from URL (0.73s)\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Resized Outfit: (My) Boots And Boyshorts Fur to 864x1536\nmultimodal: Included Outfit: (My) Boots And Boyshorts Fur reference (Local)\n\u26a1 Assets processed in 5.24s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Medium shot, eye level. Shays leans forward, engaging (My) in conversation, while Chels listens, smile on her lips. Night, soft box lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with soft lighting and elegant decor, Shay's outfit texture.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957376_c95d9da5.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 21:49:38.450147"
+    },
+    {
+        "id": "job_1769956596_28",
+        "name": "EpThrouple's_Delight_S2_Sh5",
+        "description": "Scene 2 Shot 5",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.292178",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Close up, eye level. (My) and Shays share a tender moment, hands lightly touching on the table. Night, rim light, shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with soft lighting and elegant decor, My's outfit texture.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Beige%20Bodysuit.jpg",
+                        "label": "Outfit: Lounge Wear / Beige Bodysuit"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/assets/AI Content Creators/Friends/Mens Friends/Shays bofriend full view .png",
+                        "label": "Cast: Shays"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Mens%20clothing/Mens%20High%20Fashion/Cowprint%20SLide%20Brown%20Fit%20.png",
+                        "label": "Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957418_3386dd14.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Throuple%27s_Delight/gen_nano_1769957418_3386dd14.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=zpEKSI%2FkujS6Qm8KGTw8zeKikwk%3D&Expires=1769961020",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 4 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Beige Bodysuit from URL (0.69s)\nmultimodal: Resized Cast: Shays to 1237x1536\nmultimodal: Included Cast: Shays reference (Local)\nmultimodal: Resized Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  to 864x1536\nmultimodal: Downloaded Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  from URL (4.44s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit : 4.53s\n\u26a1 Assets processed in 4.53s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Close up, eye level. (My) and Shays share a tender moment, hands lightly touching on the table. Night, rim light, shallow depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with soft lighting and elegant decor, My's outfit texture.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957418_3386dd14.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 21:50:20.010374"
+    },
+    {
+        "id": "job_1769956596_29",
+        "name": "EpThrouple's_Delight_S2_Sh6",
+        "description": "Scene 2 Shot 6",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.294654",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Medium shot, eye level. Chels, (My), and Shays, enjoy their meals. Night, Rembrandt lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with soft lighting and elegant decor, outfit textures of all main characters.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Outfits/boots and boyshorts fur.png",
+                        "label": "Outfit: (My) Boots And Boyshorts Fur"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Beige%20Bodysuit.jpg",
+                        "label": "Outfit: Lounge Wear / Beige Bodysuit"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/assets/AI Content Creators/Friends/Mens Friends/Shays bofriend full view .png",
+                        "label": "Cast: Shays"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Mens%20clothing/Mens%20High%20Fashion/Cowprint%20SLide%20Brown%20Fit%20.png",
+                        "label": "Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957467_90b69ba3.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Throuple%27s_Delight/gen_nano_1769957467_90b69ba3.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=MSaqMXazRopRRrWtrue%2BK8%2BdHKE%3D&Expires=1769961068",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 6 assets in parallel...\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Resized Outfit: (My) Boots And Boyshorts Fur to 864x1536\nmultimodal: Included Outfit: (My) Boots And Boyshorts Fur reference (Local)\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Beige Bodysuit from URL (1.61s)\nmultimodal: Resized Cast: Shays to 1237x1536\nmultimodal: Included Cast: Shays reference (Local)\nmultimodal: Resized Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  to 864x1536\nmultimodal: Downloaded Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  from URL (5.61s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit : 5.70s\n\u26a1 Assets processed in 5.72s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Medium shot, eye level. Chels, (My), and Shays, enjoy their meals. Night, Rembrandt lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with soft lighting and elegant decor, outfit textures of all main characters.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957467_90b69ba3.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 21:51:08.774129"
+    },
+    {
+        "id": "job_1769956596_30",
+        "name": "EpThrouple's_Delight_S2_Sh7",
+        "description": "Scene 2 Shot 7",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.298548",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Medium shot, eye level. Chels, (My), and Shays Bofriend Full View full view. Night, Rembrandt lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with soft lighting and elegant decor, outfit textures of all main characters.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Chels/Chels.png",
+                        "label": "Cast: Chels"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Outfits/boots and boyshorts fur.png",
+                        "label": "Outfit: (My) Boots And Boyshorts Fur"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Beige%20Bodysuit.jpg",
+                        "label": "Outfit: Lounge Wear / Beige Bodysuit"
+                    },
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/assets/AI Content Creators/Friends/Mens Friends/Shays bofriend full view .png",
+                        "label": "Cast: Shays"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Mens%20clothing/Mens%20High%20Fashion/Cowprint%20SLide%20Brown%20Fit%20.png",
+                        "label": "Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit "
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957515_26c0d7ae.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Throuple%27s_Delight/gen_nano_1769957515_26c0d7ae.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=QpQK7bLhEzwde4nPsFHeVuWWR44%3D&Expires=1769961117",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 6 assets in parallel...\nmultimodal: Included Cast: Chels reference (Local)\nmultimodal: Resized Outfit: (My) Boots And Boyshorts Fur to 864x1536\nmultimodal: Included Outfit: (My) Boots And Boyshorts Fur reference (Local)\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Beige Bodysuit from URL (0.68s)\nmultimodal: Resized Cast: Shays to 1237x1536\nmultimodal: Included Cast: Shays reference (Local)\nmultimodal: Resized Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  to 864x1536\nmultimodal: Downloaded Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit  from URL (5.24s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: Mens Clothing / Mens High Fashion / Cowprint Slide Brown Fit : 5.33s\n\u26a1 Assets processed in 5.34s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Medium shot, eye level. Chels, (My), and Shays Bofriend Full View full view. Night, Rembrandt lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with soft lighting and elegant decor, outfit textures of all main characters.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957515_26c0d7ae.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 21:51:57.635650"
+    },
+    {
+        "id": "job_1769956596_31",
+        "name": "EpThrouple's_Delight_S2_Sh8",
+        "description": "Scene 2 Shot 8",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-01 21:36:36.300617",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "Time of Day: Night. Extreme Close up, eye level. (My) Shay Blonde Bob Back full view sitting near candle light. Night, Rembrandt lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with soft lighting and elegant decor, outfit textures of main character.",
+                "negative_prompt": "blurry, low quality, distortion, ugly face",
+                "width": 1024,
+                "height": 576,
+                "num_images": 1,
+                "guidance_scale": 7.5,
+                "model_type": "nano",
+                "assets": [
+                    {
+                        "path": "/Users/tylarkin/Desktop/AI Cnntent Creator workflow/output/users/Tytheguyttg/Assets/Characters/Shay blonde bob back.png",
+                        "label": "Cast: (My)"
+                    },
+                    {
+                        "path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/Lounge%20Wear/Beige%20Bodysuit.jpg",
+                        "label": "Outfit: Lounge Wear / Beige Bodysuit"
+                    }
+                ]
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight",
+                "char_path": null,
+                "outfit_path": null,
+                "vibe_path": null
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957554_a8ba1ca0.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Series/My_Series/Throuple%27s_Delight/gen_nano_1769957554_a8ba1ca0.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=%2BLnrMWnArgZKJZ%2Bnkz3KOmuf6kk%3D&Expires=1769961155",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 2 assets in parallel...\nmultimodal: Resized Cast: (My) to 1147x1536\nmultimodal: Included Cast: (My) reference (Local)\nmultimodal: Downloaded Outfit: Lounge Wear / Beige Bodysuit from URL (0.70s)\n\u26a1 Assets processed in 0.73s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\nTime of Day: Night. Extreme Close up, eye level. (My) Shay Blonde Bob Back full view sitting near candle light. Night, Rembrandt lighting, medium depth of field. Arri Alexa 65 with Arri Signature Prime lens, cinematic, color graded, volumetric lighting, depth of field, 8k, ultra-detailed film still. Restaurant ambiance with soft lighting and elegant decor, outfit textures of main character.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Series/My_Series/Throuple's_Delight/gen_nano_1769957554_a8ba1ca0.jpg"
+            }
+        ],
+        "completed_at": "2026-02-01 21:52:35.812945"
+    },
+    {
+        "id": "job_1770008678_32",
+        "name": "Athleticwear / Black Pink  Biker Set  - Almafi Coast 1",
+        "description": "Engine: nano",
+        "status": "completed",
+        "type": "image",
+        "created_at": "2026-02-02 12:04:38.574466",
+        "data": {
+            "prompt_data": {
+                "positive_prompt": "[SUBJECT]: (Ebony skin, Dark olive undertones, almond eyes, defined cheekbones, high nose bridge, athletic_muscle_definition, sculpting_fit, skin_pore_texture) with her dark, sleek hair styled in a high bun, posing confidently with a subtle smolder. [OUTFIT]: (Black Cropped Polo Shirt with 'Girls' written in bold pink leopard print, short sleeves, pink trim, and a quarter-zip closure, paired with matching black shorts featuring the number '21' in pink and XXX pink accents on the side, ribbed corduroy texture). [ENVIRONMENT]: (Standing on a sunlit stone staircase overlooking the Amalfi Coast, the turquoise water stretching out to the horizon. White buildings with terracotta roofs cascade down the hillside. Vibrant pink bougainvillea flowers frame the foreground, blue sky, wispy clouds). [LIGHTING_COHERENCE]: (Bright, sun-drenched lighting casting a warm glow on her skin. Contact shadows form under her feet as she steps onto the cobblestone steps. Soft global illumination from the clear blue sky, emphasizing the light, airy feel of the Amalfi Coast). [STYLE]: (Candid, natural lighting, medium shot, taken with a wide-angle lens to capture the stunning vista, the mood is vibrant and energetic). High Detail, 8k.",
+                "negative_prompt": "cartoon, illustration, anime, deformed, low quality, flat lighting, 3d render, missing accessories, wrong outfit, floating subject, bad composition, cut and paste look, disconnected background, wrong skin tone, whitewashed, distorted features, bad anatomy",
+                "aspect_ratio": "9:16",
+                "likeness_strength": 0.5,
+                "model_type": "nano"
+            },
+            "settings": {
+                "batch_count": 1
+            },
+            "paths": {
+                "output_folder": "output/users/Tytheguyttg/Campaign",
+                "char_path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Shay.So.Fine/SHAY%20STOCK%20Photo/SHay%20High%20Bun%20front.png",
+                "outfit_path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Influencer%20CLothing%20/AthleticWear/Black%20Pink%20%20Biker%20Set%20.jpg",
+                "vibe_path": "https://vlmcreateflowbucket.s3.ap-southeast-2.amazonaws.com/assets/AI%20Content%20Creators/Environments/Almafi%20Coast%201.jpg"
+            }
+        },
+        "results": [
+            {
+                "status": "success",
+                "image_path": "output/users/Tytheguyttg/Campaign/gen_nano_1770008751_108827db.jpg",
+                "s3_url": "https://vlmcreateflowbucket.s3.amazonaws.com/users/Tytheguyttg/Campaign/gen_nano_1770008751_108827db.jpg?AWSAccessKeyId=AKIARRIRMLA3UMDUAOCB&Signature=adgXYUsaXekdCIP0ScpB6UXwEfw%3D&Expires=1770012353",
+                "model_used": "nano-banana-pro",
+                "logs": "--- Attempting Generation with Nano Banana Pro ---\n\u26a1 Processing 3 assets in parallel...\nmultimodal: Resized Character to 1147x1536\nmultimodal: Downloaded Character from URL (21.94s)\n\u26a0\ufe0f Slow Asset Processing for Character: 22.08s\nmultimodal: Downloaded Outfit from URL (2.58s)\n\u26a0\ufe0f Slow Asset Processing for Outfit: 2.63s\nmultimodal: Resized Vibe to 864x1536\nmultimodal: Downloaded Vibe from URL (3.23s)\n\u26a0\ufe0f Slow Asset Processing for Vibe: 3.32s\n\u26a1 Assets processed in 22.08s\nPrompt sent to Nano: 'Generate a 9:16 aspect ratio image of: SYSTEM INSTRUCTION: You are a continuity engine. Your primary goal is to generate the scene described below while EXPERTLY matching the visual identities of the provided character reference images. You must match their face, hair, and outfit details exactly. Do not hallucinate new features. \n\n[SUBJECT]: (Ebony skin, Dark olive undertones, almond eyes, defined cheekbones, high nose bridge, athletic_muscle_definition, sculpting_fit, skin_pore_texture) with her dark, sleek hair styled in a high bun, posing confidently with a subtle smolder. [OUTFIT]: (Black Cropped Polo Shirt with 'Girls' written in bold pink leopard print, short sleeves, pink trim, and a quarter-zip closure, paired with matching black shorts featuring the number '21' in pink and XXX pink accents on the side, ribbed corduroy texture). [ENVIRONMENT]: (Standing on a sunlit stone staircase overlooking the Amalfi Coast, the turquoise water stretching out to the horizon. White buildings with terracotta roofs cascade down the hillside. Vibrant pink bougainvillea flowers frame the foreground, blue sky, wispy clouds). [LIGHTING_COHERENCE]: (Bright, sun-drenched lighting casting a warm glow on her skin. Contact shadows form under her feet as she steps onto the cobblestone steps. Soft global illumination from the clear blue sky, emphasizing the light, airy feel of the Amalfi Coast). [STYLE]: (Candid, natural lighting, medium shot, taken with a wide-angle lens to capture the stunning vista, the mood is vibrant and energetic). High Detail, 8k.'\n\u2601\ufe0f Uploaded to S3: users/Tytheguyttg/Campaign/gen_nano_1770008751_108827db.jpg"
+            }
+        ],
+        "completed_at": "2026-02-02 12:05:53.237094"
+    }
+]
