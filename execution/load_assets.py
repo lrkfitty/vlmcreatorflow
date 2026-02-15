@@ -198,11 +198,32 @@ def load_assets(base_path="assets", user_assets_dir=None, skip_base=False, targe
                              with open(user_manifest_path, "r") as f:
                                  cached_items = json.load(f)
                                  
+                             # Initialize S3 for re-signing
+                             import boto3
+                             from botocore.config import Config
+                             s3 = boto3.client(
+                                 's3', 
+                                 region_name=os.getenv("AWS_REGION", "ap-southeast-2"),
+                                 config=Config(s3={'addressing_style': 'virtual', 'signature_version': 's3v4'})
+                             )
+
                              # Reconstruct Data Structure
                              for item in cached_items:
                                  cat_key = item.get("category")
                                  name = item.get("name")
                                  url = item.get("url")
+                                 key = item.get("key")
+
+                                 # RE-SIGN URL IF KEY EXISTS (Fix Expiry)
+                                 if key and bucket:
+                                     try:
+                                         url = s3.generate_presigned_url(
+                                             'get_object',
+                                             Params={'Bucket': bucket, 'Key': key},
+                                             ExpiresIn=3600
+                                         )
+                                     except Exception:
+                                         pass # Fallback to cached URL if signing fails
                                  
                                  if cat_key in data and name and url:
                                       data[cat_key][name] = url
