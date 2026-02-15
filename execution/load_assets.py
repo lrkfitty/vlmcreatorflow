@@ -40,7 +40,7 @@ def scan_directory(directory):
 # --- CLOUD MANIFEST LOGIC ---
 # (scan_manifest function removed - logic moved to Single Pass loop below)
 
-def load_assets(base_path="assets", user_assets_dir=None, skip_base=False):
+def load_assets(base_path="assets", user_assets_dir=None, skip_base=False, target_username=None):
     """
     Dynamically loads assets.
     If 'assets_manifest.json' exists, uses S3 URLs (Cloud Mode).
@@ -177,11 +177,15 @@ def load_assets(base_path="assets", user_assets_dir=None, skip_base=False):
             # Check if this is a path like "output/users/{user}/Assets"
             # We need the username to build the S3 key: users/{user}/Assets
             try:
-                # Use heuristic: check if "users" is in path
-                parts = user_assets_dir.split(os.sep)
-                if "users" in parts:
-                    u_idx = parts.index("users")
-                    username = parts[u_idx + 1]
+                username = target_username
+                if not username:
+                    # Use heuristic: check if "users" is in path
+                    parts = user_assets_dir.split(os.sep)
+                    if "users" in parts:
+                        u_idx = parts.index("users")
+                        username = parts[u_idx + 1]
+                
+                if username:
                     
                     user_manifest_path = os.path.join(user_assets_dir, "user_manifest.json")
                     bucket = os.getenv("S3_BUCKET_NAME")

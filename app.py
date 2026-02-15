@@ -244,13 +244,13 @@ try:
 
     # 2. User Assets (Session Cache, Fast, Updates often)
     @st.cache_data(ttl=300, show_spinner=False)
-    def get_user_assets(user_path):
+    def get_user_assets(user_path, username):
         if not user_path: return {}
-        return load_assets(user_assets_dir=user_path, skip_base=True)
+        return load_assets(user_assets_dir=user_path, skip_base=True, target_username=username)
 
     # Load & Merge
     base_assets = get_base_assets()
-    user_assets_raw = get_user_assets(user_asset_path) if user_asset_path else {} # Return empty dict structure
+    user_assets_raw = get_user_assets(user_asset_path, username) if user_asset_path else {} # Return empty dict structure
 
     # Deep Merge (Naive update overwrites dicts, we need to merge keys within categories)
     # Actually load_assets returns {'characters': {...}, ...}
