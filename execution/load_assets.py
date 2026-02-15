@@ -410,8 +410,8 @@ def load_assets(base_path="assets", user_assets_dir=None, skip_base=False):
                 "Props": "props",
                 "Shay.So.Fine": "characters", # Critical Mapping
                 "Vehicles": "vehicles",
-                "2026 Jan CLothing ": "outfits",
-                "2026 Jan CLothing": "outfits"
+                "2026 jan clothing": "outfits",
+                "2026 jan clothing ": "outfits"
             }
             
             for folder_name, cat_key in nested_map.items():
