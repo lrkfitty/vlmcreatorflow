@@ -221,19 +221,58 @@ def generate_prompt_content(vibe, outfit, character,
             from PIL import Image
             import requests
             from io import BytesIO
+            import concurrent.futures
+
+            def resize_image(img, max_size=1024):
+                """Resize image to max_size on longest side while maintaining aspect ratio."""
+                width, height = img.size
+                if width <= max_size and height <= max_size:
+                    return img
+                
+                if width > height:
+                    new_width = max_size
+                    new_height = int(height * (max_size / width))
+                else:
+                    new_height = max_size
+                    new_width = int(width * (max_size / height))
+                
+                return img.resize((new_width, new_height), Image.Resampling.LANCZOS)
 
             def load_pil_image(path):
-                if path.startswith(('http://', 'https://')):
-                    try:
-                        resp = requests.get(path)
+                img = None
+                try:
+                    if path.startswith(('http://', 'https://')):
+                        resp = requests.get(path, timeout=10)
                         resp.raise_for_status()
-                        return Image.open(BytesIO(resp.content))
+                        img = Image.open(BytesIO(resp.content))
+                    elif os.path.exists(path):
+                        img = Image.open(path)
+                except Exception as e:
+                    print(f"PIL Load Error for {path}: {e}")
+                    return None
+                
+                if img:
+                    try:
+                        return resize_image(img)
                     except Exception as e:
-                        print(f"PIL Load Error for {path}: {e}")
-                        return None
-                elif os.path.exists(path):
-                    return Image.open(path)
+                        print(f"Resize Error for {path}: {e}")
+                        return img # Return original if resize fails
                 return None
+
+            # Parallel Load Helper
+            def fetch_image_map(img_data):
+                """Helper for parallel fetch. Returns (label, PIL_Image) or None"""
+                p = img_data.get("path")
+                l = img_data.get("label", "Ref")
+                if not p: return None
+                
+                image_obj = load_pil_image(p)
+                if image_obj:
+                    return (l, image_obj)
+                return None
+
+            # 1. Load Main Images (Sequential is fine for 3, but let's be consistent)
+            # Actually, let's just load them.
             
             if character_is_image:
                 img = load_pil_image(character)
@@ -253,17 +292,17 @@ def generate_prompt_content(vibe, outfit, character,
                     gemini_content.append("IMAGE 3 (LOCATION/VIBE):")
                     gemini_content.append(img)
                 
-            # Process Extra Images (Friends, Props, etc.)
+            # 2. Parallel Load Extra Images
             if extra_images:
-                for idx, img_obj in enumerate(extra_images):
-                    path = img_obj.get("path")
-                    label = img_obj.get("label", f"Extra Ref {idx+1}")
-                    
-                    if path:
-                        img = load_pil_image(path)
-                        if img:
-                            gemini_content.append(f"ADDITIONAL REFERENCE ({label} - DESCRIBE EXACTLY AS SHOWN):")
-                            gemini_content.append(img)
+                print(f"⚡ Fetching {len(extra_images)} extra images in parallel...")
+                with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+                    results = list(executor.map(fetch_image_map, extra_images))
+                
+                for res in results:
+                    if res:
+                        lbl, img_obj = res
+                        gemini_content.append(f"ADDITIONAL REFERENCE ({lbl} - DESCRIBE EXACTLY AS SHOWN):")
+                        gemini_content.append(img_obj)
                 
             # RETRY LOGIC FOR 429 (RATE LIMIT)
             max_retries = 3

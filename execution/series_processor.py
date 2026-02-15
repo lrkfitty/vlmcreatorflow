@@ -5,6 +5,45 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Imports for inner function needing global scope if moving out
+from PIL import Image
+from io import BytesIO
+import base64
+import concurrent.futures
+import time
+import streamlit as st
+
+def resize_bytes_to_jpeg(image_bytes, max_size=1280):
+    """Resize image bytes to max_size and return generic JPEG bytes."""
+    try:
+        img = Image.open(BytesIO(image_bytes))
+        
+        # Resize logic
+        width, height = img.size
+        if width <= max_size and height <= max_size:
+            # If small enough, just convert to JPEG to ensure compatibility/compression
+            pass 
+        else:
+            if width > height:
+                new_width = max_size
+                new_height = int(height * (max_size / width))
+            else:
+                new_height = max_size
+                new_width = int(width * (max_size / height))
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+        
+        # Convert to RGB (in case of RGBA PNG) and save as JPEG
+        if img.mode in ("RGBA", "P"):
+            img = img.convert("RGB")
+            
+        out_buffer = BytesIO()
+        img.save(out_buffer, format="JPEG", quality=85)
+        return out_buffer.getvalue()
+        
+    except Exception as e:
+        print(f"Resize Error: {e}")
+        return image_bytes # Fallback to original
+
 def parse_script_to_scenes(script_text, cast_list, environment_name, genre="General", tone="Neutral", roles_map=None, wardrobe_map=None, ref_images=None, secondary_environment="None", camera="Auto", lens="Auto", lighting="Auto", film_stock="Auto", filter_look="Auto", movie_style="Auto", transition_style="Auto"):
     """
     Uses Gemini to break down a raw script into structured Scenes.
@@ -13,6 +52,8 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
     V3.5 Update: Multimodal Support (Deep Vision).
     V3.6 Update: Added Film Stock and Filter/Look.
     """
+    
+
     api_key = os.getenv("GOOGLE_API_KEY")
     if not api_key:
         return {"error": "Missing GOOGLE_API_KEY"}
@@ -104,7 +145,16 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
        - **REASON**: Describing the face creates a "Generic AI Face" that overrides the specific LoRA/Reference Identity.
        - **VERIFICATION**: Scan your prompt. Did you write "blonde", "brunette", "blue eyes", "pale skin"? DELETE IT immediately. Only describe EMOTIONS and LIGHTING on the face.
 
-    4. B-ROLL RULES:
+    4. TEXTURE & DETAIL (HOLLYWOOD STANDARD):
+       - You MUST include 3-4 keywords per shot describing TEXTURE (e.g. "Gritty film grain", "Sweat on brow", "Dust motes in light", "Chrome reflection").
+       - Avoid vague words like "Atmospheric" without defining WHAT makes it atmospheric.
+
+    5. SHOT CONSISTENCY CHECK:
+       - If the Request says "Medium Shot", you MUST generate a "Medium Shot".
+       - Do NOT drift to "Wide Shot" unless the script action makes a Medium Shot physically impossible.
+       - Self-Correct: Before outputting, ask "Does this match the requested camera angle?"
+
+    6. B-ROLL RULES:
        - B-Roll shots must NOT focus on main characters. Focus on details, environment, lighting, or objects that set the mood (Tone).
        - Use the 'Secondary/B-Roll Environment'.
     
@@ -153,7 +203,7 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
     }}
     """
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent?key={api_key}"
     headers = { "Content-Type": "application/json" }
     
     # BUILD MULTIMODAL PAYLOAD
@@ -164,10 +214,8 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
     
     # 2. Reference Images (PARALLELIZED)
     if ref_images:
-        import base64
-        import concurrent.futures
-        import time
-        import streamlit as st
+        # Imports already handled above or at module level if moved
+        # But we need to ensure load_single_ref can see resize_bytes_to_jpeg
 
         def load_single_ref(img_data):
             path = img_data.get('path')
@@ -177,13 +225,13 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
             result_parts = []
             
             try:
+                raw_bytes = None
+                
                 # Case A: URL
                 if path and path.startswith("http"):
                     resp = requests.get(path, timeout=5)  # Reduced from 10s to 5s
                     if resp.status_code == 200:
-                        b64 = base64.b64encode(resp.content).decode('utf-8')
-                        result_parts.append({ "text": f"VISUAL REFERENCE - {label}:" })
-                        result_parts.append({ "inline_data": { "mime_type": "image/jpeg", "data": b64 } })
+                        raw_bytes = resp.content
                         print(f"   ⚡ Downloaded {label} in {time.time() - t_start:.2f}s")
                     else:
                         print(f"   ⚠️ Failed to download {label}: Status {resp.status_code}")
@@ -191,10 +239,18 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
                 # Case B: Local File
                 elif path and os.path.exists(path):
                     with open(path, "rb") as f:
-                        b64 = base64.b64encode(f.read()).decode('utf-8')
-                        result_parts.append({ "text": f"VISUAL REFERENCE - {label}:" })
-                        result_parts.append({ "inline_data": { "mime_type": "image/jpeg", "data": b64 } })
+                        raw_bytes = f.read()
                         print(f"   ⚡ Loaded {label} (Local) in {time.time() - t_start:.2f}s")
+                
+                # Optimize & Encode
+                if raw_bytes:
+                    # RESIZE STEP
+                    optimized_bytes = resize_bytes_to_jpeg(raw_bytes)
+                    
+                    b64 = base64.b64encode(optimized_bytes).decode('utf-8')
+                    result_parts.append({ "text": f"VISUAL REFERENCE - {label}:" })
+                    result_parts.append({ "inline_data": { "mime_type": "image/jpeg", "data": b64 } })
+                    
             except Exception as e:
                 print(f"   ❌ Error loading {label}: {e}")
                 
@@ -229,7 +285,6 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
     
     try:
         # Timeout increased to 120s for Director AI Stability
-        import streamlit as st
         st.toast("🎬 Waiting for Gemini AI response (may take 30-120s)...")
         
         response = requests.post(url, headers=headers, json=payload, timeout=120)

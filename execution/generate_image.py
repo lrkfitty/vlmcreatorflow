@@ -108,8 +108,8 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                     from io import BytesIO
                     img = Image.open(BytesIO(img_bytes))
                     
-                    # Resize if too large (Max 1536px long edge)
-                    max_dim = 1536
+                    # Resize if too large (Max 1280px long edge - Balanced Quality/Speed)
+                    max_dim = 1280
                     if max(img.width, img.height) > max_dim:
                         img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
                         local_logs.append(f"multimodal: Resized {label} to {img.width}x{img.height}")
@@ -150,8 +150,14 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
             # Add to Payload if we have data
             if b64_data:
                 # FIX: STRONG BINDING - Explicitly tag the image for the model
+                role_instruction = ""
+                if "Cast:" in label or "Main Character" in label or "Reference Character" in label:
+                    role_instruction = " (FACE & IDENTITY SOURCE - MATCH EXACTLY)"
+                elif "Outfit" in label:
+                    role_instruction = " (CLOTHING REFERENCE ONLY - IGNORE FACE/IDENTITY)"
+
                 asset_parts.append({
-                    "text": f"\n[VISUAL ID: {label}]\n"
+                    "text": f"\n[VISUAL ID: {label}{role_instruction}]\n"
                 })
                     
                 asset_parts.append({
@@ -190,8 +196,47 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
         contents = []
         all_asset_logs = []
 
+        # PARALLEL PROCESSING: FETCH ALL ASSETS FIRST
+        # We need to map assets to their results efficiently
+        # Strategy: 
+        # 1. Create a list of all unique assets we need to process (Characters + Outfits + Location)
+        # 2. Process them in parallel
+        # 3. Re-assemble the ordered payload based on the logic below
+        
+        assets_to_process = []
+        # Add cast members
+        for c in all_cast_members: assets_to_process.append(c)
+        # Add outfits
+        for o in all_outfits: assets_to_process.append(o)
+        # Add location
+        if location_ref: assets_to_process.append({"path": location_ref, "label": "Scene Location/Vibe"})
+        
+        import concurrent.futures
+        processed_assets_map = {} # path -> (parts, logs)
+        
+        logs.append(f"⚡ Parallel processing {len(assets_to_process)} assets...")
+        t_batch_start = time.time()
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            # We map the function to the items
+            # Note: We need to key by path or object ref. 
+            # process_single_asset takes dict.
+            future_to_asset = {executor.submit(process_single_asset, asset): asset for asset in assets_to_process}
+            
+            for future in concurrent.futures.as_completed(future_to_asset):
+                 original_asset = future_to_asset[future]
+                 try:
+                     res_parts, res_logs = future.result()
+                     # Store result keyed by path (assuming unique paths, or we accept redundant processing if dupes)
+                     processed_assets_map[original_asset.get("path")] = (res_parts, res_logs)
+                 except Exception as e:
+                     logs.append(f"⚠️ Worker Error: {e}")
+
+        logs.append(f"⚡ Assets ready in {time.time() - t_batch_start:.2f}s")
+
         # 1. Process Characters + Outfits as INTERLEAVED PAIRS
-        logs.append(f"🎭 Processing {len(all_cast_members)} character(s) with outfit pairing...")
+        logs.append(f"🎭 Assembling {len(all_cast_members)} character(s) with outfit pairing...")
+        
         for idx, cast_member in enumerate(all_cast_members):
             char_label = cast_member.get("label", "")
             
@@ -202,14 +247,13 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
             elif "Main Character" in char_label:
                 char_name = "Main Character"
             
-            # Add character reference FIRST
-            cast_parts, cast_logs = process_single_asset(cast_member)
+            # Add character reference FIRST (retrieve from map)
+            cast_parts, cast_logs = processed_assets_map.get(cast_member.get("path"), ([], []))
             contents.extend(cast_parts)
             all_asset_logs.extend(cast_logs)
             
             # DEBUG: Show what we're trying to match
             logs.append(f"🔍 Trying to find outfit for {char_name} (label: {char_label})")
-            logs.append(f"   Available outfits: {[o.get('label') for o in all_outfits]}")
             
             # IMMEDIATELY pair with their outfit (if found)
             matched_outfit = None
@@ -231,7 +275,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                 contents.append({
                     "text": f"⚠️ CRITICAL: THE CHARACTER SHOWN ABOVE ({char_name}) MUST WEAR THIS EXACT OUTFIT:"
                 })
-                outfit_parts, outfit_logs = process_single_asset(matched_outfit)
+                outfit_parts, outfit_logs = processed_assets_map.get(matched_outfit.get("path"), ([], []))
                 contents.extend(outfit_parts)
                 all_asset_logs.extend(outfit_logs)
                 logs.append(f"✅ Paired {char_name} with {matched_outfit.get('label', 'outfit')}")
@@ -240,7 +284,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
 
         # 2. Location/Vibe (if provided)
         if location_ref:
-            vibe_parts, vibe_logs = process_single_asset({"path": location_ref, "label": "Scene Location/Vibe"})
+            vibe_parts, vibe_logs = processed_assets_map.get(location_ref, ([], []))
             contents.extend(vibe_parts)
             all_asset_logs.extend(vibe_logs)
 
