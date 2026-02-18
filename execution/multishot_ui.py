@@ -134,8 +134,8 @@ def render_multishot_ui(get_user_out_dir_func):
                             from PIL import Image
                             start_img = Image.open(temp_path)
                             
-                            # Build context
-                            extra_context = additional_prompt if additional_prompt else ""
+                            # Build context (read from session state since widget is defined later)
+                            extra_context = st.session_state.get("multishot_additional", "")
                             
                             director_prompt = (
                                 "You are an AWARD-WINNING CINEMATOGRAPHER analyzing a START FRAME from a shot.\n\n"
