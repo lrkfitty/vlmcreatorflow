@@ -41,7 +41,8 @@ def render_multishot_ui(get_user_out_dir_func):
             [
                 "Character Sheet (4 Angles)", 
                 "Individual Shots (Batch)", 
-                "Single Custom Angle"
+                "Single Custom Angle",
+                "End Frame Generator"
             ]
         )
         
@@ -68,6 +69,30 @@ def render_multishot_ui(get_user_out_dir_func):
                 "Describe the Angle/Pose",
                 placeholder="e.g. looking over shoulder, confident expression"
             )
+        
+        elif multishot_mode == "End Frame Generator":
+            st.markdown("🎬 **Cinematic End Frame** — Describe how the scene should end")
+            endframe_description = st.text_area(
+                "End Frame Description",
+                placeholder="e.g. character turns away from camera, walking into a sunset, dramatic silhouette",
+                height=100,
+                help="Describe what changes between the start frame and end frame"
+            )
+            ef_col1, ef_col2 = st.columns(2)
+            with ef_col1:
+                transition_style = st.selectbox(
+                    "Transition Intensity",
+                    ["Subtle", "Moderate", "Dramatic"],
+                    index=1,
+                    help="How much the end frame can deviate from the start frame"
+                )
+            with ef_col2:
+                endframe_ar = st.selectbox(
+                    "Aspect Ratio",
+                    ["16:9", "4:5", "1:1", "9:16"],
+                    index=0,
+                    help="Cinematic 16:9 recommended"
+                )
         
         st.divider()
         
@@ -202,10 +227,108 @@ def render_multishot_ui(get_user_out_dir_func):
                                 st.error(f"Generation failed: {res.get('logs')}")
                     else:
                         st.error("Not enough credits.")
+            
+            elif multishot_mode == "End Frame Generator":
+                if not endframe_description:
+                    st.error("Please describe what the end frame should look like.")
+                else:
+                    if auth_mgr.deduct_credits(user, 1):
+                        with st.spinner("🎬 Generating cinematic end frame..."):
+                            # Build transition intensity instruction
+                            intensity_map = {
+                                "Subtle": (
+                                    "Make MINIMAL changes from the start frame. "
+                                    "Keep the same camera angle, lighting, and composition. "
+                                    "Only adjust what the user described — small expression changes, slight movement, minor lighting shifts."
+                                ),
+                                "Moderate": (
+                                    "Allow MODERATE changes from the start frame. "
+                                    "The scene can shift noticeably — different pose, adjusted camera angle, evolved lighting — "
+                                    "but the overall environment and character identity must remain consistent."
+                                ),
+                                "Dramatic": (
+                                    "Allow DRAMATIC changes from the start frame. "
+                                    "The scene can transform significantly — major camera movement, lighting overhaul, "
+                                    "new positioning — while preserving character identity and scene continuity."
+                                )
+                            }
+                            intensity_instruction = intensity_map.get(transition_style, intensity_map["Moderate"])
+                            
+                            # Build the cinematic end frame prompt
+                            endframe_prompt = (
+                                f"CINEMATIC END FRAME GENERATION\n\n"
+                                f"You are a cinematic continuity engine. You are given a START FRAME from a shot. "
+                                f"Generate the END FRAME of this same shot.\n\n"
+                                f"RULES:\n"
+                                f"- Maintain EXACT character identity (face, body, clothing) from the start frame\n"
+                                f"- Maintain scene continuity (same location, same world, same time of day unless told otherwise)\n"
+                                f"- The end frame should feel like a natural conclusion of the same camera shot\n"
+                                f"- {intensity_instruction}\n\n"
+                                f"WHAT CHANGES IN THE END FRAME:\n"
+                                f"{endframe_description}\n"
+                            )
+                            if additional_prompt:
+                                endframe_prompt += f"\nADDITIONAL CONTEXT: {additional_prompt}\n"
+                            
+                            endframe_prompt += (
+                                f"\nSTYLE: Photorealistic, cinematic, professional cinematography, "
+                                f"film grain, shallow depth of field"
+                            )
+                            
+                            assets = [{"path": temp_ref_path, "label": "Reference Character (START FRAME - MAINTAIN CONTINUITY)"}]
+                            selected_ar = endframe_ar
+                            payload = {
+                                "positive_prompt": endframe_prompt,
+                                "aspect_ratio": selected_ar,
+                                "model_type": "nano",
+                                "assets": assets
+                            }
+                            
+                            res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
+                            
+                            if res["status"] == "success":
+                                st.session_state['endframe_result'] = {
+                                    "start_frame": temp_ref_path,
+                                    "end_frame": res['image_path'],
+                                    "description": endframe_description,
+                                    "transition": transition_style
+                                }
+                                st.success("✅ End frame generated!")
+                                st.rerun()
+                            else:
+                                auth_mgr.add_credits(user, 1)  # Refund
+                                st.error(f"Generation failed: {res.get('logs')}")
+                    else:
+                        st.error("Not enough credits.")
     
     # Display Results
     st.divider()
     st.markdown("#### Results")
+    
+    # End Frame side-by-side display
+    if 'endframe_result' in st.session_state:
+        ef_data = st.session_state['endframe_result']
+        st.markdown(f"**🎬 End Frame** — *{ef_data.get('transition', '')}* transition")
+        st.caption(f"Description: {ef_data.get('description', '')}")
+        
+        col_start, col_end = st.columns(2)
+        with col_start:
+            st.markdown("**START FRAME**")
+            if os.path.exists(ef_data['start_frame']):
+                st.image(ef_data['start_frame'], caption="Start Frame", use_container_width=True)
+        with col_end:
+            st.markdown("**END FRAME**")
+            if os.path.exists(ef_data['end_frame']):
+                st.image(ef_data['end_frame'], caption="End Frame", use_container_width=True)
+                with open(ef_data['end_frame'], "rb") as f:
+                    st.download_button(
+                        "⬇️ Download End Frame",
+                        f,
+                        file_name=os.path.basename(ef_data['end_frame']),
+                        mime="image/png",
+                        key="dl_endframe"
+                    )
+        st.divider()
     
     # Single result display
     if 'multishot_result' in st.session_state:
