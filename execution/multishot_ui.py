@@ -20,9 +20,88 @@ def render_multishot_ui(get_user_out_dir_func):
     st.markdown("### Multi-Shot Reference Generator")
     st.info("Upload a character reference and generate multiple angles for consistency across your content.")
     
+    # --- Mode Selection (OUTSIDE form so it reruns instantly) ---
+    st.markdown("**1. Output Format**")
+    multishot_mode = st.selectbox(
+        "Generation Mode",
+        [
+            "Character Sheet (4 Angles)", 
+            "Individual Shots (Batch)", 
+            "Single Custom Angle",
+            "End Frame Generator"
+        ],
+        key="multishot_mode_select"
+    )
+    
+    # Mode-specific options (also outside form for instant reactivity)
+    selected_angles = []
+    custom_angle = ""
+    endframe_description = ""
+    transition_style = "Moderate"
+    endframe_ar = "16:9"
+    
+    if multishot_mode == "Individual Shots (Batch)":
+        angle_opts = [
+            "Front View",
+            "Side View (Left)",
+            "Side View (Right)",
+            "3/4 View (Left)",
+            "3/4 View (Right)",
+            "Back View",
+            "Over Shoulder",
+            "Low Angle",
+            "High Angle"
+        ]
+        selected_angles = st.multiselect(
+            "Select Angles to Generate",
+            angle_opts,
+            default=["Front View", "Side View (Left)", "3/4 View (Left)", "Back View"]
+        )
+    elif multishot_mode == "Single Custom Angle":
+        custom_angle = st.text_input(
+            "Describe the Angle/Pose",
+            placeholder="e.g. looking over shoulder, confident expression"
+        )
+    elif multishot_mode == "End Frame Generator":
+        st.markdown("🎬 **Cinematic End Frame** — Describe how the scene should end")
+        endframe_description = st.text_area(
+            "End Frame Description",
+            placeholder="e.g. character turns away from camera, walking into a sunset, dramatic silhouette",
+            height=100,
+            help="Describe what changes between the start frame and end frame"
+        )
+        ef_col1, ef_col2 = st.columns(2)
+        with ef_col1:
+            transition_style = st.selectbox(
+                "Transition Intensity",
+                ["Subtle", "Moderate", "Dramatic"],
+                index=1,
+                help="How much the end frame can deviate from the start frame"
+            )
+        with ef_col2:
+            endframe_ar = st.selectbox(
+                "Aspect Ratio",
+                ["16:9", "4:5", "1:1", "9:16"],
+                index=0,
+                help="Cinematic 16:9 recommended"
+            )
+    
+    st.divider()
+    
+    # Additional prompts (outside form)
+    additional_prompt = st.text_area(
+        "Additional Details (Optional)",
+        placeholder="e.g. wearing black jacket, cyberpunk aesthetic, neon lighting",
+        height=80,
+        help="Add specific details you want to maintain across all angles",
+        key="multishot_additional"
+    )
+    
+    st.divider()
+    
+    # --- Form: just the image upload + generate button ---
     with st.form("multishot_form"):
-        # Reference Image Upload
-        st.markdown("**1. Upload Reference Image**")
+        st.markdown("**📸 Upload Reference Image**")
         ref_upload = st.file_uploader(
             "Character or Object Reference", 
             type=['png', 'jpg', 'jpeg'],
@@ -32,82 +111,6 @@ def render_multishot_ui(get_user_out_dir_func):
         if ref_upload:
             st.image(ref_upload, caption="Reference Preview", use_container_width=True)
         
-        st.divider()
-        
-        # Generation Mode
-        st.markdown("**2. Output Format**")
-        multishot_mode = st.selectbox(
-            "Generation Mode",
-            [
-                "Character Sheet (4 Angles)", 
-                "Individual Shots (Batch)", 
-                "Single Custom Angle",
-                "End Frame Generator"
-            ]
-        )
-        
-        # Angle Selection (for Individual Shots)
-        if multishot_mode == "Individual Shots (Batch)":
-            angle_opts = [
-                "Front View",
-                "Side View (Left)",
-                "Side View (Right)",
-                "3/4 View (Left)",
-                "3/4 View (Right)",
-                "Back View",
-                "Over Shoulder",
-                "Low Angle",
-                "High Angle"
-            ]
-            selected_angles = st.multiselect(
-                "Select Angles to Generate",
-                angle_opts,
-                default=["Front View", "Side View (Left)", "3/4 View (Left)", "Back View"]
-            )
-        elif multishot_mode == "Single Custom Angle":
-            custom_angle = st.text_input(
-                "Describe the Angle/Pose",
-                placeholder="e.g. looking over shoulder, confident expression"
-            )
-        
-        elif multishot_mode == "End Frame Generator":
-            st.markdown("🎬 **Cinematic End Frame** — Describe how the scene should end")
-            endframe_description = st.text_area(
-                "End Frame Description",
-                placeholder="e.g. character turns away from camera, walking into a sunset, dramatic silhouette",
-                height=100,
-                help="Describe what changes between the start frame and end frame"
-            )
-            ef_col1, ef_col2 = st.columns(2)
-            with ef_col1:
-                transition_style = st.selectbox(
-                    "Transition Intensity",
-                    ["Subtle", "Moderate", "Dramatic"],
-                    index=1,
-                    help="How much the end frame can deviate from the start frame"
-                )
-            with ef_col2:
-                endframe_ar = st.selectbox(
-                    "Aspect Ratio",
-                    ["16:9", "4:5", "1:1", "9:16"],
-                    index=0,
-                    help="Cinematic 16:9 recommended"
-                )
-        
-        st.divider()
-        
-        # Additional prompts
-        st.markdown("**3. Additional Details (Optional)**")
-        additional_prompt = st.text_area(
-            "Additional Context",
-            placeholder="e.g. wearing black jacket, cyberpunk aesthetic, neon lighting",
-            height=80,
-            help="Add specific details you want to maintain across all angles"
-        )
-        
-        st.divider()
-        
-        # Queue or Generate
         col_q, col_gen = st.columns([1, 2])
         with col_q:
             add_to_queue = st.checkbox("Add to Queue", value=False)
