@@ -205,18 +205,31 @@ def render_multishot_ui(get_user_out_dir_func):
     
     st.divider()
     
-    # --- Form: just the image upload + generate button ---
+    # --- Image Upload (OUTSIDE form so it persists across reruns) ---
+    st.markdown("**📸 Upload Reference Image**")
+    ref_upload = st.file_uploader(
+        "Character or Object Reference", 
+        type=['png', 'jpg', 'jpeg'],
+        help="Upload a clear reference image of your character or object",
+        key="multishot_ref_uploader"
+    )
+    
+    # Persist upload to disk immediately so it survives reruns
+    temp_ref_path = os.path.join("output", "temp_multishot_ref.png")
+    if ref_upload:
+        os.makedirs("output", exist_ok=True)
+        with open(temp_ref_path, "wb") as f:
+            f.write(ref_upload.getbuffer())
+        st.session_state["multishot_ref_saved"] = True
+        st.image(ref_upload, caption="Reference Preview", use_container_width=True)
+    elif st.session_state.get("multishot_ref_saved") and os.path.exists(temp_ref_path):
+        # Show previously uploaded image even after reruns
+        st.image(temp_ref_path, caption="Reference Preview (saved)", use_container_width=True)
+    
+    st.divider()
+    
+    # --- Generate Button (minimal form) ---
     with st.form("multishot_form"):
-        st.markdown("**📸 Upload Reference Image**")
-        ref_upload = st.file_uploader(
-            "Character or Object Reference", 
-            type=['png', 'jpg', 'jpeg'],
-            help="Upload a clear reference image of your character or object"
-        )
-        
-        if ref_upload:
-            st.image(ref_upload, caption="Reference Preview", use_container_width=True)
-        
         col_q, col_gen = st.columns([1, 2])
         with col_q:
             add_to_queue = st.checkbox("Add to Queue", value=False)
@@ -224,17 +237,12 @@ def render_multishot_ui(get_user_out_dir_func):
             generate_multishot = st.form_submit_button("✨ Generate Multi-Shot", type="primary", use_container_width=True)
     
     # Processing Logic
+    has_ref_image = os.path.exists(temp_ref_path) if st.session_state.get("multishot_ref_saved") else False
     if generate_multishot:
-        if not ref_upload:
+        if not has_ref_image:
             st.error("Please upload a reference image first.")
         else:
             user = st.session_state.current_user.get("username") if st.session_state.get("current_user") else "guest"
-            
-            # Save uploaded file temporarily
-            temp_ref_path = os.path.join("output", "temp_multishot_ref.png")
-            os.makedirs("output", exist_ok=True)
-            with open(temp_ref_path, "wb") as f:
-                f.write(ref_upload.getbuffer())
             
             # Build base prompt
             base_prompt = "character maintaining exact identity and features from reference image"
