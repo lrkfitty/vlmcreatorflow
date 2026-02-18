@@ -9,6 +9,7 @@ from execution.character_utils import get_character_sheet_prompt
 from execution.generate_image import generate_image_from_prompt
 from execution.auth import auth_mgr
 import os
+import google.generativeai as genai
 
 def render_multishot_ui(get_user_out_dir_func):
     """
@@ -19,6 +20,50 @@ def render_multishot_ui(get_user_out_dir_func):
     """
     st.markdown("### Multi-Shot Reference Generator")
     st.info("Upload a character reference and generate multiple angles for consistency across your content.")
+    
+    # --- Character & Outfit Reference Dropdowns ---
+    assets_data = st.session_state.get("global_assets", {})
+    characters_data = assets_data.get("characters", {}).copy()
+    characters_data.update(assets_data.get("relations", {}))  # Include friends
+    outfits_data = assets_data.get("outfits", {})
+    
+    char_list = ["None (use uploaded reference only)"] + sorted(characters_data.keys())
+    outfit_list = ["None"] + sorted(outfits_data.keys())
+    
+    st.markdown("**🎭 Character & Outfit Reference**")
+    ref_col1, ref_col2 = st.columns(2)
+    with ref_col1:
+        selected_char = st.selectbox(
+            "Character Reference",
+            char_list,
+            index=0,
+            help="Select a character from your asset library for identity consistency",
+            key="ms_char_select"
+        )
+    with ref_col2:
+        selected_outfit = st.selectbox(
+            "Outfit Reference",
+            outfit_list,
+            index=0,
+            help="Select an outfit for wardrobe consistency",
+            key="ms_outfit_select"
+        )
+    
+    # Resolve paths
+    char_ref_path = characters_data.get(selected_char) if selected_char != "None (use uploaded reference only)" else None
+    outfit_ref_path = outfits_data.get(selected_outfit) if selected_outfit != "None" else None
+    
+    # Show thumbnails if selected
+    if char_ref_path or outfit_ref_path:
+        thumb_cols = st.columns(2)
+        with thumb_cols[0]:
+            if char_ref_path:
+                st.image(char_ref_path, caption=selected_char, width=120)
+        with thumb_cols[1]:
+            if outfit_ref_path:
+                st.image(outfit_ref_path, caption=selected_outfit, width=120)
+    
+    st.divider()
     
     # --- Mode Selection (OUTSIDE form so it reruns instantly) ---
     st.markdown("**1. Output Format**")
@@ -68,8 +113,66 @@ def render_multishot_ui(get_user_out_dir_func):
             "End Frame Description",
             placeholder="e.g. character turns away from camera, walking into a sunset, dramatic silhouette",
             height=100,
-            help="Describe what changes between the start frame and end frame"
+            help="Describe what changes between the start frame and end frame",
+            key="endframe_desc_input"
         )
+        
+        # --- AI Director Vision Button ---
+        if st.button("🎬 AI Director Vision", help="AI analyzes your start frame and suggests an end frame", key="ai_director_btn"):
+            # Check if there's a start frame in session from a previous upload
+            temp_path = os.path.join("output", "temp_multishot_ref.png")
+            if os.path.exists(temp_path):
+                with st.spinner("🎬 Director is analyzing your start frame..."):
+                    try:
+                        google_key = os.getenv("GOOGLE_API_KEY")
+                        if not google_key:
+                            st.error("Missing GOOGLE_API_KEY for AI Director.")
+                        else:
+                            genai.configure(api_key=google_key)
+                            model = genai.GenerativeModel("gemini-2.0-flash")
+                            
+                            from PIL import Image
+                            start_img = Image.open(temp_path)
+                            
+                            # Build context
+                            extra_context = additional_prompt if additional_prompt else ""
+                            
+                            director_prompt = (
+                                "You are an AWARD-WINNING CINEMATOGRAPHER analyzing a START FRAME from a shot.\n\n"
+                                "TASK: Suggest what the END FRAME of this same shot should look like.\n\n"
+                                "Analyze the image and describe:\n"
+                                "1. What cinematic movement should happen (camera pan, dolly, zoom, etc.)\n"
+                                "2. How the subject's pose/position should change\n"
+                                "3. How the lighting/mood should evolve\n"
+                                "4. What makes this transition feel cinematic and emotionally impactful\n\n"
+                                "OUTPUT: Write ONLY the end frame description in 2-3 sentences. "
+                                "Be specific and visual. No JSON, no labels — just the description.\n"
+                            )
+                            if extra_context:
+                                director_prompt += f"\nCONTEXT FROM USER: {extra_context}\n"
+                            
+                            response = model.generate_content([director_prompt, start_img])
+                            suggestion = response.text.strip()
+                            
+                            st.session_state["ai_director_suggestion"] = suggestion
+                            st.rerun()
+                            
+                    except Exception as e:
+                        st.error(f"AI Director Error: {e}")
+            else:
+                st.warning("⚠️ Upload a start frame image first (click Generate once to save it), then try AI Director.")
+        
+        # Show AI Director suggestion if available
+        if st.session_state.get("ai_director_suggestion"):
+            st.success(f"🎬 **Director's Vision:** {st.session_state['ai_director_suggestion']}")
+            if st.button("✅ Use This Description", key="use_director_suggestion"):
+                st.session_state["endframe_desc_input"] = st.session_state["ai_director_suggestion"]
+                del st.session_state["ai_director_suggestion"]
+                st.rerun()
+            if st.button("🔄 Get Another Suggestion", key="retry_director"):
+                del st.session_state["ai_director_suggestion"]
+                st.rerun()
+        
         ef_col1, ef_col2 = st.columns(2)
         with ef_col1:
             transition_style = st.selectbox(
@@ -135,6 +238,20 @@ def render_multishot_ui(get_user_out_dir_func):
             if additional_prompt:
                 base_prompt += f", {additional_prompt}"
             
+            # Build common asset list with character/outfit references
+            def build_assets_list(start_frame_path, label="Reference Character"):
+                """Builds the asset payload with character/outfit refs."""
+                asset_list = [{"path": start_frame_path, "label": label}]
+                # Extract character name for outfit pairing
+                char_name = None
+                if char_ref_path:
+                    char_name = selected_char.replace("(My) ", "")
+                    asset_list.append({"path": char_ref_path, "label": f"Cast: {char_name}"})
+                if outfit_ref_path:
+                    outfit_label = f"Outfit for {char_name}" if char_name else f"Outfit: {selected_outfit}"
+                    asset_list.append({"path": outfit_ref_path, "label": outfit_label})
+                return asset_list
+            
             # Handle different modes
             if multishot_mode == "Character Sheet (4 Angles)":
                 # Generate 4-angle character sheet
@@ -143,7 +260,7 @@ def render_multishot_ui(get_user_out_dir_func):
                 # Credit check
                 if auth_mgr.deduct_credits(user, 1):
                     with st.spinner("Generating 4-angle character sheet..."):
-                        assets = [{"path": temp_ref_path, "label": "Reference Character"}]
+                        assets = build_assets_list(temp_ref_path)
                         payload = {
                             "positive_prompt": full_prompt,
                             "aspect_ratio": "16:9",
@@ -177,7 +294,7 @@ def render_multishot_ui(get_user_out_dir_func):
                             with st.spinner(f"Generating {angle}..."):
                                 angle_prompt = f"{base_prompt}, {angle.lower()}, professional photography"
                                 
-                                assets = [{"path": temp_ref_path, "label": "Reference Character"}]
+                                assets = build_assets_list(temp_ref_path)
                                 payload = {
                                     "positive_prompt": angle_prompt,
                                     "aspect_ratio": "4:5",
@@ -211,7 +328,7 @@ def render_multishot_ui(get_user_out_dir_func):
                         with st.spinner(f"Generating custom angle..."):
                             custom_prompt = f"{base_prompt}, {custom_angle}, professional photography"
                             
-                            assets = [{"path": temp_ref_path, "label": "Reference Character"}]
+                            assets = build_assets_list(temp_ref_path)
                             payload = {
                                 "positive_prompt": custom_prompt,
                                 "aspect_ratio": "4:5",
@@ -278,7 +395,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                 f"film grain, shallow depth of field"
                             )
                             
-                            assets = [{"path": temp_ref_path, "label": "Reference Character (START FRAME - MAINTAIN CONTINUITY)"}]
+                            assets = build_assets_list(temp_ref_path, label="Reference Character (START FRAME - MAINTAIN CONTINUITY)")
                             selected_ar = endframe_ar
                             payload = {
                                 "positive_prompt": endframe_prompt,
