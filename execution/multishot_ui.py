@@ -256,6 +256,10 @@ def render_multishot_ui(get_user_out_dir_func):
         st.divider()
         
         # --- Scene Description ---
+        # Apply AI Director prefill BEFORE widget renders
+        if "coverage_scene_prefill" in st.session_state:
+            st.session_state["coverage_scene_key"] = st.session_state.pop("coverage_scene_prefill")
+        
         coverage_scene = st.text_area(
             "Scene Description",
             placeholder="e.g. Two characters face each other across a dimly lit bar, tension building. Rain streaks the window behind them.",
@@ -263,6 +267,102 @@ def render_multishot_ui(get_user_out_dir_func):
             help="Describe the moment happening — all angles will capture this same moment",
             key="coverage_scene_key"
         )
+        
+        # --- AI Director Vision for Coverage ---
+        dir_col1, dir_col2 = st.columns([1, 1])
+        with dir_col1:
+            if st.button("🎬 AI Director Vision", help="AI analyzes your reference and suggests a scene", key="coverage_director_btn"):
+                st.session_state["run_coverage_director"] = True
+        
+        # Show suggestion if available
+        if st.session_state.get("coverage_director_suggestion"):
+            st.success(f"🎬 **Director's Vision:** {st.session_state['coverage_director_suggestion']}")
+            col_use, col_retry = st.columns(2)
+            with col_use:
+                if st.button("✅ Use This Scene", key="use_coverage_suggestion"):
+                    st.session_state["coverage_scene_prefill"] = st.session_state["coverage_director_suggestion"]
+                    del st.session_state["coverage_director_suggestion"]
+                    st.rerun()
+            with col_retry:
+                if st.button("🔄 Get Another", key="retry_coverage_director"):
+                    st.session_state["run_coverage_director"] = True
+                    if "coverage_director_suggestion" in st.session_state:
+                        del st.session_state["coverage_director_suggestion"]
+        
+        # Execute Coverage AI Director if triggered
+        if st.session_state.pop("run_coverage_director", False):
+            temp_path = os.path.join("output", "temp_multishot_ref.png")
+            has_frame = os.path.exists(temp_path)
+            with st.spinner("🎬 Director is analyzing your scene..."):
+                try:
+                    google_key = os.getenv("GOOGLE_API_KEY")
+                    if not google_key:
+                        st.error("Missing GOOGLE_API_KEY for AI Director.")
+                    else:
+                        genai.configure(api_key=google_key)
+                        model = genai.GenerativeModel("gemini-2.0-flash")
+                        
+                        # Build rich context from all inputs
+                        context_parts = []
+                        
+                        # Cast info
+                        if coverage_cast:
+                            cast_names = [c.replace("(My) ", "") for c in coverage_cast]
+                            context_parts.append(f"CHARACTERS IN SCENE: {', '.join(cast_names)}")
+                            # Outfits
+                            outfit_info = []
+                            for c in coverage_cast:
+                                o = coverage_outfits.get(c, "None")
+                                if o != "None":
+                                    outfit_info.append(f"{c.replace('(My) ', '')} wearing {o}")
+                            if outfit_info:
+                                context_parts.append(f"OUTFITS: {'; '.join(outfit_info)}")
+                        
+                        # Selected angles
+                        sel_angles = st.session_state.get("coverage_angles_select", [])
+                        if sel_angles:
+                            context_parts.append(f"CAMERA ANGLES PLANNED: {', '.join(sel_angles)}")
+                        
+                        # User's scene description so far
+                        scene_input = st.session_state.get("coverage_scene_key", "")
+                        if scene_input:
+                            context_parts.append(f"USER'S SCENE IDEA: {scene_input}")
+                        
+                        # Additional details
+                        additional_input = st.session_state.get("multishot_additional", "")
+                        if additional_input:
+                            context_parts.append(f"ADDITIONAL DETAILS: {additional_input}")
+                        
+                        context_block = "\n".join(context_parts)
+                        
+                        director_prompt = (
+                            "You are an AWARD-WINNING FILM DIRECTOR planning scene coverage.\n\n"
+                            "TASK: Write a vivid, cinematic SCENE DESCRIPTION for a dramatic moment.\n\n"
+                            f"CONTEXT:\n{context_block}\n\n"
+                            "Write a rich scene description (3-4 sentences) that:\n"
+                            "1. Sets the environment/location with vivid detail\n"
+                            "2. Describes the characters' positions, body language, and emotional state\n"
+                            "3. Establishes the mood, lighting, and atmosphere\n"
+                            "4. Creates dramatic tension or emotional weight\n\n"
+                            "OUTPUT: Write ONLY the scene description. No labels, no JSON.\n"
+                            "Incorporate the user's ideas if provided. Be specific and visual.\n"
+                        )
+                        
+                        # Include reference image if available
+                        content_parts = [director_prompt]
+                        if has_frame:
+                            from PIL import Image
+                            start_img = Image.open(temp_path)
+                            content_parts.append(start_img)
+                        
+                        response = model.generate_content(content_parts)
+                        suggestion = response.text.strip()
+                        
+                        st.session_state["coverage_director_suggestion"] = suggestion
+                        st.rerun()
+                        
+                except Exception as e:
+                    st.error(f"AI Director Error: {e}")
         
         # --- Cinematic Angle Presets ---
         base_angles = [
