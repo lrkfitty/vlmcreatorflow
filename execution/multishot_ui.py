@@ -837,44 +837,6 @@ def render_multishot_ui(get_user_out_dir_func):
         if cov_results:
             st.markdown("**🎬 Cinematic Coverage**")
             
-            # Handle rerun trigger
-            rerun_idx = st.session_state.pop("coverage_rerun_idx", None)
-            if rerun_idx is not None and 0 <= rerun_idx < len(cov_results):
-                target = cov_results[rerun_idx]
-                stored_payload = target.get("payload")
-                if stored_payload:
-                    user = st.session_state.current_user.get("username") if st.session_state.get("current_user") else "guest"
-                    if auth_mgr.deduct_credits(user, 1):
-                        with st.spinner(f"🔄 Re-generating {target['angle']}..."):
-                            # Use cascading ref from adjacent shot if available
-                            rerun_assets = list(stored_payload.get("assets", []))
-                            # Remove any old 'Prior Angle' refs
-                            rerun_assets = [a for a in rerun_assets if "Prior Angle" not in a.get("label", "")]
-                            # Add adjacent shot as continuity ref
-                            adj_idx = rerun_idx - 1 if rerun_idx > 0 else (rerun_idx + 1 if rerun_idx + 1 < len(cov_results) else None)
-                            if adj_idx is not None and os.path.exists(cov_results[adj_idx]['path']):
-                                rerun_assets.append({
-                                    "path": cov_results[adj_idx]['path'],
-                                    "label": "Prior Angle (SCENE CONTINUITY - MATCH ENVIRONMENT & LIGHTING)"
-                                })
-                            
-                            rerun_payload = dict(stored_payload)
-                            rerun_payload["assets"] = rerun_assets
-                            
-                            res = generate_image_from_prompt(rerun_payload, get_user_out_dir_func("MultiShot"))
-                            if res["status"] == "success":
-                                # Update in-place, keep all others
-                                cov_results[rerun_idx]["path"] = res['image_path']
-                                cov_results[rerun_idx]["payload"] = rerun_payload
-                                st.session_state['coverage_results'] = cov_results
-                                st.toast(f"✅ {target['angle']} re-generated!")
-                                st.rerun()
-                            else:
-                                auth_mgr.add_credits(user, 1)
-                                st.error(f"Rerun failed: {res.get('logs')}")
-                    else:
-                        st.error("Not enough credits to rerun.")
-            
             # 2x2 grid
             for row_start in range(0, len(cov_results), 2):
                 row_items = cov_results[row_start:row_start + 2]
@@ -896,5 +858,36 @@ def render_multishot_ui(get_user_out_dir_func):
                                     )
                             with btn_rerun:
                                 if st.button(f"🔄 Rerun", key=f"rerun_coverage_{actual_idx}"):
-                                    st.session_state["coverage_rerun_idx"] = actual_idx
-                                    st.rerun()
+                                    # Run regeneration INLINE — no intermediate rerun
+                                    stored_payload = result.get("payload")
+                                    if not stored_payload:
+                                        st.error("No stored payload — regenerate all shots first.")
+                                    else:
+                                        user = st.session_state.current_user.get("username") if st.session_state.get("current_user") else "guest"
+                                        if auth_mgr.deduct_credits(user, 1):
+                                            with st.spinner(f"🔄 Re-generating {result['angle']}..."):
+                                                # Build assets with cascading ref from adjacent shot
+                                                rerun_assets = [a for a in stored_payload.get("assets", []) if "Prior Angle" not in a.get("label", "")]
+                                                adj_idx = actual_idx - 1 if actual_idx > 0 else (actual_idx + 1 if actual_idx + 1 < len(cov_results) else None)
+                                                if adj_idx is not None and os.path.exists(cov_results[adj_idx]['path']):
+                                                    rerun_assets.append({
+                                                        "path": cov_results[adj_idx]['path'],
+                                                        "label": "Prior Angle (SCENE CONTINUITY - MATCH ENVIRONMENT & LIGHTING)"
+                                                    })
+                                                
+                                                rerun_payload = dict(stored_payload)
+                                                rerun_payload["assets"] = rerun_assets
+                                                
+                                                res = generate_image_from_prompt(rerun_payload, get_user_out_dir_func("MultiShot"))
+                                                if res["status"] == "success":
+                                                    cov_results[actual_idx]["path"] = res['image_path']
+                                                    cov_results[actual_idx]["payload"] = rerun_payload
+                                                    st.session_state['coverage_results'] = cov_results
+                                                    st.toast(f"✅ {result['angle']} re-generated!")
+                                                    st.rerun()
+                                                else:
+                                                    auth_mgr.add_credits(user, 1)
+                                                    st.error(f"Rerun failed: {res.get('logs')}")
+                                        else:
+                                            st.error("Not enough credits to rerun.")
+
