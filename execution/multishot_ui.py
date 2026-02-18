@@ -139,8 +139,14 @@ def render_multishot_ui(get_user_out_dir_func):
                             from PIL import Image
                             start_img = Image.open(temp_path)
                             
-                            # Build context (read from session state since widget is defined later)
-                            extra_context = st.session_state.get("multishot_additional", "")
+                            # Build context from BOTH text fields
+                            endframe_input = st.session_state.get("endframe_desc_key", "")
+                            additional_input = st.session_state.get("multishot_additional", "")
+                            extra_context = ""
+                            if endframe_input:
+                                extra_context += f"User's end frame idea: {endframe_input}"
+                            if additional_input:
+                                extra_context += f"\nAdditional details: {additional_input}"
                             
                             director_prompt = (
                                 "You are an AWARD-WINNING CINEMATOGRAPHER analyzing a START FRAME from a shot.\n\n"
@@ -154,7 +160,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                 "Be specific and visual. No JSON, no labels — just the description.\n"
                             )
                             if extra_context:
-                                director_prompt += f"\nCONTEXT FROM USER: {extra_context}\n"
+                                director_prompt += f"\nCONTEXT FROM USER:\n{extra_context}\n\nIncorporate the user's intent into your suggestion."
                             
                             response = model.generate_content([director_prompt, start_img])
                             suggestion = response.text.strip()
