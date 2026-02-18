@@ -123,8 +123,28 @@ def render_multishot_ui(get_user_out_dir_func):
         )
         
         # --- AI Director Vision Button ---
-        if st.button("🎬 AI Director Vision", help="AI analyzes your start frame and suggests an end frame", key="ai_director_btn"):
-            # Check if there's a start frame in session from a previous upload
+        dir_col1, dir_col2 = st.columns([1, 1])
+        with dir_col1:
+            if st.button("🎬 AI Director Vision", help="AI analyzes your start frame and suggests an end frame", key="ai_director_btn"):
+                st.session_state["run_ai_director"] = True
+        
+        # Show AI Director suggestion if available
+        if st.session_state.get("ai_director_suggestion"):
+            st.success(f"🎬 **Director's Vision:** {st.session_state['ai_director_suggestion']}")
+            col_use, col_retry = st.columns(2)
+            with col_use:
+                if st.button("✅ Use This Description", key="use_director_suggestion"):
+                    st.session_state["endframe_prefill"] = st.session_state["ai_director_suggestion"]
+                    del st.session_state["ai_director_suggestion"]
+                    st.rerun()
+            with col_retry:
+                if st.button("🔄 Get Another Suggestion", key="retry_director"):
+                    st.session_state["run_ai_director"] = True
+                    if "ai_director_suggestion" in st.session_state:
+                        del st.session_state["ai_director_suggestion"]
+        
+        # Execute AI Director if triggered
+        if st.session_state.pop("run_ai_director", False):
             temp_path = os.path.join("output", "temp_multishot_ref.png")
             if os.path.exists(temp_path):
                 with st.spinner("🎬 Director is analyzing your start frame..."):
@@ -171,18 +191,7 @@ def render_multishot_ui(get_user_out_dir_func):
                     except Exception as e:
                         st.error(f"AI Director Error: {e}")
             else:
-                st.warning("⚠️ Upload a start frame image first (click Generate once to save it), then try AI Director.")
-        
-        # Show AI Director suggestion if available
-        if st.session_state.get("ai_director_suggestion"):
-            st.success(f"🎬 **Director's Vision:** {st.session_state['ai_director_suggestion']}")
-            if st.button("✅ Use This Description", key="use_director_suggestion"):
-                st.session_state["endframe_prefill"] = st.session_state["ai_director_suggestion"]
-                del st.session_state["ai_director_suggestion"]
-                st.rerun()
-            if st.button("🔄 Get Another Suggestion", key="retry_director"):
-                del st.session_state["ai_director_suggestion"]
-                st.rerun()
+                st.warning("⚠️ Upload a start frame image first, then try AI Director.")
         
         ef_col1, ef_col2 = st.columns(2)
         with ef_col1:
