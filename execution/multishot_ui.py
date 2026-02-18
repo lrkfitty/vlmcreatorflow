@@ -245,13 +245,19 @@ def render_multishot_ui(get_user_out_dir_func):
                         key=f"coverage_outfit_{i}"
                     )
             
-            # Show cast thumbnails
+            # Show cast + outfit thumbnails
             thumb_cols = st.columns(min(len(coverage_cast), 4))
             for i, char_name in enumerate(coverage_cast):
                 with thumb_cols[i % len(thumb_cols)]:
                     c_path = characters_data.get(char_name)
                     if c_path:
                         st.image(c_path, caption=char_name.replace("(My) ", ""), width=100)
+                    # Show outfit thumbnail if selected
+                    selected_outfit_name = coverage_outfits.get(char_name, "None")
+                    if selected_outfit_name != "None":
+                        o_path = outfits_data.get(selected_outfit_name)
+                        if o_path:
+                            st.image(o_path, caption=f"👔 {selected_outfit_name}", width=100)
         
         st.divider()
         
