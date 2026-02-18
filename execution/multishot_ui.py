@@ -73,7 +73,8 @@ def render_multishot_ui(get_user_out_dir_func):
             "Character Sheet (4 Angles)", 
             "Individual Shots (Batch)", 
             "Single Custom Angle",
-            "End Frame Generator"
+            "End Frame Generator",
+            "Cinematic Coverage (Scene)"
         ],
         key="multishot_mode_select"
     )
@@ -84,6 +85,11 @@ def render_multishot_ui(get_user_out_dir_func):
     endframe_description = ""
     transition_style = "Moderate"
     endframe_ar = "16:9"
+    # Cinematic Coverage state
+    coverage_scene = ""
+    coverage_angles = []
+    coverage_cast = []
+    coverage_outfits = {}
     
     if multishot_mode == "Individual Shots (Batch)":
         angle_opts = [
@@ -208,6 +214,104 @@ def render_multishot_ui(get_user_out_dir_func):
                 index=0,
                 help="Cinematic 16:9 recommended"
             )
+    elif multishot_mode == "Cinematic Coverage (Scene)":
+        st.markdown("🎬 **Cinematic Scene Coverage** — Same moment, multiple camera angles")
+        st.caption("Select your cast, describe the scene, and choose which angles to cover.")
+        
+        # --- Multi-Character Selection ---
+        st.markdown("**🎭 Cast Selection**")
+        char_options = sorted(characters_data.keys())
+        coverage_cast = st.multiselect(
+            "Select Characters in Scene",
+            char_options,
+            default=[],
+            help="Choose 1-4 characters that appear in this scene",
+            max_selections=4,
+            key="coverage_cast_select"
+        )
+        
+        # Per-character outfit assignment
+        if coverage_cast:
+            st.markdown("**👔 Outfit Assignment**")
+            outfit_options = ["None"] + sorted(outfits_data.keys())
+            outfit_cols = st.columns(min(len(coverage_cast), 4))
+            for i, char_name in enumerate(coverage_cast):
+                with outfit_cols[i % len(outfit_cols)]:
+                    clean_name = char_name.replace("(My) ", "")
+                    coverage_outfits[char_name] = st.selectbox(
+                        f"{clean_name}",
+                        outfit_options,
+                        index=0,
+                        key=f"coverage_outfit_{i}"
+                    )
+            
+            # Show cast thumbnails
+            thumb_cols = st.columns(min(len(coverage_cast), 4))
+            for i, char_name in enumerate(coverage_cast):
+                with thumb_cols[i % len(thumb_cols)]:
+                    c_path = characters_data.get(char_name)
+                    if c_path:
+                        st.image(c_path, caption=char_name.replace("(My) ", ""), width=100)
+        
+        st.divider()
+        
+        # --- Scene Description ---
+        coverage_scene = st.text_area(
+            "Scene Description",
+            placeholder="e.g. Two characters face each other across a dimly lit bar, tension building. Rain streaks the window behind them.",
+            height=120,
+            help="Describe the moment happening — all angles will capture this same moment",
+            key="coverage_scene_key"
+        )
+        
+        # --- Cinematic Angle Presets ---
+        base_angles = [
+            "Wide Establishing Shot",
+            "Two-Shot (Medium)",
+            "Low Angle Power Shot",
+            "High Angle Overview",
+            "Dutch Angle (Tension)",
+            "Extreme Close-Up (Detail)"
+        ]
+        # Add per-character angles
+        for char_name in coverage_cast:
+            clean = char_name.replace("(My) ", "")
+            base_angles.append(f"Over-the-Shoulder ({clean})")
+            base_angles.append(f"Close-Up ({clean})")
+            base_angles.append(f"Medium Shot ({clean})")
+        
+        # Smart defaults based on cast size
+        if len(coverage_cast) >= 2:
+            c1 = coverage_cast[0].replace("(My) ", "")
+            c2 = coverage_cast[1].replace("(My) ", "")
+            default_angles = [
+                "Wide Establishing Shot",
+                f"Over-the-Shoulder ({c1})",
+                f"Over-the-Shoulder ({c2})",
+                f"Close-Up ({c1})"
+            ]
+        elif len(coverage_cast) == 1:
+            c1 = coverage_cast[0].replace("(My) ", "")
+            default_angles = [
+                "Wide Establishing Shot",
+                f"Medium Shot ({c1})",
+                f"Close-Up ({c1})",
+                "Low Angle Power Shot"
+            ]
+        else:
+            default_angles = ["Wide Establishing Shot", "Two-Shot (Medium)", "Low Angle Power Shot", "High Angle Overview"]
+        
+        # Filter defaults to only include available options
+        default_angles = [a for a in default_angles if a in base_angles]
+        
+        coverage_angles = st.multiselect(
+            "Camera Angles to Generate",
+            base_angles,
+            default=default_angles[:4],
+            help="Select up to 4 angles. Each costs 1 credit.",
+            max_selections=4,
+            key="coverage_angles_select"
+        )
     
     st.divider()
     
@@ -448,6 +552,102 @@ def render_multishot_ui(get_user_out_dir_func):
                                 st.error(f"Generation failed: {res.get('logs')}")
                     else:
                         st.error("Not enough credits.")
+            
+            elif multishot_mode == "Cinematic Coverage (Scene)":
+                if not coverage_scene:
+                    st.error("Please describe the scene.")
+                elif not coverage_angles:
+                    st.error("Please select at least one camera angle.")
+                else:
+                    total_credits = len(coverage_angles)
+                    if auth_mgr.deduct_credits(user, total_credits):
+                        st.session_state['coverage_results'] = []
+                        
+                        # Build cast assets (same for every shot)
+                        cast_assets = []
+                        if has_ref_image:
+                            cast_assets.append({"path": temp_ref_path, "label": "Reference Character"})
+                        for c_name in coverage_cast:
+                            c_path = characters_data.get(c_name)
+                            if c_path:
+                                clean = c_name.replace("(My) ", "")
+                                cast_assets.append({"path": c_path, "label": f"Cast: {clean}"})
+                                # Add outfit if assigned
+                                outfit_choice = coverage_outfits.get(c_name, "None")
+                                if outfit_choice != "None":
+                                    o_path = outfits_data.get(outfit_choice)
+                                    if o_path:
+                                        cast_assets.append({"path": o_path, "label": f"Outfit for {clean}"})
+                        
+                        # Generate each angle
+                        for angle_name in coverage_angles:
+                            with st.spinner(f"🎬 Generating {angle_name}..."):
+                                # Build per-angle camera direction
+                                camera_direction = ""
+                                if "Wide" in angle_name or "Establishing" in angle_name:
+                                    camera_direction = "Wide establishing shot. Full scene visible. All characters in frame. Environmental context emphasized. Deep depth of field."
+                                elif "Over-the-Shoulder" in angle_name:
+                                    # Extract character name from parentheses
+                                    focus_char = angle_name.split("(")[-1].rstrip(")")
+                                    camera_direction = f"Over-the-shoulder shot. Camera behind {focus_char}, looking at the other character(s). {focus_char}'s shoulder/back visible in foreground, slightly blurred. Focus on the character they're facing. Shallow depth of field."
+                                elif "Close-Up" in angle_name:
+                                    if "Extreme" in angle_name:
+                                        camera_direction = "Extreme close-up on a key detail — eyes, hands, or an important object. Macro-level detail. Very shallow depth of field."
+                                    else:
+                                        focus_char = angle_name.split("(")[-1].rstrip(")")
+                                        camera_direction = f"Close-up on {focus_char}. Head and shoulders framing. Intimate, emotional. Shallow depth of field with background softly blurred."
+                                elif "Medium Shot" in angle_name:
+                                    focus_char = angle_name.split("(")[-1].rstrip(")")
+                                    camera_direction = f"Medium shot of {focus_char}. Waist-up framing. Character clearly visible with some environmental context. Natural depth of field."
+                                elif "Two-Shot" in angle_name:
+                                    camera_direction = "Two-shot at medium distance. Both characters in frame, positioned naturally. Balanced composition showing their spatial relationship."
+                                elif "Low Angle" in angle_name:
+                                    camera_direction = "Low angle shot looking up. Emphasizes power and dominance. Characters appear larger than life. Dramatic perspective."
+                                elif "High Angle" in angle_name:
+                                    camera_direction = "High angle shot looking down. Creates vulnerability or reveals spatial layout. Bird's eye perspective on the scene."
+                                elif "Dutch" in angle_name:
+                                    camera_direction = "Dutch angle (tilted frame). Creates unease and tension. Diagonal composition. Disorienting and dramatic."
+                                else:
+                                    camera_direction = f"{angle_name}. Professional cinematography."
+                                
+                                # Build the scene prompt for this angle
+                                coverage_prompt = (
+                                    f"CINEMATIC SCENE COVERAGE — {angle_name}\n\n"
+                                    f"SCENE: {coverage_scene}\n\n"
+                                    f"CAMERA: {camera_direction}\n\n"
+                                    f"RULES:\n"
+                                    f"- This is ONE MOMENT captured from this specific camera angle\n"
+                                    f"- ALL characters must maintain their EXACT identity from reference images\n"
+                                    f"- ALL characters must wear their assigned outfits EXACTLY\n"
+                                    f"- The scene, lighting, and environment must be CONSISTENT across all angles\n"
+                                    f"- Photorealistic, cinematic, professional cinematography, film grain\n"
+                                )
+                                if additional_prompt:
+                                    coverage_prompt += f"\nADDITIONAL CONTEXT: {additional_prompt}\n"
+                                
+                                payload = {
+                                    "positive_prompt": coverage_prompt,
+                                    "aspect_ratio": "16:9",
+                                    "model_type": "nano",
+                                    "assets": cast_assets
+                                }
+                                
+                                res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
+                                
+                                if res["status"] == "success":
+                                    st.session_state['coverage_results'].append({
+                                        "angle": angle_name,
+                                        "path": res['image_path']
+                                    })
+                                    st.toast(f"✅ {angle_name} complete!")
+                                else:
+                                    st.error(f"{angle_name} failed: {res.get('logs')}")
+                                    auth_mgr.add_credits(user, 1)  # Refund this one
+                        
+                        st.success(f"🎬 Cinematic coverage complete! {len(st.session_state.get('coverage_results', []))} shots generated.")
+                        st.rerun()
+                    else:
+                        st.error(f"Need {total_credits} credits for this coverage.")
     
     # Display Results
     st.divider()
@@ -508,3 +708,25 @@ def render_multishot_ui(get_user_out_dir_func):
                                 mime="image/png",
                                 key=f"dl_multishot_{idx}"
                             )
+    
+    # Cinematic Coverage results (2x2 grid)
+    if 'coverage_results' in st.session_state:
+        cov_results = st.session_state['coverage_results']
+        if cov_results:
+            st.markdown("**🎬 Cinematic Coverage**")
+            # 2x2 grid
+            for row_start in range(0, len(cov_results), 2):
+                row_items = cov_results[row_start:row_start + 2]
+                cols = st.columns(2)
+                for i, result in enumerate(row_items):
+                    with cols[i]:
+                        if os.path.exists(result['path']):
+                            st.image(result['path'], caption=result['angle'], use_container_width=True)
+                            with open(result['path'], "rb") as f:
+                                st.download_button(
+                                    f"⬇️ {result['angle']}",
+                                    f,
+                                    file_name=os.path.basename(result['path']),
+                                    mime="image/png",
+                                    key=f"dl_coverage_{row_start + i}"
+                                )
