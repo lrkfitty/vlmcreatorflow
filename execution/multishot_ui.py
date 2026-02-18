@@ -679,9 +679,10 @@ def render_multishot_ui(get_user_out_dir_func):
                                     if o_path:
                                         cast_assets.append({"path": o_path, "label": f"Outfit for {clean}"})
                         
-                        # Generate each angle
-                        for angle_name in coverage_angles:
-                            with st.spinner(f"🎬 Generating {angle_name}..."):
+                        # Generate each angle with cascading reference
+                        last_generated_path = None
+                        for shot_idx, angle_name in enumerate(coverage_angles):
+                            with st.spinner(f"🎬 Generating {angle_name} ({shot_idx + 1}/{len(coverage_angles)})..."):
                                 # Build per-angle camera direction
                                 camera_direction = ""
                                 if "Wide" in angle_name or "Establishing" in angle_name:
@@ -725,16 +726,30 @@ def render_multishot_ui(get_user_out_dir_func):
                                 if additional_prompt:
                                     coverage_prompt += f"\nADDITIONAL CONTEXT: {additional_prompt}\n"
                                 
+                                # Cascading reference: include prior shot for scene consistency
+                                shot_assets = list(cast_assets)  # Copy base assets
+                                if last_generated_path and os.path.exists(last_generated_path):
+                                    coverage_prompt += (
+                                        f"\nSCENE CONTINUITY: The attached 'Prior Angle' image shows this SAME scene "
+                                        f"from a different camera angle. Match the EXACT environment, lighting, "
+                                        f"color palette, set design, and character wardrobe from that image.\n"
+                                    )
+                                    shot_assets.append({
+                                        "path": last_generated_path, 
+                                        "label": "Prior Angle (SCENE CONTINUITY - MATCH ENVIRONMENT & LIGHTING)"
+                                    })
+                                
                                 payload = {
                                     "positive_prompt": coverage_prompt,
                                     "aspect_ratio": "16:9",
                                     "model_type": "nano",
-                                    "assets": cast_assets
+                                    "assets": shot_assets
                                 }
                                 
                                 res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
                                 
                                 if res["status"] == "success":
+                                    last_generated_path = res['image_path']  # Chain for next shot
                                     st.session_state['coverage_results'].append({
                                         "angle": angle_name,
                                         "path": res['image_path']
