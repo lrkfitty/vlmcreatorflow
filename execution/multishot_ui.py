@@ -109,12 +109,15 @@ def render_multishot_ui(get_user_out_dir_func):
         )
     elif multishot_mode == "End Frame Generator":
         st.markdown("🎬 **Cinematic End Frame** — Describe how the scene should end")
+        
+        # Use prefill from AI Director if available
+        prefill_value = st.session_state.pop("endframe_prefill", "")
         endframe_description = st.text_area(
             "End Frame Description",
+            value=prefill_value,
             placeholder="e.g. character turns away from camera, walking into a sunset, dramatic silhouette",
             height=100,
-            help="Describe what changes between the start frame and end frame",
-            key="endframe_desc_input"
+            help="Describe what changes between the start frame and end frame"
         )
         
         # --- AI Director Vision Button ---
@@ -166,7 +169,7 @@ def render_multishot_ui(get_user_out_dir_func):
         if st.session_state.get("ai_director_suggestion"):
             st.success(f"🎬 **Director's Vision:** {st.session_state['ai_director_suggestion']}")
             if st.button("✅ Use This Description", key="use_director_suggestion"):
-                st.session_state["endframe_desc_input"] = st.session_state["ai_director_suggestion"]
+                st.session_state["endframe_prefill"] = st.session_state["ai_director_suggestion"]
                 del st.session_state["ai_director_suggestion"]
                 st.rerun()
             if st.button("🔄 Get Another Suggestion", key="retry_director"):
