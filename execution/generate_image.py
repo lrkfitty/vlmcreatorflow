@@ -24,6 +24,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
     Generates using Google Nano Banana Pro (Gemini/Imagen).
     """
     # Try specific Image Key first (for Paid tier), else fallback to standard key
+    load_dotenv(override=True)
     api_key = os.getenv("GOOGLE_IMAGE_KEY") or os.getenv("GOOGLE_API_KEY")
     logs = ["--- Attempting Generation with Nano Banana Pro (Character-Outfit Pairing Enabled) ---"]
     
