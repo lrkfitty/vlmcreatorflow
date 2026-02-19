@@ -376,12 +376,45 @@ def render_multishot_ui(get_user_out_dir_func):
         
         # --- Cinematic Angle Presets ---
         base_angles = [
+            # === CORE COVERAGE ===
             "Wide Establishing Shot",
             "Two-Shot (Medium)",
             "Low Angle Power Shot",
             "High Angle Overview",
             "Dutch Angle (Tension)",
-            "Extreme Close-Up (Detail)"
+            "Extreme Close-Up (Detail)",
+            # === CLASSIC CINEMATIC ===
+            "Cowboy Shot (Mid-Thigh)",
+            "Full Body Shot",
+            "Profile Shot (Side View)",
+            "Three-Quarter Shot",
+            "Insert Shot (Object Detail)",
+            "Reaction Shot",
+            "Point-of-View (POV)",
+            "Bird's Eye Top-Down",
+            "Worm's Eye (Ground Level)",
+            # === CINEMATOGRAPHER SIGNATURES ===
+            "Kubrick One-Point Perspective",
+            "Spielberg Oner (Long Take)",
+            "Tarantino Trunk Shot",
+            "Wes Anderson Symmetry",
+            "Hitchcock Vertigo Zoom",
+            "Deakins Natural Light",
+            "Vilmos Zsigmond Flare Shot",
+            "Gordon Willis Godfather Shadow",
+            "Emmanuel Lubezki Golden Hour",
+            "Bradford Young Silhouette",
+            # === ADVANCED TECHNIQUES ===
+            "Rack Focus Pull",
+            "Split Diopter (Dual Focus)",
+            "Mirror/Reflection Shot",
+            "Foreground Framing",
+            "Doorway / Threshold Shot",
+            "Negative Space Composition",
+            "Chiaroscuro (High Contrast)",
+            "Shallow DOF Bokeh Portrait",
+            "Lens Flare / Backlit",
+            "Handheld Intimate"
         ]
         # Add per-character angles
         for char_name in coverage_cast:
@@ -418,8 +451,8 @@ def render_multishot_ui(get_user_out_dir_func):
             "Camera Angles to Generate",
             base_angles,
             default=default_angles[:4],
-            help="Select up to 4 angles. Each costs 1 credit.",
-            max_selections=4,
+            help="Select your angles. Each costs 1 credit.",
+            max_selections=8,
             key="coverage_angles_select"
         )
     
@@ -698,7 +731,6 @@ def render_multishot_ui(get_user_out_dir_func):
                                 if "Wide" in angle_name or "Establishing" in angle_name:
                                     camera_direction = "Wide establishing shot. Full scene visible. All characters in frame. Environmental context emphasized. Deep depth of field."
                                 elif "Over-the-Shoulder" in angle_name:
-                                    # Extract character name from parentheses
                                     focus_char = angle_name.split("(")[-1].rstrip(")")
                                     camera_direction = f"Over-the-shoulder shot. Camera behind {focus_char}, looking at the other character(s). {focus_char}'s shoulder/back visible in foreground, slightly blurred. Focus on the character they're facing. Shallow depth of field."
                                 elif "Close-Up" in angle_name:
@@ -718,6 +750,67 @@ def render_multishot_ui(get_user_out_dir_func):
                                     camera_direction = "High angle shot looking down. Creates vulnerability or reveals spatial layout. Bird's eye perspective on the scene."
                                 elif "Dutch" in angle_name:
                                     camera_direction = "Dutch angle (tilted frame). Creates unease and tension. Diagonal composition. Disorienting and dramatic."
+                                # --- CLASSIC CINEMATIC ---
+                                elif "Cowboy" in angle_name:
+                                    camera_direction = "Cowboy shot. Framed from mid-thigh up, showing hands and hips. Classic Western framing. Conveys readiness and confidence. Named for showing the gun holster in Westerns."
+                                elif "Full Body" in angle_name:
+                                    camera_direction = "Full body shot. Character framed head to toe with breathing room. Shows full posture, outfit, and body language. Medium depth of field."
+                                elif "Profile" in angle_name:
+                                    camera_direction = "Profile shot from the side. Clean 90-degree side view of the character. Strong silhouette emphasis. Shows jawline and profile features. Dramatic rim lighting."
+                                elif "Three-Quarter" in angle_name:
+                                    camera_direction = "Three-quarter angle shot. Camera at 45 degrees to the subject. Classic portrait angle showing depth and dimension. Flattering perspective with natural depth."
+                                elif "Insert" in angle_name:
+                                    camera_direction = "Insert shot on a crucial object or detail in the scene — a hand gesture, a prop, a letter, a weapon. Tight framing. Narrative emphasis. Shallow depth of field."
+                                elif "Reaction" in angle_name:
+                                    camera_direction = "Reaction shot. Focus on a character's emotional response to events. Medium close-up capturing subtle facial expressions. The story is told through their face."
+                                elif "POV" in angle_name or "Point-of-View" in angle_name:
+                                    camera_direction = "First-person point-of-view shot. Camera IS the character's eyes. What they see, we see. Immersive, subjective perspective. Slight handheld movement for authenticity."
+                                elif "Bird" in angle_name and "Eye" in angle_name:
+                                    camera_direction = "Bird's eye view. Camera directly overhead looking straight down. God-like perspective. Reveals spatial relationships and patterns. Disorienting, powerful."
+                                elif "Worm" in angle_name:
+                                    camera_direction = "Worm's eye view. Camera at ground level looking up. Extreme low angle. Characters tower overhead. Ground texture visible in foreground. Dramatic and imposing."
+                                # --- CINEMATOGRAPHER SIGNATURES ---
+                                elif "Kubrick" in angle_name:
+                                    camera_direction = "Kubrick one-point perspective. Perfectly symmetrical composition. Single vanishing point dead center. Hallway or corridor framing. Unsettling precision. Deep depth of field. Every element mathematically balanced."
+                                elif "Spielberg" in angle_name or "Oner" in angle_name:
+                                    camera_direction = "Spielberg-style long take / oner. Camera moves fluidly through the scene, following action without cuts. Choreographed blocking. Characters move in and out of frame. Naturalistic, immersive. Medium depth of field."
+                                elif "Tarantino" in angle_name or "Trunk" in angle_name:
+                                    camera_direction = "Tarantino trunk shot. Camera placed inside a car trunk or container looking up at characters peering down. Extreme low angle. Characters dominate the frame from above. Wide-angle lens distortion. Iconic and voyeuristic."
+                                elif "Wes Anderson" in angle_name or "Symmetry" in angle_name:
+                                    camera_direction = "Wes Anderson symmetrical composition. Perfectly centered subject. Pastel or curated color palette. Flat, tableau-like staging. Deadpan framing. Characters face camera directly. Storybook aesthetic."
+                                elif "Hitchcock" in angle_name or "Vertigo" in angle_name:
+                                    camera_direction = "Hitchcock vertigo effect (dolly zoom). Background appears to stretch or compress while subject stays same size. Disorienting, psychologically intense. Creates a sense of dread or revelation."
+                                elif "Deakins" in angle_name:
+                                    camera_direction = "Roger Deakins natural light style. Soft, motivated lighting from practical sources (windows, lamps, fire). No harsh artificial light. Naturalistic color palette. Painterly composition. Atmospheric depth."
+                                elif "Zsigmond" in angle_name or "Flare" in angle_name:
+                                    camera_direction = "Vilmos Zsigmond lens flare shot. Shooting into a light source (sun, lamp, window). Intentional lens flares streak across the frame. Warm, golden tones. Dreamy, romantic 1970s cinematography aesthetic."
+                                elif "Willis" in angle_name or "Godfather" in angle_name:
+                                    camera_direction = "Gordon Willis 'Prince of Darkness' style. Deep shadows dominate. Character's eyes barely visible under heavy brow shadow. Top-lit, high contrast. Rich blacks, warm amber tones. The darkness tells the story."
+                                elif "Lubezki" in angle_name or "Golden Hour" in angle_name:
+                                    camera_direction = "Emmanuel Lubezki golden hour shot. Natural sunlight at magic hour. Long shadows, warm golden tones. Naturalistic, almost spiritual quality. Wide-angle with deep focus. Characters bathed in ethereal light."
+                                elif "Bradford" in angle_name or "Silhouette" in angle_name:
+                                    camera_direction = "Bradford Young silhouette shot. Character rendered as dark silhouette against a bright background. Minimal detail, maximum emotion. Backlit. The shape and posture tell everything. Moody, poetic, underexposed."
+                                # --- ADVANCED TECHNIQUES ---
+                                elif "Rack Focus" in angle_name:
+                                    camera_direction = "Rack focus pull. Foreground element sharp, background blurred — or vice versa. Guides the viewer's attention. Dramatic shift in focus plane. Reveals hidden information."
+                                elif "Split Diopter" in angle_name:
+                                    camera_direction = "Split diopter shot. Both foreground and background in sharp focus simultaneously using split-focus lens. Unnatural but striking. Two planes of action visible at once. De Palma signature technique."
+                                elif "Mirror" in angle_name or "Reflection" in angle_name:
+                                    camera_direction = "Mirror or reflection shot. Character seen through a mirror, window, puddle, or reflective surface. Creates visual duality. Metaphor for inner conflict or hidden self."
+                                elif "Foreground" in angle_name:
+                                    camera_direction = "Foreground framing shot. An object or element in the near foreground creates a natural frame around the subject. Adds depth layers. Selective focus between planes."
+                                elif "Doorway" in angle_name or "Threshold" in angle_name:
+                                    camera_direction = "Doorway / threshold shot. Character framed within a door, window, or archway. Creates a frame-within-a-frame. Symbolizes transition, choices, or confinement. John Ford signature."
+                                elif "Negative Space" in angle_name:
+                                    camera_direction = "Negative space composition. Character occupies a small portion of the frame. Vast empty space dominates. Creates isolation, loneliness, or insignificance. Minimalist and powerful."
+                                elif "Chiaroscuro" in angle_name:
+                                    camera_direction = "Chiaroscuro lighting. Extreme contrast between light and dark. Renaissance painting influence. Single hard light source. Deep blacks and bright highlights. Dramatic, sculptural quality."
+                                elif "Bokeh" in angle_name or "Shallow DOF" in angle_name:
+                                    camera_direction = "Shallow depth of field portrait. Subject tack-sharp with creamy bokeh background. Wide aperture, f/1.2-1.4 aesthetic. Dreamy out-of-focus highlights. Intimate and cinematic."
+                                elif "Lens Flare" in angle_name or "Backlit" in angle_name:
+                                    camera_direction = "Backlit lens flare shot. Strong light source behind the subject. Rim light outlines the character. Intentional flares and haze. Ethereal, dramatic, J.J. Abrams-esque."
+                                elif "Handheld" in angle_name:
+                                    camera_direction = "Handheld intimate shot. Slightly unsteady, raw, documentary feel. Close to the subject. Creates urgency and authenticity. Paul Greengrass / Dardenne Brothers style."
                                 else:
                                     camera_direction = f"{angle_name}. Professional cinematography."
                                 
