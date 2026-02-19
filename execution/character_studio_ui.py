@@ -48,6 +48,23 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                  lock_identity_path = val.get('default_img') if isinstance(val, dict) else val
                  st.caption(f"Using Identity: {ref_identity.split('/')[-1]}")
             
+            # Likeness Fidelity Slider
+            st.markdown("**Likeness Fidelity**")
+            likeness = st.slider(
+                "How closely should the result match the reference?",
+                0, 100, 70,
+                help="0: Creative interpretation | 50: Inspired by reference | 100: Near-identical likeness",
+                key="char_likeness"
+            )
+            likeness_labels = {
+                0: "🎨 Fully Creative", 20: "🌀 Loosely Inspired",
+                40: "👤 Similar Features", 60: "🔍 Strong Resemblance",
+                80: "🎯 Near Identical", 100: "🔒 Exact Likeness"
+            }
+            # Find closest label
+            closest = min(likeness_labels.keys(), key=lambda k: abs(k - likeness))
+            st.caption(f"{likeness_labels[closest]}")
+            
             # Pass this to session state for generation
             if lock_identity_path:
                 st.session_state['lock_identity_path'] = lock_identity_path
@@ -253,7 +270,8 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                    "skin_details": c_skin,
                    "tattoo_style": c_tat_style,
                    "tattoo_places": c_tat_place,
-                   "description": c_description
+                   "description": c_description,
+                   "likeness": likeness
                 }
                 st.session_state['char_last_attrs'] = attrs 
                 
