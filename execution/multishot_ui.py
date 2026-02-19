@@ -155,6 +155,8 @@ def render_multishot_ui(get_user_out_dir_func):
             if os.path.exists(temp_path):
                 with st.spinner("🎬 Director is analyzing your start frame..."):
                     try:
+                        from dotenv import load_dotenv
+                        load_dotenv(override=True)
                         google_key = os.getenv("GOOGLE_API_KEY")
                         if not google_key:
                             st.error("Missing GOOGLE_API_KEY for AI Director.")
@@ -301,6 +303,8 @@ def render_multishot_ui(get_user_out_dir_func):
             has_frame = os.path.exists(temp_path)
             with st.spinner("🎬 Director is analyzing your scene..."):
                 try:
+                    from dotenv import load_dotenv
+                    load_dotenv(override=True)
                     google_key = os.getenv("GOOGLE_API_KEY")
                     if not google_key:
                         st.error("Missing GOOGLE_API_KEY for AI Director.")

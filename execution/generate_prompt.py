@@ -208,6 +208,7 @@ def generate_prompt_content(vibe, outfit, character,
     # ================= GEMINI IMPLEMENTATION =================
     if "gemini" in model_engine:
         try:
+            load_dotenv(override=True)
             google_key = os.getenv("GOOGLE_API_KEY")
             if not google_key: return {"positive_prompt": "Error: GOOGLE_API_KEY missing", "aspect_ratio": "9:16"}
             
