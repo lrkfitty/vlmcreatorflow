@@ -266,18 +266,244 @@ def inject_magic_css():
              transform: translateY(0);
         }
 
+        /* --- BRAND OVERLINE --- */
+        .brand-overline {
+            text-align: center;
+            color: #94A3B8;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.25em;
+            text-transform: uppercase;
+            margin-bottom: 0;
+        }
+
+        /* --- BOLD WIDGET LABELS (Global) --- */
+        .stSelectbox label,
+        .stMultiSelect label,
+        .stTextInput label,
+        .stTextArea label,
+        .stSlider label,
+        .stCheckbox label,
+        .stRadio label,
+        .stNumberInput label,
+        .stFileUploader label,
+        .stDateInput label,
+        .stTimeInput label,
+        .stColorPicker label,
+        [data-testid="stWidgetLabel"] {
+            color: #FFFFFF !important;
+            font-weight: 600 !important;
+            font-size: 0.9rem !important;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+        }
+
+        /* --- SLIDER STYLING --- */
+        .stSlider [data-baseweb="slider"] [role="slider"] {
+            background: #38BDF8 !important;
+            border: 2px solid #FFFFFF !important;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.5);
+        }
+        .stSlider [data-baseweb="slider"] [data-testid="stTickBar"] > div {
+            background: rgba(255,255,255,0.2) !important;
+        }
+        .stSlider div[data-baseweb="slider"] > div > div {
+            background: linear-gradient(90deg, #2563EB, #38BDF8) !important;
+        }
+        .stSlider div[data-baseweb="slider"] > div {
+            background: rgba(255,255,255,0.15) !important;
+        }
+        .stSlider [data-testid="stThumbValue"],
+        .stSlider [data-testid="stTickBarMin"],
+        .stSlider [data-testid="stTickBarMax"] {
+            color: #FFFFFF !important;
+            font-weight: 600 !important;
+        }
+
+        /* --- CHECKBOX & RADIO --- */
+        .stCheckbox label span,
+        .stCheckbox p,
+        .stRadio label span,
+        .stRadio p,
+        .stRadio div[role="radiogroup"] label p {
+            color: #FFFFFF !important;
+            font-weight: 500 !important;
+        }
+        .stCheckbox [data-testid="stCheckbox"] > label > div[role="checkbox"] {
+            border-color: rgba(255,255,255,0.4) !important;
+            background: rgba(255,255,255,0.05) !important;
+        }
+        .stCheckbox [data-testid="stCheckbox"] > label > div[role="checkbox"][aria-checked="true"] {
+            background: #2563EB !important;
+            border-color: #2563EB !important;
+        }
+
+        /* --- EXPANDERS --- */
+        .streamlit-expanderHeader,
+        [data-testid="stExpander"] summary,
+        [data-testid="stExpander"] summary span,
+        [data-testid="stExpander"] summary p {
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            font-size: 1rem !important;
+        }
+        [data-testid="stExpander"] {
+            background: rgba(15, 23, 42, 0.6) !important;
+            border: 1px solid rgba(255,255,255,0.12) !important;
+            border-radius: 12px !important;
+        }
+        [data-testid="stExpander"] details {
+            border: none !important;
+        }
+
+        /* --- FORMS --- */
+        [data-testid="stForm"] {
+            background: rgba(15, 23, 42, 0.4) !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            border-radius: 12px !important;
+            padding: 16px !important;
+        }
+        /* Form Submit Button */
+        [data-testid="stForm"] button[kind="secondaryFormSubmit"],
+        [data-testid="stForm"] button[type="submit"] {
+            background: linear-gradient(110deg, #1e293b, #334155, #1e293b) !important;
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+        }
+
+        /* --- MULTISELECT TAGS --- */
+        .stMultiSelect span[data-baseweb="tag"] {
+            background: rgba(37, 99, 235, 0.3) !important;
+            border: 1px solid rgba(56, 189, 248, 0.4) !important;
+            border-radius: 6px !important;
+        }
+        .stMultiSelect span[data-baseweb="tag"] span {
+            color: #FFFFFF !important;
+            font-weight: 500 !important;
+        }
+        .stMultiSelect span[data-baseweb="tag"] span[role="presentation"] {
+            color: #FFFFFF !important;
+        }
+        /* Multiselect container */
+        .stMultiSelect div[data-baseweb="select"] > div {
+            background-color: #0F172A !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+            color: #FFFFFF !important;
+        }
+
+        /* --- DIVIDERS --- */
+        hr, [data-testid="stDecoration"],
+        .stDivider {
+            border-color: rgba(255,255,255,0.1) !important;
+            background-color: rgba(255,255,255,0.1) !important;
+        }
+
+        /* --- METRIC WIDGETS --- */
+        [data-testid="stMetricValue"] {
+            color: #FFFFFF !important;
+            font-weight: 800 !important;
+        }
+        [data-testid="stMetricLabel"] {
+            color: #94A3B8 !important;
+            font-weight: 600 !important;
+        }
+        [data-testid="stMetricDelta"] svg {
+            fill: currentColor !important;
+        }
+
+        /* --- ALERT BOXES (info, warning, success, error) --- */
+        .stAlert, [data-testid="stAlert"] {
+            border-radius: 10px !important;
+            font-weight: 500 !important;
+        }
+        div[data-testid="stAlert"] p {
+            font-weight: 500 !important;
+        }
+
+        /* --- CAPTION --- */
+        .stCaption, [data-testid="stCaptionContainer"] p {
+            color: #94A3B8 !important;
+            font-weight: 500 !important;
+        }
+
+        /* --- NUMBER INPUT --- */
+        .stNumberInput input {
+            background-color: #0F172A !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+            color: #FFFFFF !important;
+            border-radius: 8px !important;
+        }
+        .stNumberInput button {
+            color: #FFFFFF !important;
+            border-color: rgba(255,255,255,0.2) !important;
+        }
+
+        /* --- FILE UPLOADER --- */
+        [data-testid="stFileUploader"] section {
+            background: rgba(15, 23, 42, 0.6) !important;
+            border: 1px dashed rgba(255,255,255,0.2) !important;
+            border-radius: 10px !important;
+        }
+        [data-testid="stFileUploader"] section small,
+        [data-testid="stFileUploader"] section span {
+            color: #94A3B8 !important;
+        }
+
         /* --- TABS --- */
         .stTabs [data-baseweb="tab-list"] button [data-testid="stMarkdownContainer"] p {
-            font-size: 1.2rem !important; /* Bigger */
-            font-weight: 700 !important; /* Bold */
+            font-size: 1.2rem !important;
+            font-weight: 700 !important;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
-        
-        /* Active Tab Highlight */
+        .stTabs [data-baseweb="tab-list"] button {
+            color: #94A3B8 !important;
+        }
         .stTabs [data-baseweb="tab-list"] button[aria-selected="true"] {
              color: #FFFFFF !important;
              border-bottom-color: #38BDF8 !important;
+        }
+        .stTabs [data-baseweb="tab-list"] button:hover {
+            color: #FFFFFF !important;
+        }
+        .stTabs [data-baseweb="tab-list"] {
+            border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+        }
+
+        /* --- TOAST --- */
+        [data-testid="stToast"] {
+            background: rgba(15, 23, 42, 0.95) !important;
+            border: 1px solid rgba(255,255,255,0.15) !important;
+            color: #FFFFFF !important;
+            backdrop-filter: blur(10px);
+        }
+        [data-testid="stToast"] p {
+            color: #FFFFFF !important;
+            font-weight: 500 !important;
+        }
+
+        /* --- MARKDOWN BOLD TEXT (inside widgets) --- */
+        .stMarkdown strong, .stMarkdown b {
+            color: #FFFFFF !important;
+            font-weight: 700 !important;
+        }
+
+        /* --- SELECTBOX PLACEHOLDER TEXT --- */
+        .stSelectbox [data-baseweb="select"] input::placeholder,
+        .stMultiSelect [data-baseweb="select"] input::placeholder {
+            color: #64748B !important;
+        }
+
+        /* --- DOWNLOAD BUTTON --- */
+        .stDownloadButton button {
+            background: linear-gradient(110deg, #1e293b, #334155, #1e293b) !important;
+            color: #FFFFFF !important;
+            font-weight: 600 !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+        }
+        .stDownloadButton button:hover {
+            border-color: #38BDF8 !important;
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
         }
 
     </style>

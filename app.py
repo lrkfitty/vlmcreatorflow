@@ -159,8 +159,8 @@ if not st.session_state.authenticated:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     c1, c2, c3 = st.columns([1, 1.5, 1])
     with c2:
-        st.markdown("<div style='text-align: center; color: #64748B; font-size: 1rem; font-weight: 500; margin-bottom: 0.5rem;'>Welcome to an all new tool brought to you by</div>", unsafe_allow_html=True)
-        st.markdown("<div style='text-align: center; color: #1E293B; font-size: 1.8rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0px;'>VIRAL LENSE MEDIA</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; color: #94A3B8; font-size: 1rem; font-weight: 500; margin-bottom: 0.5rem;'>Welcome to an all new tool brought to you by</div>", unsafe_allow_html=True)
+        st.markdown("<div style='text-align: center; color: #FFFFFF; font-size: 1.8rem; font-weight: 900; letter-spacing: 0.1em; margin-bottom: 0px;'>VIRAL LENSE MEDIA</div>", unsafe_allow_html=True)
         # Magic Text H1
         magic_text("CreateFlow", type="h1")
         
@@ -349,21 +349,38 @@ st.markdown("""
         justify-content: center;
         overflow-x: auto;
         padding-bottom: 10px;
+        gap: 6px;
     }
     div[data-testid="stRadio"] > div[role="radiogroup"] > label {
-        background-color: #f0f2f6;
-        padding: 0.5rem 1rem;
+        background-color: rgba(255, 255, 255, 0.06);
+        padding: 0.5rem 1.1rem;
         border-radius: 20px;
-        margin-right: 10px;
-        border: 1px solid #e0e0e0;
-        transition: all 0.2s;
+        margin-right: 0px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        transition: all 0.3s ease;
         cursor: pointer;
+        backdrop-filter: blur(8px);
+    }
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label p {
+        color: #CBD5E1 !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+    }
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
+        background-color: rgba(255, 255, 255, 0.12);
+        border-color: rgba(56, 189, 248, 0.4);
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);
     }
     div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-checked="true"] {
-        background-color: #ff4b4b;
+        background: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
         color: white;
-        border-color: #ff4b4b;
+        border-color: transparent;
         font-weight: bold;
+        box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
+    }
+    div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-checked="true"] p {
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -1622,7 +1639,7 @@ if selection == "World Builder":
         with st.form(key="wb_camera_form"):
             # --- CAMERA CONTROLS ---
             with st.expander("Camera & Scene Settings", expanded=False):
-                col_cam, col_light, col_action = st.columns(3)
+                col_cam, col_light, col_action, col_look = st.columns(4)
                 with col_cam:
                     st.markdown("**Hardware**")
                     sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []), key="wb_cam")
@@ -1670,6 +1687,13 @@ if selection == "World Builder":
                          "Tilting head slightly", "Walking confidently forward", "Walking side by side", "Walking with friends"
                      ]
                     sel_action = st.selectbox("Action", actions, key="wb_act")
+
+                with col_look:
+                    st.markdown("**Appearance**")
+                    sel_hairstyle = st.selectbox("Hairstyle", ["Auto"] + knowledge_base.get("hairstyles", []), key="wb_hair")
+                    sel_makeup = st.selectbox("Makeup", ["Auto"] + knowledge_base.get("makeup", []), key="wb_makeup")
+                    sel_hair_cond = st.selectbox("Hair Condition", ["Auto"] + knowledge_base.get("hair_condition", []), key="wb_hair_cond")
+                    sel_temperature = st.slider("Temperature (AI Creativity)", 0.0, 2.0, 1.0, 0.1, key="wb_temp", help="Lower = more predictable. Higher = more creative/wild.")
             
             # --- CUSTOM DETAILS ---
             st.markdown("#### Creative Direction")
@@ -1702,7 +1726,10 @@ if selection == "World Builder":
                         'emotion': sel_emotion,
                         'action': sel_action,
                         'film': sel_film,
-                        'filter_look': sel_filter_look
+                        'filter_look': sel_filter_look,
+                        'hairstyle': sel_hairstyle,
+                        'makeup': sel_makeup,
+                        'hair_condition': sel_hair_cond
                     },
                     'custom_details': custom_details
                 }
@@ -1761,6 +1788,9 @@ if selection == "World Builder":
                 # New Logic
                 if sel_emotion != "Auto": cam_details.append(f"Expression: {sel_emotion}")
                 if sel_action != "Auto": cam_details.append(f"Action: {sel_action}")
+                if sel_hairstyle != "Auto": cam_details.append(f"Hairstyle: {sel_hairstyle}")
+                if sel_makeup != "Auto": cam_details.append(f"Makeup: {sel_makeup}")
+                if sel_hair_cond != "Auto": cam_details.append(f"Hair: {sel_hair_cond}")
                 
                 if cam_details:
                     final_prompt += ", " + ", ".join(cam_details)
@@ -1824,6 +1854,9 @@ Vibe: {custom_data['current_selections'].get('VIBE', 'neutral')}"""
                         if cam_settings['action'] != "Auto": camera_summary.append(f"Action: {cam_settings['action']}")
                         if cam_settings['film'] != "Auto": camera_summary.append(f"Style: {cam_settings['film']}")
                         if cam_settings['filter_look'] != "Auto": camera_summary.append(f"Look: {cam_settings['filter_look']}")
+                        if cam_settings.get('hairstyle', 'Auto') != "Auto": camera_summary.append(f"Hairstyle: {cam_settings['hairstyle']}")
+                        if cam_settings.get('makeup', 'Auto') != "Auto": camera_summary.append(f"Makeup: {cam_settings['makeup']}")
+                        if cam_settings.get('hair_condition', 'Auto') != "Auto": camera_summary.append(f"Hair: {cam_settings['hair_condition']}")
                         
                         camera_str = ", ".join(camera_summary) if camera_summary else "natural"
                         
@@ -1860,7 +1893,7 @@ Write an immersive, detailed prompt now:"""
                         try:
                             import google.generativeai as genai
                             model = genai.GenerativeModel("gemini-2.0-flash")
-                            response = model.generate_content(director_prompt)
+                            response = model.generate_content(director_prompt, generation_config={"temperature": sel_temperature})
                             generated_prompt = response.text.strip()
                             
                             # Remove any markdown artifacts if present
