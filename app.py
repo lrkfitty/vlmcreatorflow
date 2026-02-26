@@ -14,7 +14,7 @@ try:
     import load_assets as la_module
     importlib.reload(la_module)
     from load_assets import load_assets, promote_image_to_asset
-    from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button
+    from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button, icon_grid_selector
     import generate_image as gi_module
     importlib.reload(gi_module)
     from generate_image import generate_image_from_prompt
@@ -1635,6 +1635,40 @@ if selection == "World Builder":
         pet_names = st.session_state.get('wb_pet_names', [])
         prop_names = st.session_state.get('wb_prop_names', [])
         
+        # --- VISUAL CAMERA PICKERS (Outside Form — uses buttons) ---
+        with st.expander("📸 Visual Camera Picker", expanded=False):
+            st.caption("Click a card to select — or use the dropdowns below for full control.")
+            vpc1, vpc2, vpc3 = st.columns(3)
+            with vpc1:
+                icon_grid_selector(
+                    "Camera Angle",
+                    knowledge_base.get("camera_angles", []),
+                    "assets/ui_icons/camera_angles",
+                    "wb_vp_angle",
+                    cols_per_row=3
+                )
+            with vpc2:
+                icon_grid_selector(
+                    "Shot Type",
+                    ["Close Up", "Medium Shot", "Full Body", "Wide Shot", "Extreme Close Up", "Cowboy Shot", "Overhead"],
+                    "assets/ui_icons/shot_types",
+                    "wb_vp_shot",
+                    cols_per_row=3
+                )
+            with vpc3:
+                icon_grid_selector(
+                    "Lighting",
+                    knowledge_base.get("lighting", []),
+                    "assets/ui_icons/lighting",
+                    "wb_vp_light",
+                    cols_per_row=3
+                )
+
+        # --- Sync visual picker → dropdown defaults ---
+        _vp_angle = st.session_state.get("icon_grid_wb_vp_angle", "Auto")
+        _vp_shot = st.session_state.get("icon_grid_wb_vp_shot", "Auto")
+        _vp_light = st.session_state.get("icon_grid_wb_vp_light", "Auto")
+
         # V3.9: Wrapped in Form to prevent Camera Settings Reload Loop
         with st.form(key="wb_camera_form"):
             # --- CAMERA CONTROLS ---
@@ -1644,20 +1678,22 @@ if selection == "World Builder":
                     st.markdown("**Hardware**")
                     sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []), key="wb_cam")
                     sel_lens = st.selectbox("Lens", ["Auto"] + knowledge_base.get("lenses", []), key="wb_lens")
-                    sel_shot = st.selectbox("Shot Type", ["Auto", "Close Up", "Medium Shot", "Full Body", "Wide Shot", "Extreme Close Up", "Cowboy Shot", "Overhead"], key="wb_shot") 
+                    sel_shot = st.selectbox("Shot Type", ["Auto", "Close Up", "Medium Shot", "Full Body", "Wide Shot", "Extreme Close Up", "Cowboy Shot", "Overhead"], index=["Auto", "Close Up", "Medium Shot", "Full Body", "Wide Shot", "Extreme Close Up", "Cowboy Shot", "Overhead"].index(_vp_shot) if _vp_shot in ["Auto", "Close Up", "Medium Shot", "Full Body", "Wide Shot", "Extreme Close Up", "Cowboy Shot", "Overhead"] else 0, key="wb_shot") 
                     sel_ar = st.selectbox("Aspect Ratio", ["Auto", "4:5", "16:9", "9:16", "1:1", "3:2"], index=0, key="wb_ar")
     
     
                 with col_light:
                     st.markdown("**Lighting & Mood**")
-                    sel_lighting = st.selectbox("Lighting", ["Auto"] + knowledge_base.get("lighting", []), key="wb_light")
+                    _light_opts = ["Auto"] + knowledge_base.get("lighting", [])
+                    sel_lighting = st.selectbox("Lighting", _light_opts, index=_light_opts.index(_vp_light) if _vp_light in _light_opts else 0, key="wb_light")
                     sel_weather = st.selectbox("Weather", ["Auto"] + knowledge_base.get("weather", []), key="wb_weath")
                     sel_film_stock = st.selectbox("Film Stock", ["Auto"] + knowledge_base.get("film_stocks", []), key="wb_stock")
     
                 with col_action:
                     st.markdown("**Direction**")
                     sel_film = st.selectbox("Style", ["Auto"] + knowledge_base.get("styles", []), key="wb_film")
-                    sel_angle = st.selectbox("Angle", ["Auto"] + knowledge_base.get("camera_angles", []), key="wb_ang") # Fixed key to match KB
+                    _angle_opts = ["Auto"] + knowledge_base.get("camera_angles", [])
+                    sel_angle = st.selectbox("Angle", _angle_opts, index=_angle_opts.index(_vp_angle) if _vp_angle in _angle_opts else 0, key="wb_ang")
                     sel_filter_look = st.selectbox("Filter / Look", ["Auto"] + knowledge_base.get("filters", []), key="wb_look")
     
                     # User Provided Emotions (30 List)

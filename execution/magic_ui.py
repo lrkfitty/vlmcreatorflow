@@ -506,6 +506,65 @@ def inject_magic_css():
             box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
         }
 
+        /* --- ICON GRID SELECTOR --- */
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 8px;
+            margin: 8px 0;
+        }
+        .icon-card {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.1);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            aspect-ratio: 1;
+            background: rgba(15, 23, 42, 0.6);
+        }
+        .icon-card:hover {
+            border-color: rgba(56, 189, 248, 0.5);
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(56, 189, 248, 0.3);
+        }
+        .icon-card.selected {
+            border-color: #38BDF8;
+            box-shadow: 0 0 20px rgba(56, 189, 248, 0.5), 0 0 40px rgba(56, 189, 248, 0.2);
+            transform: scale(1.03);
+        }
+        .icon-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .icon-card-label {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.85));
+            color: #FFFFFF;
+            font-size: 0.65rem;
+            font-weight: 600;
+            padding: 16px 6px 5px 6px;
+            text-align: center;
+            line-height: 1.2;
+        }
+        .icon-card-text-only {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            height: 100%;
+            color: #CBD5E1;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-align: center;
+            padding: 6px;
+            background: rgba(15, 23, 42, 0.8);
+        }
+
     </style>
     """
     st.markdown(css, unsafe_allow_html=True)
@@ -538,3 +597,110 @@ def hover_button(label="Download", key=None):
         <div class="hover-btn-reveal">⬇</div>
     </div>
     """
+
+
+def icon_grid_selector(label, options, icons_dir, key, cols_per_row=4):
+    """Visual grid selector with photorealistic thumbnails.
+    
+    Args:
+        label: Section header label
+        options: List of option strings (e.g. ["Eye Level (Neutral)", "Low Angle (Heroic/Power)"])  
+        icons_dir: Path to directory containing icon images (e.g. "assets/ui_icons/camera_angles")
+        key: Session state key for storing selection
+        cols_per_row: Number of columns in the grid
+    
+    Returns:
+        Selected option string (or "Auto" if none selected)
+    """
+    import os
+    import base64
+    
+    st.markdown(f"**{label}**")
+    
+    # Initialize session state
+    state_key = f"icon_grid_{key}"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = "Auto"
+    
+    # Auto option
+    if st.button("✨ Auto", key=f"{key}_auto", 
+                 type="primary" if st.session_state[state_key] == "Auto" else "secondary",
+                 use_container_width=True):
+        st.session_state[state_key] = "Auto"
+        st.rerun()
+    
+    # Build grid
+    abs_icons_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), icons_dir)
+    
+    rows = [options[i:i+cols_per_row] for i in range(0, len(options), cols_per_row)]
+    
+    for row_opts in rows:
+        cols = st.columns(cols_per_row)
+        for idx, opt in enumerate(row_opts):
+            with cols[idx]:
+                is_selected = st.session_state[state_key] == opt
+                
+                # Find icon file
+                safe_name = opt.lower()
+                for char in "()/ &":
+                    safe_name = safe_name.replace(char, "_")
+                safe_name = safe_name.strip("_").replace("__", "_")
+                
+                icon_path = None
+                for ext in ['.png', '.jpg', '.jpeg', '.webp']:
+                    candidate = os.path.join(abs_icons_dir, safe_name + ext)
+                    if os.path.exists(candidate):
+                        icon_path = candidate
+                        break
+                
+                # Render card
+                if icon_path:
+                    # Image card with overlay label
+                    with open(icon_path, "rb") as f:
+                        img_data = base64.b64encode(f.read()).decode()
+                    
+                    ext_type = os.path.splitext(icon_path)[1].lstrip('.')
+                    if ext_type == 'jpg': ext_type = 'jpeg'
+                    
+                    border_style = "border: 2px solid #38BDF8; box-shadow: 0 0 15px rgba(56,189,248,0.5);" if is_selected else "border: 2px solid rgba(255,255,255,0.1);"
+                    
+                    # Short label (remove parenthetical) 
+                    short_label = opt.split("(")[0].strip() if "(" in opt else opt
+                    
+                    st.markdown(f"""
+                    <div style="position:relative; border-radius:10px; overflow:hidden; {border_style} 
+                                transition: all 0.3s ease; aspect-ratio:1; cursor:pointer;">
+                        <img src="data:image/{ext_type};base64,{img_data}" 
+                             style="width:100%; height:100%; object-fit:cover;">
+                        <div style="position:absolute; bottom:0; left:0; right:0; 
+                                    background: linear-gradient(transparent, rgba(0,0,0,0.85));
+                                    color:#FFF; font-size:0.65rem; font-weight:600; 
+                                    padding:16px 4px 4px 4px; text-align:center; line-height:1.2;">
+                            {short_label}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                else:
+                    # Text-only fallback card
+                    border_style = "border: 2px solid #38BDF8; box-shadow: 0 0 15px rgba(56,189,248,0.5); background: rgba(37,99,235,0.2);" if is_selected else "border: 2px solid rgba(255,255,255,0.1); background: rgba(15,23,42,0.8);"
+                    short_label = opt.split("(")[0].strip() if "(" in opt else opt
+                    
+                    st.markdown(f"""
+                    <div style="display:flex; align-items:center; justify-content:center;
+                                border-radius:10px; {border_style} aspect-ratio:1; 
+                                transition: all 0.3s ease; cursor:pointer;">
+                        <span style="color:#CBD5E1; font-size:0.7rem; font-weight:600; 
+                                     text-align:center; padding:6px;">{short_label}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Actual clickable button (small, below card)
+                btn_label = "●" if is_selected else "○"
+                if st.button(btn_label, key=f"{key}_{idx}_{opt[:15]}", use_container_width=True):
+                    st.session_state[state_key] = opt
+                    st.rerun()
+    
+    selected = st.session_state[state_key]
+    st.caption(f"Selected: **{selected}**")
+    return selected
+
