@@ -642,9 +642,11 @@ def icon_grid_selector(label, options, icons_dir, key, cols_per_row=4):
                 
                 # Find icon file
                 safe_name = opt.lower()
-                for char in "()/ &":
+                for char in "()/ &'":
                     safe_name = safe_name.replace(char, "_")
-                safe_name = safe_name.strip("_").replace("__", "_")
+                safe_name = safe_name.strip("_")
+                while "__" in safe_name:
+                    safe_name = safe_name.replace("__", "_")
                 
                 icon_path = None
                 for ext in ['.png', '.jpg', '.jpeg', '.webp']:
