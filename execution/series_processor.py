@@ -47,10 +47,11 @@ def resize_bytes_to_jpeg(image_bytes, max_size=1280):
 def parse_script_to_scenes(script_text, cast_list, environment_name, genre="General", tone="Neutral", roles_map=None, wardrobe_map=None, ref_images=None, secondary_environment="None", camera="Auto", lens="Auto", lighting="Auto", film_stock="Auto", filter_look="Auto", movie_style="Auto", transition_style="Auto"):
     """
     Uses Gemini to break down a raw script into structured Scenes.
-    Enforces 12-Scene Structure (8 Narrative + 4 B-Roll).
+    Enforces 12-Shot Structure (8 Narrative Key Moments + 4 B-Roll Atmosphere Stills).
     V3 Update: Added Cinematic Parameters (Camera, Lens, Lighting).
     V3.5 Update: Multimodal Support (Deep Vision).
     V3.6 Update: Added Film Stock and Filter/Look.
+    V4 Update: Reframed for photorealistic scene stills (not video).
     """
     
 
@@ -77,7 +78,7 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
     - FILM STOCK: {film_stock}
     - FILTER/LOOK: {filter_look}
     - MOVIE STYLE REFERENCE: {movie_style}
-    - PREFERRED TRANSITION STYLE: {transition_style}
+    - VISUAL PACING / MOOD PROGRESSION: {transition_style}
     """
 
     system_instruction = f"""
