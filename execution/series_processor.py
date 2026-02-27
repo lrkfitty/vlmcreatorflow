@@ -131,6 +131,16 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
          * Only use B-Roll (Environment/Details) if it enhances the atmosphere.
          * If the scene is dialogue-heavy or emotional, **PRIORITIZE CHARACTER FOCUS**.
 
+       - **DIALOGUE-TO-SHOT MAPPING (CRITICAL — DO NOT SKIP LINES):**
+         * If the script contains SPEAKING LINES or DIALOGUE, you MUST dedicate shots to the KEY dialogue moments.
+         * Each important line of dialogue = ONE SHOT capturing the character IN THE ACT of delivering that line.
+         * The 'visual_prompt' MUST quote the specific line being spoken (e.g. "Shay, mid-sentence, saying 'I told you this would happen'").
+         * Show the CHARACTER'S FACE and BODY LANGUAGE at that exact moment — the emotion behind the words.
+         * Include REACTION SHOTS: after a key line, show the OTHER character's face reacting to what was just said.
+         * Do NOT summarize 5 lines of dialogue into one generic "two characters talking" shot.
+         * A dialogue-heavy script should be 70-80% dialogue coverage shots, NOT 70% establishing/B-roll.
+         * Think of it like a SCRIPT SUPERVISOR: every beat in the script should have visual coverage.
+
     3. VISUAL FIDELITY (CRITICAL - DO NOT FAIL THIS):
        - You have been provided with VISUAL REFERENCE images labeled "Wardrobe".
        - You MUST Use these images as the ABSOLUTE SOURCE OF TRUTH.
