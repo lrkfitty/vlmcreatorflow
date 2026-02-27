@@ -121,10 +121,10 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                         prompt_data={
                             "positive_prompt": final_prompt,
                             "negative_prompt": "blurry, low quality, distortion, ugly face",
-                            "width": 1024, "height": 576, # 16:9 Cinematic
                             "num_images": 1,
                             "guidance_scale": 7.5,
                             "model_type": "nano",
+                            "aspect_ratio": st.session_state.get('series_ar', '16:9'),
                             "assets": assets_payload
                         },
                         settings={"batch_count": 1},
@@ -311,6 +311,10 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                          "Euphoria (Glitter/A24)", "Cyberpunk (Neon)", "1950s Technicolor", "1990s Sitcom"
                      ]
                      s_movie_style = st.selectbox("Style Reference", style_opts)
+                
+                c_ar_col, _ = st.columns(2)
+                with c_ar_col:
+                     s_aspect_ratio = st.selectbox("Aspect Ratio", ["16:9", "9:16", "4:5", "1:1"], index=0, key="series_ar")
             
             s_transition_style = st.selectbox("Transition Pacing", ["Standard", "Fast / TikTok", "Slow / Cinematic", "Match Cut"])
             
@@ -592,7 +596,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                                              "positive_prompt": final_shot_prompt,
                                              "model_type": "nano", 
                                              "assets": final_assets_payload,
-                                             "aspect_ratio": "16:9"
+                                             "aspect_ratio": st.session_state.get('series_ar', '16:9')
                                         }
                                         
                                         res = generate_image_from_prompt(p_data, get_user_out_dir_func("Series"))
