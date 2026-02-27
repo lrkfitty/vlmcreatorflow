@@ -67,17 +67,21 @@ def render_multishot_ui(get_user_out_dir_func):
     
     # --- Mode Selection (OUTSIDE form so it reruns instantly) ---
     st.markdown("**1. Output Format**")
-    multishot_mode = st.selectbox(
-        "Generation Mode",
-        [
-            "Character Sheet (4 Angles)", 
-            "Individual Shots (Batch)", 
-            "Single Custom Angle",
-            "End Frame Generator",
-            "Cinematic Coverage (Scene)"
-        ],
-        key="multishot_mode_select"
-    )
+    ms_mode_col, ms_res_col = st.columns([2, 1])
+    with ms_mode_col:
+        multishot_mode = st.selectbox(
+            "Generation Mode",
+            [
+                "Character Sheet (4 Angles)", 
+                "Individual Shots (Batch)", 
+                "Single Custom Angle",
+                "End Frame Generator",
+                "Cinematic Coverage (Scene)"
+            ],
+            key="multishot_mode_select"
+        )
+    with ms_res_col:
+        ms_resolution = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, key="ms_res", help="Higher = sharper but slower")
     
     # Mode-specific options (also outside form for instant reactivity)
     selected_angles = []
@@ -216,6 +220,7 @@ def render_multishot_ui(get_user_out_dir_func):
                 index=0,
                 help="Cinematic 16:9 recommended"
             )
+            endframe_res = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, key="ms_ef_res", help="Higher = sharper but slower")
     elif multishot_mode == "Cinematic Coverage (Scene)":
         st.markdown("🎬 **Cinematic Scene Coverage** — Same moment, multiple camera angles")
         st.caption("Select your cast, describe the scene, and choose which angles to cover.")
@@ -539,6 +544,7 @@ def render_multishot_ui(get_user_out_dir_func):
                         payload = {
                             "positive_prompt": full_prompt,
                             "aspect_ratio": "16:9",
+                            "image_size": st.session_state.get("ms_res", "1K"),
                             "model_type": "nano",
                             "assets": assets
                         }
@@ -573,6 +579,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                 payload = {
                                     "positive_prompt": angle_prompt,
                                     "aspect_ratio": "4:5",
+                                    "image_size": st.session_state.get("ms_res", "1K"),
                                     "model_type": "nano",
                                     "assets": assets
                                 }
@@ -607,6 +614,7 @@ def render_multishot_ui(get_user_out_dir_func):
                             payload = {
                                 "positive_prompt": custom_prompt,
                                 "aspect_ratio": "4:5",
+                                "image_size": st.session_state.get("ms_res", "1K"),
                                 "model_type": "nano",
                                 "assets": assets
                             }
@@ -675,6 +683,7 @@ def render_multishot_ui(get_user_out_dir_func):
                             payload = {
                                 "positive_prompt": endframe_prompt,
                                 "aspect_ratio": selected_ar,
+                                "image_size": st.session_state.get("ms_ef_res", "1K"),
                                 "model_type": "nano",
                                 "assets": assets
                             }
@@ -845,6 +854,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                 payload = {
                                     "positive_prompt": coverage_prompt,
                                     "aspect_ratio": "16:9",
+                                    "image_size": st.session_state.get("ms_res", "1K"),
                                     "model_type": "nano",
                                     "assets": shot_assets
                                 }

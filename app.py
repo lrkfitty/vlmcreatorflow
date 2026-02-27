@@ -872,6 +872,7 @@ if selection == "Workflow Wizard":
                     sel_shot = st.selectbox("Shot Type", ["Auto"] + knowledge_base.get("shot_types", []))
                     sel_angle = st.selectbox("Camera Angle", ["Auto"] + knowledge_base.get("camera_angles", []))
                     sel_ar = st.selectbox("Aspect Ratio", ["Auto", "4:5 (Standard)", "16:9 (Cinematic)", "9:16 (Social)"], index=0)
+                    sel_res = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, help="Higher = sharper but slower")
                     sel_style = st.selectbox("Photo Style", ["Auto"] + knowledge_base.get("styles", []))
                     
                 with col_light:
@@ -970,6 +971,7 @@ if selection == "Workflow Wizard":
                 prompt_data["likeness_strength"] = likeness # Pass to generator
                 
                 prompt_data["model_type"] = render_engine 
+                prompt_data["image_size"] = sel_res
                 # prompt_data["checkpoint"] removed
                 
                 job_name = f"{s_outfit} - {clean_val(s_vibe)}"
@@ -1679,6 +1681,7 @@ if selection == "World Builder":
                     sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []), key="wb_cam")
                     sel_lens = st.selectbox("Lens", ["Auto"] + knowledge_base.get("lenses", []), key="wb_lens")
                     sel_ar = st.selectbox("Aspect Ratio", ["Auto", "4:5", "16:9", "9:16", "1:1", "3:2"], index=0, key="wb_ar")
+                    sel_res = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, key="wb_res", help="Higher = sharper but slower")
     
                 with col_mood:
                     st.markdown("**Direction & Mood**")
@@ -2055,6 +2058,7 @@ Write an immersive, detailed prompt now:"""
                     prompt_data={
                         "positive_prompt": final_prompt,
                         "aspect_ratio": sel_ar,
+                        "image_size": sel_res,
                         "model_type": "nano",
                         "assets": assets_to_inject
                     },
@@ -2086,6 +2090,7 @@ Write an immersive, detailed prompt now:"""
                      wb_payload = {
                          "positive_prompt": final_prompt,
                          "aspect_ratio": sel_ar, 
+                         "image_size": sel_res,
                          "model_type": "nano", 
                          "assets": assets_to_inject
                      }
@@ -2176,6 +2181,7 @@ Write an immersive, detailed prompt now:"""
                                 prompt_data={
                                     "positive_prompt": p + f", {final_prompt}", 
                                     "aspect_ratio": sel_ar,
+                                    "image_size": sel_res,
                                     "model_type": "nano",
                                     "assets": assets_to_inject
                                 },
@@ -2202,6 +2208,7 @@ Write an immersive, detailed prompt now:"""
                                      wb_payload = {
                                          "positive_prompt": p + f", {final_prompt}", # Append full context
                                          "aspect_ratio": sel_ar, 
+                                         "image_size": sel_res,
                                          "model_type": "nano", 
                                          "assets": assets_to_inject
                                      }
@@ -2242,6 +2249,7 @@ Write an immersive, detailed prompt now:"""
                                     wb_payload = {
                                          "positive_prompt": val, # Use edited text
                                          "aspect_ratio": sel_ar, 
+                                         "image_size": sel_res,
                                          "model_type": "nano", 
                                          "assets": assets_to_inject
                                      }
@@ -2283,6 +2291,7 @@ Write an immersive, detailed prompt now:"""
                         p_data = {
                             "positive_prompt": p + f", {final_prompt}",
                             "aspect_ratio": sel_ar,
+                            "image_size": sel_res,
                             "model_type": "nano",
                             "assets": current_assets
                         }
