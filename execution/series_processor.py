@@ -47,7 +47,7 @@ def resize_bytes_to_jpeg(image_bytes, max_size=1280):
 def parse_script_to_scenes(script_text, cast_list, environment_name, genre="General", tone="Neutral", roles_map=None, wardrobe_map=None, ref_images=None, secondary_environment="None", camera="Auto", lens="Auto", lighting="Auto", film_stock="Auto", filter_look="Auto", movie_style="Auto", transition_style="Auto"):
     """
     Uses Gemini to break down a raw script into structured Scenes.
-    Enforces 12-Shot Structure (8 Narrative Key Moments + 4 B-Roll Atmosphere Stills).
+    Dynamic shot count based on script content (minimum 8, no maximum).
     V3 Update: Added Cinematic Parameters (Camera, Lens, Lighting).
     V3.5 Update: Multimodal Support (Deep Vision).
     V3.6 Update: Added Film Stock and Filter/Look.
@@ -116,20 +116,28 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
        - Think like a PHOTOGRAPHER capturing a single decisive moment, NOT a videographer.
        - Example: "Wide shot on Arri Alexa with Anamorphic Lens, cinematic moody lighting, frozen moment..."
     
-    2. SCENE BREAKDOWN: transform the script into **EXACTLY 12 KEY MOMENTS** (individual photographs).
+    2. SCENE BREAKDOWN: Analyze the script and create AS MANY SHOTS AS THE SCRIPT NEEDS.
        - Each shot is a STANDALONE STILL IMAGE — a frozen moment in time.
-       - **Suggested Structure (Adapt if Narrative Requires):**
-         * Shots 1-2: Establishing Stills (Character/Environment Introduction)
-         * Shot 3: Atmosphere / Detail Shot (B-Roll OR Reaction)
-         * Shots 4-5: Story Development (Deepen Emotional Stakes)
-         * Shot 6: Mid-Point (Detail/Environment or Intimate Character Moment)
-         * Shots 7-11: Dramatic Peak / Resolution
-         * Shot 12: Closing Still (B-Roll Atmosphere - NO CHARACTERS) OR Final Hero Shot
+       - MINIMUM 8 shots. NO MAXIMUM — let the script dictate the count.
+       - **HOW TO DETERMINE SHOT COUNT:**
+         * Count every KEY DIALOGUE LINE → each one needs a shot
+         * Count every REACTION MOMENT → each one needs a shot  
+         * Count every LOCATION CHANGE → each one needs an establishing shot
+         * Count every EMOTIONAL BEAT → each one needs a shot
+         * Add 1-2 opening establishing shots + 1 closing atmosphere shot
+         * Example: Script with 10 dialogue lines + 3 reactions + 2 location changes = ~17 shots
+
+       - **STRUCTURE GUIDE (Scale with script complexity):**
+         * OPENING: 1-2 Establishing Stills (Character/Environment Introduction)
+         * BODY: One shot per dialogue line, reaction, or emotional beat (the bulk of coverage)
+         * B-ROLL: Sprinkle atmosphere/detail shots where they serve the mood (mark these with "is_broll": true)
+         * CLOSING: 1 Final Hero Shot or Closing Atmosphere Still
 
        - **CRITICAL RULE ON B-ROLL:**
-         * Do NOT force B-Roll every 4th shot if it breaks the flow.
+         * Do NOT force B-Roll at fixed positions — place them where they serve the scene.
          * Only use B-Roll (Environment/Details) if it enhances the atmosphere.
-         * If the scene is dialogue-heavy or emotional, **PRIORITIZE CHARACTER FOCUS**.
+         * Mark B-Roll shots with "is_broll": true in the JSON output.
+         * If the scene is dialogue-heavy, prioritize CHARACTER FOCUS over B-Roll.
 
        - **DIALOGUE-TO-SHOT MAPPING (CRITICAL — DO NOT SKIP LINES):**
          * If the script contains SPEAKING LINES or DIALOGUE, you MUST dedicate shots to the KEY dialogue moments.
@@ -138,7 +146,6 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
          * Show the CHARACTER'S FACE and BODY LANGUAGE at that exact moment — the emotion behind the words.
          * Include REACTION SHOTS: after a key line, show the OTHER character's face reacting to what was just said.
          * Do NOT summarize 5 lines of dialogue into one generic "two characters talking" shot.
-         * A dialogue-heavy script should be 70-80% dialogue coverage shots, NOT 70% establishing/B-roll.
          * Think of it like a SCRIPT SUPERVISOR: every beat in the script should have visual coverage.
 
     3. VISUAL FIDELITY (CRITICAL - DO NOT FAIL THIS):
@@ -209,7 +216,8 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
                "subject_position": "...",
                "action_description": "...",
                "characters": ["Name1"],
-               "visual_prompt": "..."
+               "visual_prompt": "...",
+               "is_broll": false
             }}
           ]
         }}

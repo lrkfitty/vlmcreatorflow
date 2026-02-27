@@ -486,7 +486,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                                     char_full_key = c_key
                                     break
                     
-                    if not char_full_key and cast_selection and not (shot_idx+1 in [3,6,9,12]):
+                    if not char_full_key and cast_selection and not shot.get('is_broll', False):
                          char_full_key = cast_selection[0]
 
                     col_txt, col_img = st.columns([1.5, 1])
@@ -560,7 +560,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                                         # Resolve Cast Assets (Robust)
                                         target_chars = shot.get('characters', [])
                                         # If empty and not B-Roll, force first cast
-                                        is_broll = (shot_idx + 1) in [3, 6, 9, 12]
+                                        is_broll = shot.get('is_broll', False)
                                         if not target_chars and cast_selection and not is_broll:
                                              # Fallback protagonist
                                              pass 
