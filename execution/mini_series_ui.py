@@ -327,7 +327,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                 with c_res_col:
                      s_resolution = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, key="series_res", help="Higher = sharper but slower + more expensive")
             
-            s_transition_style = st.selectbox("Visual Pacing", ["Standard", "Slow Build / Tension", "High Energy / Dynamic", "Intimate / Quiet"])
+            s_transition_style = st.selectbox("Transition Pacing", ["Standard", "Fast / TikTok", "Slow / Cinematic", "Match Cut"])
             
             st.markdown("<br>", unsafe_allow_html=True)
             submit_director = st.form_submit_button("✨ Director Vision AI", type="primary", use_container_width=True)
@@ -541,7 +541,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                         shot['time_of_day'] = selected_time
 
                         trans_opts = ["None"] + knowledge_base.get("transitions", [])
-                        sel_trans = st.selectbox("Mood", trans_opts, key=f"trans_{key_base}", label_visibility="collapsed")
+                        sel_trans = st.selectbox("Transition", trans_opts, key=f"trans_{key_base}", label_visibility="collapsed")
                         shot['transition'] = sel_trans
                         
                         shot_prompt = st.text_area("Visual Prompt", value=shot.get('visual_prompt'), height=250, key=f"p_{key_base}", label_visibility="collapsed")
