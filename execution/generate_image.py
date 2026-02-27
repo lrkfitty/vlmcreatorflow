@@ -42,8 +42,9 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
     if "SYSTEM INSTRUCTION" not in positive_prompt:
         positive_prompt = system_instruction + positive_prompt
     aspect_ratio = prompt_data.get("aspect_ratio")
+    image_size = prompt_data.get("image_size", "1K")  # "512px", "1K", "2K", "4K" (uppercase K required)
     if aspect_ratio and aspect_ratio.lower() != "auto":
-        # Inject AR into the prompt text as the API does not support the 'aspectRatio' field in generateContent
+        # Keep AR in prompt text as backup hint, but also pass via imageConfig
         positive_prompt = f"IMAGE ASPECT RATIO: {aspect_ratio}. " + positive_prompt
 
     # --- UNPACK ASSETS (Enhanced Multi-Character Support with Pairing) ---
@@ -295,15 +296,26 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
         # Add all asset processing logs to main logs
         logs.extend(all_asset_logs)
 
+        # Build imageConfig for native API control
+        image_config = {}
+        if aspect_ratio and aspect_ratio.lower() != "auto":
+            image_config["aspectRatio"] = aspect_ratio
+        if image_size:
+            image_config["imageSize"] = image_size  # "512px", "1K", "2K", "4K"
+        
+        gen_config = {
+            "temperature": 0.4
+        }
+        if image_config:
+            gen_config["imageConfig"] = image_config
+        
         payload = {
             "contents": [
                 {
                     "parts": contents
                 }
             ],
-            "generationConfig": {
-                "temperature": 0.4
-            }
+            "generationConfig": gen_config
         }
         
         logs.append(f"Sending request to Google API for model: {model_name}")

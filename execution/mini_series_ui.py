@@ -133,6 +133,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                             "guidance_scale": 7.5,
                             "model_type": "nano",
                             "aspect_ratio": st.session_state.get('series_ar', '16:9'),
+                            "image_size": st.session_state.get('series_res', '1K'),
                             "assets": assets_payload
                         },
                         settings={"batch_count": 1},
@@ -320,9 +321,11 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                      ]
                      s_movie_style = st.selectbox("Style Reference", style_opts)
                 
-                c_ar_col, _ = st.columns(2)
+                c_ar_col, c_res_col = st.columns(2)
                 with c_ar_col:
                      s_aspect_ratio = st.selectbox("Aspect Ratio", ["16:9", "9:16", "4:5", "1:1"], index=0, key="series_ar")
+                with c_res_col:
+                     s_resolution = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, key="series_res", help="Higher = sharper but slower + more expensive")
             
             s_transition_style = st.selectbox("Transition Pacing", ["Standard", "Fast / TikTok", "Slow / Cinematic", "Match Cut"])
             
@@ -627,7 +630,8 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                                              "positive_prompt": final_shot_prompt,
                                              "model_type": "nano", 
                                              "assets": final_assets_payload,
-                                             "aspect_ratio": st.session_state.get('series_ar', '16:9')
+                                             "aspect_ratio": st.session_state.get('series_ar', '16:9'),
+                                             "image_size": st.session_state.get('series_res', '1K')
                                         }
                                         
                                         res = generate_image_from_prompt(p_data, get_user_out_dir_func("Series"))
