@@ -126,6 +126,41 @@ class CampaignManager:
                 
             else:
                 # --- IMAGE JOBS ---
+                # Cascading Context: Check if previous job was from the same scene
+                # Job names like "Ep1_S1_Sh2" — share "Ep1_S1" prefix with prior shot
+                job_name = job.get("name", "")
+                scene_prefix = "_".join(job_name.split("_")[:-1])  # e.g. "Ep1_S1"
+                
+                if scene_prefix:
+                    # Find the most recent completed job with same scene prefix
+                    prior_image_path = None
+                    for prev_job in reversed(self.queue):
+                        if prev_job is job:
+                            continue
+                        if prev_job["status"] == "completed" and prev_job.get("name", "").startswith(scene_prefix):
+                            # Get the output image from prior result
+                            for r in prev_job.get("results", []):
+                                if r.get("status") == "success" and r.get("image_path"):
+                                    if os.path.exists(r["image_path"]):
+                                        prior_image_path = r["image_path"]
+                                    break
+                            break
+                    
+                    # Inject prior shot as cascading context
+                    if prior_image_path:
+                        p_data["positive_prompt"] += (
+                            "\n\nSCENE CONTINUITY: The attached 'Prior Shot' image shows the PREVIOUS moment "
+                            "from this same scene. Match the EXACT environment, lighting, color palette, "
+                            "set design, and character wardrobe from that image."
+                        )
+                        if "assets" not in p_data:
+                            p_data["assets"] = []
+                        p_data["assets"].append({
+                            "path": prior_image_path,
+                            "label": "Prior Shot (SCENE CONTINUITY - MATCH ENVIRONMENT & LIGHTING)"
+                        })
+                        print(f"   🔗 Cascading context: attached prior shot from same scene")
+                
                 for r in range(repeats):
                     print(f"   ... Batch {r+1}/{repeats}")
                     
