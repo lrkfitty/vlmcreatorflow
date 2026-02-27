@@ -379,14 +379,15 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                     logs.append(f"⚠️ Response OK but no image found. Raw: {str(result)[:200]}...")
                     # Even 200s can be empty if filtered completely, treated as fail here to trigger potential fallback or feedback
                     raise Exception("Response received but no image parts found. (Likely safety filtered).")
-                elif response.status_code == 503:
+                elif response.status_code in (500, 503):
                     if attempt < max_retries:
-                        logs.append(f"⚠️ Server Overloaded (503). Retrying in {retry_delay}s... ({attempt+1}/{max_retries})")
+                        err_label = "Internal Error (500)" if response.status_code == 500 else "Server Overloaded (503)"
+                        logs.append(f"⚠️ {err_label}. Retrying in {retry_delay}s... ({attempt+1}/{max_retries})")
                         time.sleep(retry_delay)
-                        retry_delay = min(retry_delay * 2, 10)  # Cap delay at 10s instead of 30s
+                        retry_delay = min(retry_delay * 2, 10)  # Cap delay at 10s
                         continue
                     else:
-                        raise Exception("Model Overloaded (503) after multiple retries. Try again later.")
+                        raise Exception(f"Server Error ({response.status_code}) after {max_retries} retries. Try again later.")
                 
                 else:
                      logs.append(f"❌ Error {response.status_code}: {response.text}")
