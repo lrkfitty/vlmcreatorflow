@@ -16,17 +16,17 @@ def generate_image_from_prompt(prompt_data, output_folder="output", reference_im
     """
     
     # 1. Dispatch (Strictly Cloud)
-    # Default to Nano Banana Pro
+    # Default to Nano Banana 2
     return generate_image_nano(prompt_data, output_folder, reference_image_path, outfit_path, vibe_path)
 
 def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit_path, vibe_path):
     """
-    Generates using Google Nano Banana Pro (Gemini/Imagen).
+    Generates using Google Nano Banana 2 (Gemini 3.1 Flash Image).
     """
     # Try specific Image Key first (for Paid tier), else fallback to standard key
     load_dotenv(override=True)
     api_key = os.getenv("GOOGLE_IMAGE_KEY") or os.getenv("GOOGLE_API_KEY")
-    logs = ["--- Attempting Generation with Nano Banana Pro (Character-Outfit Pairing Enabled) ---"]
+    logs = ["--- Attempting Generation with Nano Banana 2 (Character-Outfit Pairing Enabled) ---"]
     
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -80,7 +80,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
     try:
         # Switching to explicit Image Generation model from list (Nano/1.5 aliases are unstable)
         # Use known stable version
-        model_name = 'gemini-3-pro-image-preview' # Validated: Nano Banana Pro (High Fidelity)
+        model_name = 'gemini-3.1-flash-image-preview' # Nano Banana 2 (Fast + High Fidelity)
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={api_key}"
         headers = { "Content-Type": "application/json" }
 
@@ -329,7 +329,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                                     # Decode and save
                                     image_bytes = base64.b64decode(image_data_b64)
                                     timestamp = int(time.time())
-                                    filename = f"gen_nano_{timestamp}_{str(os.urandom(4).hex())}.jpg"
+                                    filename = f"gen_nano2_{timestamp}_{str(os.urandom(4).hex())}.jpg"
                                     filepath = os.path.join(output_folder, filename)
                                     with open(filepath, "wb") as f:
                                         f.write(image_bytes)
