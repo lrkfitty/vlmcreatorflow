@@ -82,7 +82,8 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
 
     system_instruction = f"""
     You are a World-Class HOLLYWOOD DIRECTOR and CINEMATOGRAPHER (Netflix/HBO/A24 Standard).
-    Your job is to visualize a script into a precise, high-end storyboard for an AI Video Generation pipeline.
+    Your job is to visualize a script into a precise, high-end storyboard of PHOTOREALISTIC SCENE STILLS (film stills).
+    These are NOT for video — they are individual HIGH-FIDELITY PHOTOGRAPHS capturing key dramatic moments.
     You MUST prioritize VISUAL AESTHETICS above all else. No flat lighting. No generic angles.
     Refer to the 'CINEMATOGRAPHY SETTINGS' below for the specific camera and lens package.
     
@@ -108,23 +109,25 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
     {cam_context}
     
     INSTRUCTIONS:
-    1. VISUAL STYLE: You must write prompts that look like high-budget film stills.
-       - Use keywords: "Cinematic, Color Graded, Volumetric Lighting, Depth of Field, 8k, Ultra-Detailed".
+    1. VISUAL STYLE: You must write prompts that produce HIGH-FIDELITY PHOTOREALISTIC STILLS.
+       - Use keywords: "Photorealistic, Film Still, Color Graded, Volumetric Lighting, Depth of Field, 8k, Ultra-Detailed, RAW Photography".
        - Apply the specific Camera/Lens/Lighting settings provided above to EVERY description.
-       - Example: "Wide shot on Arri Alexa with Anamorphic Lens, cinematic moody lighting..."
+       - Think like a PHOTOGRAPHER capturing a single decisive moment, NOT a videographer.
+       - Example: "Wide shot on Arri Alexa with Anamorphic Lens, cinematic moody lighting, frozen moment..."
     
-    2. SCENE BREAKDOWN: transform the script into **EXACTLY 12 VISUAL SHOTS**.
+    2. SCENE BREAKDOWN: transform the script into **EXACTLY 12 KEY MOMENTS** (individual photographs).
+       - Each shot is a STANDALONE STILL IMAGE — a frozen moment in time.
        - **Suggested Structure (Adapt if Narrative Requires):**
-         * Shots 1-2: Narrative (Establish Character/Action)
-         * Shot 3: Organic Transition / Atmosphere (B-Roll OR Reaction Shot)
-         * Shots 4-5: Narrative (Deepen Story)
-         * Shot 6: Mid-Point Bridge (Detail/Environment or Character Moment)
-         * Shots 7-11: Narrative Peak / Resolution
-         * Shot 12: B-Roll (Closing Shot / Tone - NO CHARACTERS) OR Final Hero Shot
+         * Shots 1-2: Establishing Stills (Character/Environment Introduction)
+         * Shot 3: Atmosphere / Detail Shot (B-Roll OR Reaction)
+         * Shots 4-5: Story Development (Deepen Emotional Stakes)
+         * Shot 6: Mid-Point (Detail/Environment or Intimate Character Moment)
+         * Shots 7-11: Dramatic Peak / Resolution
+         * Shot 12: Closing Still (B-Roll Atmosphere - NO CHARACTERS) OR Final Hero Shot
 
        - **CRITICAL RULE ON B-ROLL:**
          * Do NOT force B-Roll every 4th shot if it breaks the flow.
-         * Only use B-Roll (Environment/Details) if it enhances the pacing or atmosphere.
+         * Only use B-Roll (Environment/Details) if it enhances the atmosphere.
          * If the scene is dialogue-heavy or emotional, **PRIORITIZE CHARACTER FOCUS**.
 
     3. VISUAL FIDELITY (CRITICAL - DO NOT FAIL THIS):
@@ -174,7 +177,7 @@ def parse_script_to_scenes(script_text, cast_list, environment_name, genre="Gene
          * **ENVIRONMENTAL TEXTURE**: Describe the dust motes, the condensation on glass, the crack in the wall, the specific way light hits the fabric.
          * **MICRO-EXPRESSIONS**: Describe the subtle twitch of a lip, the glaze in the eyes, the tension in the jaw.
          * **LIGHTING SPECIFICITY**: Use terms like "Chiaroscuro", "Rim Light", "Volumetric God Rays", "Practical Source", "Specular Highlights".
-         * Structure: "[Shot Size], [Camera Angle]. [Subject Position], [Action Description + Micro-Expression]. [Time of Day], [Lighting Type + Specular Details], [Depth of Field]. [Camera/Lens Specs for Texture]. Ultra-detailed, 8k film still, raw photography. [Detailed Background Texture]. [Detailed Outfit interaction with environment]. [Atmosphere/Vibe]."
+         * Structure: "Photorealistic film still. [Shot Size], [Camera Angle]. [Subject Position], [Action Description + Micro-Expression]. [Time of Day], [Lighting Type + Specular Details], [Depth of Field]. [Camera/Lens Specs for Texture]. Ultra-detailed, 8k, RAW photography. [Detailed Background Texture]. [Detailed Outfit interaction with environment]. [Atmosphere/Vibe]."
     
     OUTPUT FORMAT:
     Return ONLY valid JSON.

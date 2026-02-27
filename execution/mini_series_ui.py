@@ -105,12 +105,20 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                                     # Use "Outfit for {character}" format for explicit pairing
                                     assets_payload.append({"path": o_path, "label": f"Outfit for {c_name}"})
 
-                    # Prompt Construction
+                    # Prompt Construction — Structured Camera Direction + Scene Still
                     p_text = shot.get('visual_prompt', '')
                     t_day = shot.get('time_of_day', 'Day')
-                    t_trans = shot.get('transition', 'None')
-                    t_text = f"Visual Transition Style: {t_trans}. " if t_trans and t_trans != "None" else ""
-                    final_prompt = f"Time of Day: {t_day}. {t_text}{p_text}"
+                    
+                    # Build camera direction block from shot metadata
+                    cam_parts = []
+                    if shot.get('shot_size'): cam_parts.append(f"Shot: {shot['shot_size']}")
+                    if shot.get('camera_angle'): cam_parts.append(f"Angle: {shot['camera_angle']}")
+                    if shot.get('composition'): cam_parts.append(f"Composition: {shot['composition']}")
+                    if shot.get('depth_of_field'): cam_parts.append(f"DoF: {shot['depth_of_field']}")
+                    if shot.get('lighting_type'): cam_parts.append(f"Lighting: {shot['lighting_type']}")
+                    cam_direction = ". ".join(cam_parts) + "." if cam_parts else ""
+                    
+                    final_prompt = f"Photorealistic film still. Time of Day: {t_day}. {cam_direction}\n{p_text}"
                     
                     # Add Job
                     job_name = f"Ep{ep_title}_S{s_id}_Sh{sh_id}"
@@ -586,11 +594,34 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                                         if isinstance(env_path, dict): env_path = env_path.get('default_img')
                                         if env_path: final_assets_payload.append({"path": env_path, "label": f"Location: {target_env}"})
                                         
-                                        # Prompt
+                                        # Prompt — Structured Camera Direction + Scene Still
                                         time_setting = shot.get('time_of_day', 'Day')
-                                        trans_setting = shot.get('transition', 'None')
-                                        trans_text = f"Visual Transition Style: {trans_setting}. " if trans_setting and trans_setting != "None" else ""
-                                        final_shot_prompt = f"Time of Day: {time_setting}. {trans_text}{shot_prompt}"
+                                        
+                                        # Build camera direction block from shot metadata
+                                        cam_parts = []
+                                        if shot.get('shot_size'): cam_parts.append(f"Shot: {shot['shot_size']}")
+                                        if shot.get('camera_angle'): cam_parts.append(f"Angle: {shot['camera_angle']}")
+                                        if shot.get('composition'): cam_parts.append(f"Composition: {shot['composition']}")
+                                        if shot.get('depth_of_field'): cam_parts.append(f"DoF: {shot['depth_of_field']}")
+                                        if shot.get('lighting_type'): cam_parts.append(f"Lighting: {shot['lighting_type']}")
+                                        cam_direction = ". ".join(cam_parts) + "." if cam_parts else ""
+                                        
+                                        final_shot_prompt = f"Photorealistic film still. Time of Day: {time_setting}. {cam_direction}\n{shot_prompt}"
+                                        
+                                        # Cascading context — attach prior shot for scene consistency
+                                        prior_key = f"img_s{scene_idx}_sh{shot_idx - 1}" if shot_idx > 0 else None
+                                        prior_path = st.session_state.get(prior_key) if prior_key else None
+                                        
+                                        if prior_path and os.path.exists(prior_path):
+                                            final_shot_prompt += (
+                                                "\n\nSCENE CONTINUITY: The attached 'Prior Shot' image shows the PREVIOUS moment "
+                                                "from this same scene. Match the EXACT environment, lighting, color palette, "
+                                                "set design, and character wardrobe from that image."
+                                            )
+                                            final_assets_payload.append({
+                                                "path": prior_path,
+                                                "label": "Prior Shot (SCENE CONTINUITY - MATCH ENVIRONMENT & LIGHTING)"
+                                            })
                                         
                                         p_data = {
                                              "positive_prompt": final_shot_prompt,
