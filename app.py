@@ -672,7 +672,7 @@ if selection == "My Gallery":
                                  with open(item["src"], "rb") as file:
                                      st.download_button("⬇️", data=file, file_name=item["name"], key=f"dl_{idx}")
                             else:
-                                 st.link_button("⬇️", item["src"], key=f"dl_link_{idx}")
+                                 st.link_button("⬇️", item["src"])
 
 # ==========================================
 # TAB: ASSET LIBRARY
