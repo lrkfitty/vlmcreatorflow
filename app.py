@@ -415,8 +415,63 @@ selection = st.radio(
 st.session_state.active_tab = selection
 
 # ==========================================
-# TAB: MY GALLERY
+# TAB: MY GALLERY (v5 — Performance Optimized)
 # ==========================================
+
+# --- Cached S3 Scanner (survives reruns, 5-min TTL) ---
+@st.cache_data(ttl=300, show_spinner="☁️ Scanning cloud gallery...")
+def _scan_s3_gallery(bucket_name, prefix, region):
+    """Cached S3 scan — returns sorted list of image metadata dicts."""
+    import boto3
+    s3 = boto3.client('s3', region_name=region)
+    all_images_meta = []
+    paginator = s3.get_paginator('list_objects_v2')
+    for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+        for obj in page.get('Contents', []):
+            key = obj['Key']
+            if key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and '/Assets/' not in key:
+                all_images_meta.append({
+                    "key": key,
+                    "name": os.path.basename(key),
+                    "time": obj.get('LastModified').timestamp()
+                })
+    all_images_meta.sort(key=lambda x: x["time"], reverse=True)
+    return all_images_meta
+
+# --- Cached Presigned URL batch (avoids re-signing on rerun) ---
+@st.cache_data(ttl=3500, show_spinner=False)
+def _sign_urls(bucket_name, region, keys_tuple):
+    """Generate presigned URLs for a batch of S3 keys. keys_tuple for hashability."""
+    import boto3
+    s3 = boto3.client('s3', region_name=region)
+    urls = {}
+    for key in keys_tuple:
+        urls[key] = s3.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': bucket_name, 'Key': key},
+            ExpiresIn=3600
+        )
+    return urls
+
+# --- Zoom Dialog ---
+@st.dialog("🔍 Image Viewer", width="large")
+def _gallery_zoom_dialog(src, name, is_local=False):
+    """Full-size image viewer in a dialog overlay."""
+    st.markdown(f"**{name}**")
+    if is_local:
+        st.image(src, use_container_width=True)
+    else:
+        st.markdown(
+            f"<img src='{src}' style='width:100%; border-radius:8px;' />",
+            unsafe_allow_html=True
+        )
+    # Download inside dialog
+    if is_local and os.path.exists(os.path.abspath(src)):
+        with open(src, "rb") as f:
+            st.download_button("⬇️ Download", data=f, file_name=name, key="dlg_dl", use_container_width=True)
+    elif not is_local:
+        st.link_button("⬇️ Download", src, use_container_width=True)
+
 if selection == "My Gallery":
     with st.container():
         st.markdown("### Personal Gallery")
@@ -428,168 +483,196 @@ if selection == "My Gallery":
             user_root = os.path.join("output", "users", username)
             abs_root = os.path.abspath(user_root)
             
-            col_gal_head, col_gal_ref = st.columns([3, 1])
+            # --- Header Row: path info + page size + refresh ---
+            col_gal_head, col_gal_size, col_gal_ref = st.columns([3, 1, 1])
             with col_gal_head:
                  if os.getenv("S3_BUCKET_NAME"):
                      st.caption(f"☁️ Cloud Gallery: `s3://{os.getenv('S3_BUCKET_NAME')}/users/{username}`")
                  else:
                      st.caption(f"📂 Gallery Path: `{abs_root}`")
+            with col_gal_size:
+                 page_size_options = [12, 20, 50]
+                 if "gallery_page_size" not in st.session_state:
+                     st.session_state.gallery_page_size = 20
+                 selected_size = st.selectbox(
+                     "Per page", page_size_options, 
+                     index=page_size_options.index(st.session_state.gallery_page_size),
+                     key="gal_page_size_sel", label_visibility="collapsed"
+                 )
+                 if selected_size != st.session_state.gallery_page_size:
+                     st.session_state.gallery_page_size = selected_size
+                     st.session_state.gallery_page = 0
+                     st.rerun()
             with col_gal_ref:
-                 if st.button("🔄 Refresh"):
-                     if "gallery_all_images_meta" in st.session_state:
-                         del st.session_state.gallery_all_images_meta
-                     
-                     # Clear scan key to force re-fetch
-                     scan_key = f"gallery_scan_done_{username}"
-                     if scan_key in st.session_state:
-                         del st.session_state[scan_key]
-                         
+                 if st.button("🔄 Refresh", use_container_width=True):
+                     # Clear the @st.cache_data scan cache
+                     _scan_s3_gallery.clear()
+                     _sign_urls.clear()
+                     st.session_state.gallery_page = 0
                      st.rerun()
         
-        my_images = []
+            my_images = []
+            IMAGES_PER_PAGE = st.session_state.get("gallery_page_size", 20)
         
-        # --- S3 CLOUD SCAN ---
-        if os.getenv("S3_BUCKET_NAME"):
-            try:
-                import boto3
-                bucket = os.getenv("S3_BUCKET_NAME")
-                s3 = boto3.client('s3', region_name=os.getenv("AWS_REGION", "ap-southeast-2"))
-                prefix = f"users/{username}/"
+            # --- S3 CLOUD SCAN (Cached) ---
+            if os.getenv("S3_BUCKET_NAME"):
+                try:
+                    bucket = os.getenv("S3_BUCKET_NAME")
+                    region = os.getenv("AWS_REGION", "ap-southeast-2")
+                    prefix = f"users/{username}/"
+                    
+                    if "gallery_page" not in st.session_state:
+                        st.session_state.gallery_page = 0
+                    
+                    # 1. Fetch metadata (cached across reruns)
+                    all_images_meta = _scan_s3_gallery(bucket, prefix, region)
+                    
+                    # 2. Paginate
+                    total_images = len(all_images_meta)
+                    total_pages = max(1, (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE)
+                    
+                    current_page = st.session_state.gallery_page
+                    if current_page >= total_pages:
+                        current_page = total_pages - 1
+                        st.session_state.gallery_page = current_page
+                    if current_page < 0:
+                        current_page = 0
+                        st.session_state.gallery_page = 0
+                        
+                    start_idx = current_page * IMAGES_PER_PAGE
+                    end_idx = start_idx + IMAGES_PER_PAGE
+                    page_meta = all_images_meta[start_idx:end_idx]
+                    
+                    # 3. Batch-sign URLs (cached separately so page changes are instant)
+                    page_keys = tuple(item["key"] for item in page_meta)
+                    signed_urls = _sign_urls(bucket, region, page_keys)
+                    
+                    for item in page_meta:
+                        my_images.append({
+                            "src": signed_urls[item["key"]],
+                            "name": item['name'],
+                            "time": item['time']
+                        })
+                    
+                    # Pagination Controls
+                    st.caption(f"Showing {start_idx+1}–{min(end_idx, total_images)} of {total_images} images")
+                    
+                    col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
+                    with col_p1:
+                        if st.button("⬅️ Previous", disabled=(current_page == 0)):
+                            st.session_state.gallery_page -= 1
+                            st.rerun()
+                    with col_p2:
+                        st.markdown(f"<div style='text-align: center'>Page {current_page + 1} of {total_pages}</div>", unsafe_allow_html=True)
+                    with col_p3:
+                        if st.button("Next ➡️", disabled=(current_page >= total_pages - 1)):
+                            st.session_state.gallery_page += 1
+                            st.rerun()
+
+                except Exception as e:
+                    st.error(f"Gallery S3 Scan Error: {e}")
                 
-                # PAGINATION LOGIC
-                IMAGES_PER_PAGE = 50
-                
-                # Check scan state to prevent loops
-                scan_key = f"gallery_scan_done_{username}"
-                
+            # --- LOCAL SCAN (Fallback or Hybrid) ---
+            elif os.path.exists(user_root):
+                local_imgs = []
+                for root, dirs, files in os.walk(user_root):
+                    for file in files:
+                        if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and "Assets" not in root:
+                            full_path = os.path.join(root, file)
+                            local_imgs.append({
+                                "src": full_path, 
+                                "name": file,
+                                "time": os.path.getmtime(full_path),
+                                "is_local": True
+                            })
+                local_imgs.sort(key=lambda x: x["time"], reverse=True)
+                # Apply pagination to local images too
+                total_local = len(local_imgs)
                 if "gallery_page" not in st.session_state:
                     st.session_state.gallery_page = 0
-                    
-                # 1. Fetch Metadata (cached in session state to avoid re-scanning on every interaction)
-                # We only re-scan if explicitly refreshed or if cache is missing
-                if "gallery_all_images_meta" not in st.session_state or not st.session_state.get(scan_key):
-                    all_images_meta = []
-                    
-                    paginator = s3.get_paginator('list_objects_v2')
-                    pages = paginator.paginate(Bucket=bucket, Prefix=prefix)
-                    
-                    for page in pages:
-                        for obj in page.get('Contents', []):
-                            key = obj['Key']
-                            if key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
-                                if "/Assets/" not in key:
-                                    # Store ONLY metadata, not the signed URL yet
-                                    all_images_meta.append({
-                                        "key": key,
-                                        "name": os.path.basename(key),
-                                        "time": obj.get('LastModified').timestamp()
-                                    })
-                    
-                    # Sort Newest First
-                    all_images_meta.sort(key=lambda x: x["time"], reverse=True)
-                    st.session_state.gallery_all_images_meta = all_images_meta
-                    st.session_state[scan_key] = True  # Mark scan as done for this user
-                
-                # 2. Slice for Current Page
-                meta_list = st.session_state.gallery_all_images_meta
-                total_images = len(meta_list)
-                total_pages = max(1, (total_images + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE)
-                
-                # Ensure page is valid
-                current_page = st.session_state.gallery_page
-                if current_page >= total_pages:
-                    current_page = total_pages - 1
-                    st.session_state.gallery_page = current_page
-                if current_page < 0:
-                    current_page = 0
-                    st.session_state.gallery_page = 0
-                    
+                total_pages_local = max(1, (total_local + IMAGES_PER_PAGE - 1) // IMAGES_PER_PAGE)
+                current_page = min(st.session_state.gallery_page, total_pages_local - 1)
                 start_idx = current_page * IMAGES_PER_PAGE
                 end_idx = start_idx + IMAGES_PER_PAGE
-                page_meta = meta_list[start_idx:end_idx]
+                my_images.extend(local_imgs[start_idx:end_idx])
                 
-                # 3. Generate URLs ONLY for current page
-                for item in page_meta:
-                    url = s3.generate_presigned_url(
-                        'get_object',
-                        Params={'Bucket': bucket, 'Key': item['key']},
-                        ExpiresIn=3600 # 1 hour is enough for view
-                    )
-                    my_images.append({
-                        "src": url,
-                        "name": item['name'],
-                        "time": item['time']
-                    })
-                    
-                # Pagination Controls
-                st.caption(f"Showing {start_idx+1}-{min(end_idx, total_images)} of {total_images} images")
-                
-                col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
-                with col_p1:
-                    if st.button("⬅️ Previous", disabled=(current_page == 0)):
-                        st.session_state.gallery_page -= 1
-                        st.rerun()
-                with col_p2:
-                    st.markdown(f"<div style='text-align: center'>Page {current_page + 1} of {total_pages}</div>", unsafe_allow_html=True)
-                with col_p3:
-                    if st.button("Next ➡️", disabled=(current_page >= total_pages - 1)):
-                        st.session_state.gallery_page += 1
-                        st.rerun()
-
-            except Exception as e:
-                st.error(f"Gallery S3 Scan Error: {e}")
-                
-        # --- LOCAL SCAN (Fallback or Hybrid) ---
-        elif os.path.exists(user_root):
-            # ... (Local scan logic) ...
-            local_imgs = []
-            for root, dirs, files in os.walk(user_root):
-                for file in files:
-                    if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and "Assets" not in root:
-                        full_path = os.path.join(root, file)
-                        local_imgs.append({
-                            "src": full_path, 
-                            "name": file,
-                            "time": os.path.getmtime(full_path),
-                            "is_local": True
-                        })
-            local_imgs.sort(key=lambda x: x["time"], reverse=True)
-            my_images.extend(local_imgs)
-
-        
-        if not my_images:
-            st.info(f"No images found for `{username}` yet. Generate something in the Wizard or Series tab!")
-        else:
-            st.write(f"Found {len(my_images)} images.")
-            # Display Grid
-            # Display Grid
-            cols = st.columns(4)
-            for idx, item in enumerate(my_images):
-                with cols[idx % 4]:
-                    # Functional Gallery Card
-                    st.image(item["src"], use_container_width=True)
-                    
-                    c_view, c_dl = st.columns([1, 1])
-                    with c_view:
-                        if st.button("🔍", key=f"view_{idx}", help="Zoom Image"):
-                            st.session_state[f"zoom_img_{idx}"] = True
-                    
-                    with c_dl:
-                        # Download Logic
-                        if os.path.exists(os.path.abspath(item.get("src", ""))):
-                             with open(item["src"], "rb") as file:
-                                 st.download_button("Download", data=file, file_name=item["name"], key=f"dl_{idx}")
-                        else:
-                             # S3/URL Link
-                             st.link_button("Download", item["src"])
-
-                    # Zoom Modal (Expander hack or Dialog)
-                    if st.session_state.get(f"zoom_img_{idx}"):
-                        st.markdown(f"**{item['name']}**")
-                        st.image(item["src"], use_container_width=True)
-                        if st.button("Close View", key=f"close_{idx}"):
-                            st.session_state[f"zoom_img_{idx}"] = False
+                if total_local > 0:
+                    st.caption(f"Showing {start_idx+1}–{min(end_idx, total_local)} of {total_local} images")
+                    col_p1, col_p2, col_p3 = st.columns([1, 2, 1])
+                    with col_p1:
+                        if st.button("⬅️ Previous", disabled=(current_page == 0), key="local_prev"):
+                            st.session_state.gallery_page -= 1
                             st.rerun()
+                    with col_p2:
+                        st.markdown(f"<div style='text-align: center'>Page {current_page + 1} of {total_pages_local}</div>", unsafe_allow_html=True)
+                    with col_p3:
+                        if st.button("Next ➡️", disabled=(current_page >= total_pages_local - 1), key="local_next"):
+                            st.session_state.gallery_page += 1
+                            st.rerun()
+
+            
+            if not my_images:
+                st.info(f"No images found for `{username}` yet. Generate something in the Wizard or Series tab!")
+            else:
+                st.write(f"Found {len(my_images)} images on this page.")
+                
+                # --- Gallery Grid CSS ---
+                st.markdown("""
+                <style>
+                    .gallery-card img {
+                        border-radius: 8px;
+                        aspect-ratio: 1 / 1;
+                        object-fit: cover;
+                        width: 100%;
+                        transition: transform 0.2s ease, box-shadow 0.2s ease;
+                    }
+                    .gallery-card img:hover {
+                        transform: scale(1.03);
+                        box-shadow: 0 4px 20px rgba(56, 189, 248, 0.25);
+                    }
+                    .gallery-card {
+                        margin-bottom: 1rem;
+                    }
+                    .gal-name {
+                        font-size: 0.75rem;
+                        color: #94A3B8;
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                        margin-top: 4px;
+                    }
+                </style>
+                """, unsafe_allow_html=True)
+                
+                # Display Grid with lazy-loaded images
+                cols = st.columns(4)
+                for idx, item in enumerate(my_images):
+                    is_local = item.get("is_local", False)
+                    with cols[idx % 4]:
+                        # Lazy-loaded image via HTML (browser only fetches when scrolled into view)
+                        if is_local:
+                            st.image(item["src"], use_container_width=True)
+                        else:
+                            st.markdown(
+                                f"""<div class="gallery-card">
+                                    <img src="{item['src']}" loading="lazy" alt="{item['name']}" />
+                                    <div class="gal-name">{item['name']}</div>
+                                </div>""",
+                                unsafe_allow_html=True
+                            )
+                        
+                        c_view, c_dl = st.columns([1, 1])
+                        with c_view:
+                            if st.button("🔍", key=f"view_{idx}", help="Zoom Image"):
+                                _gallery_zoom_dialog(item["src"], item["name"], is_local=is_local)
+                        
+                        with c_dl:
+                            # Download Logic
+                            if is_local and os.path.exists(os.path.abspath(item.get("src", ""))):
+                                 with open(item["src"], "rb") as file:
+                                     st.download_button("⬇️", data=file, file_name=item["name"], key=f"dl_{idx}")
+                            else:
+                                 st.link_button("⬇️", item["src"], key=f"dl_link_{idx}")
 
 # ==========================================
 # TAB: ASSET LIBRARY
