@@ -971,7 +971,16 @@ if selection == "Workflow Wizard":
                 st.markdown("#### 3. Character")
                 c = st.selectbox("Choose Model", characters, label_visibility="collapsed", key="wiz_char")
                 if c and c in c_data:
-                    st.image(c_data[c], use_container_width=True)
+                    char_entry = c_data[c]
+                    if isinstance(char_entry, dict) and char_entry.get("is_celebrity"):
+                        # Celebrity: show info card instead of image
+                        st.info(f"⭐ **{char_entry['name']}** ({char_entry.get('category', '')})", icon=None)
+                        st.caption(char_entry.get("celebrity_desc", "")[:120] + "...")
+                    elif isinstance(char_entry, dict):
+                        img = char_entry.get("default_img")
+                        if img: st.image(img, use_container_width=True)
+                    elif char_entry:
+                        st.image(char_entry, use_container_width=True)
                 card_end()
     
         # Call Fragment
@@ -1559,6 +1568,17 @@ if selection == "World Builder":
                     
                     
                     characters_data = assets.get('characters', {})
+                    # Re-inject celebrities into World Builder's local characters_data
+                    try:
+                        from execution.celebrities import CELEBRITIES as _WB_CELEBS
+                        for _c in _WB_CELEBS:
+                            characters_data[f"⭐ {_c['name']}"] = {
+                                "name": _c["name"], "default_img": None,
+                                "is_celebrity": True, "celebrity_desc": _c["prompt_description"],
+                                "category": _c["category"]
+                            }
+                    except Exception:
+                        pass
                     wb_char_opts = {**characters_data}
                     wb_char_keys = sorted(list(wb_char_opts.keys()))
                     
