@@ -187,26 +187,81 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 
                 st.divider()
                 
-                # Tattoos
+                # Tattoos — Granular Controls
                 st.markdown("**Tattoos**")
-                c_tat_style = st.selectbox("Tattoo Style", ["None", "Minimalist", "Traditional", "Tribal", "Geometric", "Full Sleeve", "Japanese", "Henna", "Face Tats", "Blackwork", "Watercolor"])
                 
-                if c_tat_style != "None":
-                    tat_place_opts = [
-                        "Arms", "Forearms", "Upper Arms", "Full Sleeve",
-                        "Chest", "Stomach", "Ribs", "Lower Back",
-                        "Shoulders", "Traps", "Neck", "Back", "Full Back",
-                        "Face", "Hands", "Fingers",
-                        "Legs", "Thighs", "Calves", "Ankles"
-                    ]
-                    c_tat_place = st.multiselect("Tattoo Placement", tat_place_opts)
-                else:
-                    c_tat_place = []
+                tat_col1, tat_col2 = st.columns(2)
+                with tat_col1:
+                    c_tat_style = st.selectbox("Art Style", [
+                        "None",
+                        "Minimalist / Fine Line",
+                        "Traditional American",
+                        "Neo-Traditional",
+                        "Japanese / Irezumi",
+                        "Tribal",
+                        "Geometric",
+                        "Blackwork / Dotwork",
+                        "Watercolor",
+                        "Realism / Portrait",
+                        "Chicano / Black & Grey",
+                        "New School",
+                        "Henna / Mehndi",
+                        "Script / Lettering",
+                        "Ignorant Style",
+                        "Biomechanical",
+                    ])
+                    
+                    if c_tat_style != "None":
+                        c_tat_coverage = st.selectbox("Coverage / Density", [
+                            "Light (a few small pieces)",
+                            "Moderate (scattered pieces)",
+                            "Heavy (large coverage)",
+                            "Very Heavy (nearly filled)",
+                        ])
+                    else:
+                        c_tat_coverage = "None"
+
+                with tat_col2:
+                    if c_tat_style != "None":
+                        c_sleeve_style = st.selectbox("Sleeve Style", [
+                            "None",
+                            "Quarter Sleeve (shoulder cap)",
+                            "Half Sleeve (upper arm)",
+                            "Half Sleeve (forearm)",
+                            "Three-Quarter Sleeve",
+                            "Full Sleeve (one arm)",
+                            "Full Sleeve (both arms)",
+                            "Leg Sleeve (one leg)",
+                            "Leg Sleeve (both legs)",
+                            "Body Suit (full torso + arms)",
+                        ])
+                        
+                        tat_place_opts = [
+                            "Full Sleeve — Left Arm", "Full Sleeve — Right Arm",
+                            "Forearm — Left", "Forearm — Right",
+                            "Upper Arm — Left", "Upper Arm — Right",
+                            "Hands", "Fingers / Knuckles",
+                            "Chest", "Sternum / Underboob",
+                            "Stomach / Abs", "Full Stomach",
+                            "Ribs / Side", "Lower Back",
+                            "Full Back", "Upper Back", "Spine",
+                            "Shoulders", "Traps",
+                            "Neck — Front", "Neck — Side", "Behind Ear",
+                            "Face Tattoos", "Face — Minimal",
+                            "Full Leg — Left", "Full Leg — Right",
+                            "Thighs", "Calves", "Ankles / Feet",
+                            "Full Body Coverage",
+                        ]
+                        c_tat_place = st.multiselect("Placement", tat_place_opts)
+                    else:
+                        c_sleeve_style = "None"
+                        c_tat_place = []
                 
                 st.divider()
                 
                 # Skin
                 c_skin = st.multiselect("Skin Details", ["Freckles", "Beauty Marks", "Moles", "Vitiligo", "Scarring", "Acne", "Perfect Skin", "Textured Skin", "Wrinkles", "Dimples"])
+
 
             with st.expander("Makeup (Granular)", expanded=False):
                 st.caption("Fine-tune makeup details")
@@ -315,6 +370,8 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                    "skin_details": c_skin,
                    "tattoo_style": c_tat_style,
                    "tattoo_places": c_tat_place,
+                   "tattoo_coverage": c_tat_coverage,
+                   "tattoo_sleeve": c_sleeve_style,
                    "description": extra_description,
                    "likeness": likeness
                 }

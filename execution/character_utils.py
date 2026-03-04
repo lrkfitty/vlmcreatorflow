@@ -199,13 +199,42 @@ def build_character_prompt(attributes):
     if makeup_parts:
         traits.append(", ".join(makeup_parts))
     
-    # Tattoos (Multi-Placement)
+    # Tattoos — Granular Prompt
+    tattoo_style = attributes.get("tattoo_style", "None")
+    tattoo_places = attributes.get("tattoo_places", [])
+    tattoo_coverage = attributes.get("tattoo_coverage", "None")
+    tattoo_sleeve = attributes.get("tattoo_sleeve", "None")
+
     if tattoo_style != "None":
+        tat_parts = []
+
+        # 1. Art style
+        tat_parts.append(f"{tattoo_style} tattoos")
+
+        # 2. Coverage / Density
+        coverage_map = {
+            "Light (a few small pieces)":    "a few small tattoo pieces",
+            "Moderate (scattered pieces)":   "moderate tattoo coverage, scattered pieces",
+            "Heavy (large coverage)":        "heavy tattoo coverage, large pieces",
+            "Very Heavy (nearly filled)":    "very heavy tattoo coverage, skin nearly filled with ink",
+        }
+        if tattoo_coverage in coverage_map:
+            tat_parts.append(coverage_map[tattoo_coverage])
+
+        # 3. Sleeve style
+        if tattoo_sleeve and tattoo_sleeve != "None":
+            tat_parts.append(tattoo_sleeve.lower())
+
+        # 4. Specific placements
         if tattoo_places:
-            joined_places = " AND ".join(tattoo_places) # e.g. "Neck AND Arm"
-            traits.append(f"({tattoo_style} tattoos on {joined_places}:1.2)")
-        else:
-            traits.append(f"{tattoo_style} tattoos")
+            joined = ", ".join(tattoo_places)
+            tat_parts.append(f"on {joined}")
+
+        final_tat = " — ".join(tat_parts[:3])
+        if tattoo_places:
+            final_tat += f", on {', '.join(tattoo_places)}"
+        traits.append(f"({final_tat}:1.3)")
+
     
     # Skin
     if skin_details:
