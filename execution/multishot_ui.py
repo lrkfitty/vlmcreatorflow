@@ -475,25 +475,70 @@ def render_multishot_ui(get_user_out_dir_func):
     st.divider()
     
     # --- Image Upload (OUTSIDE form so it persists across reruns) ---
-    st.markdown("**📸 Upload Reference Image**")
+    st.markdown("**📸 Main Character Image**")
+    st.caption("Upload your best single-view of the character — this becomes the source of truth for outfit, pose, and environment.")
     ref_upload = st.file_uploader(
-        "Character or Object Reference", 
+        "Main Character Image (single view)", 
         type=['png', 'jpg', 'jpeg'],
-        help="Upload a clear reference image of your character or object",
+        help="Your best generated image — the one you want to rotate into other angles",
         key="multishot_ref_uploader"
     )
     
-    # Persist upload to disk immediately so it survives reruns
+    # Persist main ref to disk
     temp_ref_path = os.path.join("output", "temp_multishot_ref.png")
     if ref_upload:
         os.makedirs("output", exist_ok=True)
         with open(temp_ref_path, "wb") as f:
             f.write(ref_upload.getbuffer())
         st.session_state["multishot_ref_saved"] = True
-        st.image(ref_upload, caption="Reference Preview", use_container_width=True)
+        st.image(ref_upload, caption="✅ Main Reference", use_container_width=True)
     elif st.session_state.get("multishot_ref_saved") and os.path.exists(temp_ref_path):
-        # Show previously uploaded image even after reruns
-        st.image(temp_ref_path, caption="Reference Preview (saved)", use_container_width=True)
+        st.image(temp_ref_path, caption="Main Reference (saved)", use_container_width=True)
+    
+    st.divider()
+    
+    # --- Face Likeness Reference Uploads ---
+    st.markdown("**🔒 Face Likeness References (Optional but Recommended)**")
+    st.caption("Upload 1–5 photos of the character's face from different angles. These are used STRICTLY for identity locking — the model will fuse them into a single face composite and match it across all generated angles.")
+    face_ref_uploads = st.file_uploader(
+        "Face Reference Images",
+        type=['png', 'jpg', 'jpeg'],
+        accept_multiple_files=True,
+        help="Close-up face shots, headshots, or face-forward photos. More references = more accurate likeness.",
+        key="multishot_face_refs"
+    )
+    
+    # Save face refs to disk
+    temp_face_ref_dir = os.path.join("output", "temp_face_refs")
+    os.makedirs(temp_face_ref_dir, exist_ok=True)
+    face_ref_paths = []
+    
+    if face_ref_uploads:
+        # Clear old refs
+        import glob
+        for old in glob.glob(os.path.join(temp_face_ref_dir, "face_ref_*.png")):
+            try: os.remove(old)
+            except: pass
+        
+        cols = st.columns(min(len(face_ref_uploads), 5))
+        for idx, face_file in enumerate(face_ref_uploads):
+            fpath = os.path.join(temp_face_ref_dir, f"face_ref_{idx}.png")
+            with open(fpath, "wb") as f:
+                f.write(face_file.getbuffer())
+            face_ref_paths.append(fpath)
+            with cols[idx % 5]:
+                st.image(face_file, caption=f"Face Ref {idx+1}", use_container_width=True)
+        st.session_state["multishot_face_ref_count"] = len(face_ref_paths)
+    elif st.session_state.get("multishot_face_ref_count", 0) > 0:
+        # Reload saved refs
+        import glob
+        saved = sorted(glob.glob(os.path.join(temp_face_ref_dir, "face_ref_*.png")))
+        face_ref_paths = saved
+        if saved:
+            cols = st.columns(min(len(saved), 5))
+            for idx, fp in enumerate(saved):
+                with cols[idx % 5]:
+                    st.image(fp, caption=f"Face Ref {idx+1}", use_container_width=True)
     
     st.divider()
     
@@ -509,28 +554,53 @@ def render_multishot_ui(get_user_out_dir_func):
     has_ref_image = os.path.exists(temp_ref_path) if st.session_state.get("multishot_ref_saved") else False
     if generate_multishot:
         if not has_ref_image:
-            st.error("Please upload a reference image first.")
+            st.error("Please upload a main character image first.")
         else:
             user = st.session_state.current_user.get("username") if st.session_state.get("current_user") else "guest"
             
-            # Build base prompt
-            base_prompt = "character maintaining exact identity and features from reference image"
+            # Build base prompt with strong face-lock instruction
+            face_lock_instruction = ""
+            if face_ref_paths:
+                face_lock_instruction = (
+                    " CRITICAL FACE LOCK: Additional face reference images are provided. "
+                    "You MUST match the face in those references EXACTLY — same bone structure, "
+                    "skin tone, eye shape, nose, lips. The face must remain IDENTICAL "
+                    "across all angle changes. Only the camera angle changes, NOT the face."
+                )
+            
+            base_prompt = (
+                "character maintaining EXACT identity, face, outfit, and features from the main reference image"
+                + face_lock_instruction
+            )
             if additional_prompt:
                 base_prompt += f", {additional_prompt}"
             
-            # Build common asset list with character/outfit references
-            def build_assets_list(start_frame_path, label="Reference Character"):
-                """Builds the asset payload with character/outfit refs."""
+            # Build common asset list — main ref + face identity locks + char/outfit library refs
+            def build_assets_list(start_frame_path, label="Main Character (SOURCE OF TRUTH — match outfit, pose, environment)"):
+                """Builds asset payload with main ref, face locks, and library refs."""
                 asset_list = [{"path": start_frame_path, "label": label}]
-                # Extract character name for outfit pairing
+                
+                # Face likeness locks — IDENTITY ONLY
+                for idx, fp in enumerate(face_ref_paths):
+                    if os.path.exists(fp):
+                        asset_list.append({
+                            "path": fp,
+                            "label": f"Cast: FaceLock (Ref {idx+1}) — FACE AND IDENTITY ONLY — DO NOT use for pose or outfit"
+                        })
+                
+                # Library character reference
                 char_name = None
                 if char_ref_path:
                     char_name = selected_char.replace("(My) ", "")
                     asset_list.append({"path": char_ref_path, "label": f"Cast: {char_name}"})
+                
+                # Library outfit reference
                 if outfit_ref_path:
                     outfit_label = f"Outfit for {char_name}" if char_name else f"Outfit: {selected_outfit}"
                     asset_list.append({"path": outfit_ref_path, "label": outfit_label})
+                
                 return asset_list
+
             
             # Handle different modes
             if multishot_mode == "Character Sheet (4 Angles)":
