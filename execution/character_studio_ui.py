@@ -11,6 +11,7 @@ from execution.generate_image import generate_image_from_prompt
 from load_assets import promote_image_to_asset
 from execution.auth import auth_mgr
 from execution.s3_uploader import upload_file_obj
+from execution.celebrities import CELEBRITIES, CELEB_CATEGORIES, get_celebrities_by_category, get_celebrity_by_name
 
 def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr=None):
     """
@@ -30,29 +31,63 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
         st.markdown("#### Design Specs")
         
         with st.form("character_creator_form"):
-            # 1. Reference Image
-            st.markdown("**1. Reference (Optional)**")
-            ref_img = st.file_uploader("Upload Face/Reference", type=['png', 'jpg', 'jpeg'])
+            # 1. Reference Images (Multi-Upload)
+            st.markdown("**1. References (Optional)**")
+            ref_imgs = st.file_uploader(
+                "Upload Face/Reference Images (multiple angles = better likeness)",
+                type=['png', 'jpg', 'jpeg'],
+                accept_multiple_files=True,
+                help="Upload multiple photos of the same person from different angles to dramatically improve likeness accuracy"
+            )
             
-            # UNIFIED: Add Reference Identity from Library
+            # Thumbnail strip for uploaded references
+            if ref_imgs:
+                thumb_cols = st.columns(min(len(ref_imgs), 5))
+                for i, img_f in enumerate(ref_imgs):
+                    with thumb_cols[i % 5]:
+                        st.image(img_f, caption=f"Ref {i+1}", use_container_width=True)
+            
+            # ── CELEBRITY INSPIRATION ────────────────────────────────────
+            with st.expander("⭐ Celebrity Inspiration (Optional)", expanded=False):
+                st.caption("Generate a look inspired by a famous person. Select a category then choose a celebrity.")
+                
+                celeb_cat = st.selectbox(
+                    "Category",
+                    ["All"] + CELEB_CATEGORIES,
+                    key="celeb_cat_filter"
+                )
+                filtered_celebs = get_celebrities_by_category(celeb_cat)
+                celeb_names = ["None"] + [c["name"] for c in filtered_celebs]
+                
+                selected_celeb_name = st.selectbox(
+                    "Celebrity",
+                    celeb_names,
+                    key="selected_celeb"
+                )
+                selected_celeb = get_celebrity_by_name(selected_celeb_name) if selected_celeb_name != "None" else None
+                if selected_celeb:
+                    st.info(
+                        f"**{selected_celeb['name']}** ({selected_celeb['category']})\n\n"
+                        f"*Visual profile: {selected_celeb['prompt_description'][:120]}...*"
+                    )
+            
+            # – UNIFIED: Add Reference Identity from Library ─────────────
             st.caption("Or choose existing Identity:")
-            # Use base 'characters_data' (Unified)
             char_keys = sorted(list(characters_data.keys()))
             ref_identity = st.selectbox("Base on Character", ["None"] + char_keys, 
                                         format_func=lambda x: characters_data[x].get('name', x) if isinstance(characters_data.get(x), dict) else x)
             
-            # Logic to use ref_identity path if selected and no upload
             lock_identity_path = None
             if ref_identity != "None":
                  val = characters_data[ref_identity]
                  lock_identity_path = val.get('default_img') if isinstance(val, dict) else val
                  st.caption(f"Using Identity: {ref_identity.split('/')[-1]}")
             
-            # Likeness Fidelity Slider
+            # Likeness Fidelity Slider (default raised to 80)
             st.markdown("**Likeness Fidelity**")
             likeness = st.slider(
                 "How closely should the result match the reference?",
-                0, 100, 70,
+                0, 100, 80,
                 help="0: Creative interpretation | 50: Inspired by reference | 100: Near-identical likeness",
                 key="char_likeness"
             )
@@ -243,6 +278,16 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 st.error("Please name your character first.")
             else:
                 # Build Prompt
+                # Inject celebrity visual description if one is selected
+                celeb_obj = get_celebrity_by_name(st.session_state.get("selected_celeb", "None"))
+                extra_description = c_description
+                if celeb_obj:
+                    celeb_suffix = f"Inspired by {celeb_obj['name']}: {celeb_obj['prompt_description']}"
+                    extra_description = f"{c_description}, {celeb_suffix}" if c_description else celeb_suffix
+                    # Respect the celebrity's recommended likeness hint if slider is at default
+                    if likeness == 80:
+                        likeness = celeb_obj.get("likeness_hint", 85)
+
                 attrs = {
                    "gender": c_gender,
                    "ethnicity": c_ethnicity,
@@ -270,7 +315,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                    "skin_details": c_skin,
                    "tattoo_style": c_tat_style,
                    "tattoo_places": c_tat_place,
-                   "description": c_description,
+                   "description": extra_description,
                    "likeness": likeness
                 }
                 st.session_state['char_last_attrs'] = attrs 
@@ -295,9 +340,16 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                      # QUEUE MODE
                      job_name = f"Char_{char_name}"
                      
-                     # Check for Identity Lock Reference
+                     # Build multi-reference asset list
+                     import tempfile
                      assets = []
-                     if st.session_state.get("lock_identity_path"):
+                     for i, uploaded_ref in enumerate(ref_imgs or []):
+                         tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
+                         tmp.write(uploaded_ref.getbuffer())
+                         tmp.flush()
+                         assets.append({"path": tmp.name, "label": f"Cast: {char_name or 'Main'} (Ref {i+1})"})
+                     # Library identity lock (fallback if no uploads)
+                     if not assets and st.session_state.get("lock_identity_path"):
                          assets.append({
                              "path": st.session_state["lock_identity_path"],
                              "label": f"Cast: {char_name or 'Main'}"
@@ -325,9 +377,16 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                     user = st.session_state.current_user.get("username")
                     if auth_mgr.deduct_credits(user, 1):
                         with st.spinner("Creating Character in Studio..."):
-                             # Check for Identity Lock Reference
+                             # Build multi-reference asset list
+                             import tempfile
                              assets = []
-                             if st.session_state.get("lock_identity_path"):
+                             for i, uploaded_ref in enumerate(ref_imgs or []):
+                                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
+                                 tmp.write(uploaded_ref.getbuffer())
+                                 tmp.flush()
+                                 assets.append({"path": tmp.name, "label": f"Cast: {char_name or 'Main'} (Ref {i+1})"})
+                             # Library identity lock (fallback)
+                             if not assets and st.session_state.get("lock_identity_path"):
                                  assets.append({
                                      "path": st.session_state["lock_identity_path"],
                                      "label": f"Cast: {char_name or 'Main'}"

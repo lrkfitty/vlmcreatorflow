@@ -453,6 +453,30 @@ def _sign_urls(bucket_name, region, keys_tuple):
         )
     return urls
 
+# --- Cached Local Scanner (survives reruns, 2-min TTL) ---
+@st.cache_data(ttl=120, show_spinner="📂 Scanning local gallery...")
+def _scan_local_gallery(user_root):
+    """Cached local file scan — returns sorted list of image metadata dicts."""
+    local_imgs = []
+    if not os.path.exists(user_root):
+        return local_imgs
+    for root, dirs, files in os.walk(user_root):
+        for file in files:
+            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and "Assets" not in root:
+                full_path = os.path.join(root, file)
+                try:
+                    mtime = os.path.getmtime(full_path)
+                except OSError:
+                    mtime = 0
+                local_imgs.append({
+                    "src": full_path,
+                    "name": file,
+                    "time": mtime,
+                    "is_local": True
+                })
+    local_imgs.sort(key=lambda x: x["time"], reverse=True)
+    return local_imgs
+
 # --- Zoom Dialog ---
 @st.dialog("🔍 Image Viewer", width="large")
 def _gallery_zoom_dialog(src, name, is_local=False):
@@ -493,7 +517,7 @@ if selection == "My Gallery":
             with col_gal_size:
                  page_size_options = [12, 20, 50]
                  if "gallery_page_size" not in st.session_state:
-                     st.session_state.gallery_page_size = 20
+                     st.session_state.gallery_page_size = 12
                  selected_size = st.selectbox(
                      "Per page", page_size_options, 
                      index=page_size_options.index(st.session_state.gallery_page_size),
@@ -505,14 +529,15 @@ if selection == "My Gallery":
                      st.rerun()
             with col_gal_ref:
                  if st.button("🔄 Refresh", use_container_width=True):
-                     # Clear the @st.cache_data scan cache
-                     _scan_s3_gallery.clear()
-                     _sign_urls.clear()
-                     st.session_state.gallery_page = 0
-                     st.rerun()
+                      # Clear all gallery scan caches
+                      _scan_s3_gallery.clear()
+                      _sign_urls.clear()
+                      _scan_local_gallery.clear()
+                      st.session_state.gallery_page = 0
+                      st.rerun()
         
             my_images = []
-            IMAGES_PER_PAGE = st.session_state.get("gallery_page_size", 20)
+            IMAGES_PER_PAGE = st.session_state.get("gallery_page_size", 12)
         
             # --- S3 CLOUD SCAN (Cached) ---
             if os.getenv("S3_BUCKET_NAME"):
@@ -572,21 +597,11 @@ if selection == "My Gallery":
                 except Exception as e:
                     st.error(f"Gallery S3 Scan Error: {e}")
                 
-            # --- LOCAL SCAN (Fallback or Hybrid) ---
+            # --- LOCAL SCAN (Fallback or Hybrid) — CACHED ---
             elif os.path.exists(user_root):
-                local_imgs = []
-                for root, dirs, files in os.walk(user_root):
-                    for file in files:
-                        if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and "Assets" not in root:
-                            full_path = os.path.join(root, file)
-                            local_imgs.append({
-                                "src": full_path, 
-                                "name": file,
-                                "time": os.path.getmtime(full_path),
-                                "is_local": True
-                            })
-                local_imgs.sort(key=lambda x: x["time"], reverse=True)
-                # Apply pagination to local images too
+                local_imgs = _scan_local_gallery(user_root)
+                
+                # Apply pagination to local images
                 total_local = len(local_imgs)
                 if "gallery_page" not in st.session_state:
                     st.session_state.gallery_page = 0
@@ -649,9 +664,10 @@ if selection == "My Gallery":
                 for idx, item in enumerate(my_images):
                     is_local = item.get("is_local", False)
                     with cols[idx % 4]:
-                        # Lazy-loaded image via HTML (browser only fetches when scrolled into view)
+                        # Render image
                         if is_local:
                             st.image(item["src"], use_container_width=True)
+                            st.markdown(f"<div class='gal-name'>{item['name']}</div>", unsafe_allow_html=True)
                         else:
                             st.markdown(
                                 f"""<div class="gallery-card">
@@ -661,18 +677,9 @@ if selection == "My Gallery":
                                 unsafe_allow_html=True
                             )
                         
-                        c_view, c_dl = st.columns([1, 1])
-                        with c_view:
-                            if st.button("🔍", key=f"view_{idx}", help="Zoom Image"):
-                                _gallery_zoom_dialog(item["src"], item["name"], is_local=is_local)
-                        
-                        with c_dl:
-                            # Download Logic
-                            if is_local and os.path.exists(os.path.abspath(item.get("src", ""))):
-                                 with open(item["src"], "rb") as file:
-                                     st.download_button("⬇️", data=file, file_name=item["name"], key=f"dl_{idx}")
-                            else:
-                                 st.link_button("⬇️", item["src"])
+                        # Single row: zoom + download (reduced from 2 columns to 1 button row)
+                        if st.button("🔍 View", key=f"view_{idx}", use_container_width=True):
+                            _gallery_zoom_dialog(item["src"], item["name"], is_local=is_local)
 
 # ==========================================
 # TAB: ASSET LIBRARY
@@ -2888,8 +2895,10 @@ if selection == "Character Studio":
     # Fragment to fix "Tab Jump" bug on generation
     @st.fragment
     def character_studio_fragment():
-        from execution.character_studio_ui import render_character_studio
-        render_character_studio(characters_data, get_user_out_dir, campaign_mgr)
+        import importlib
+        import execution.character_studio_ui as _cs_mod
+        importlib.reload(_cs_mod)
+        _cs_mod.render_character_studio(characters_data, get_user_out_dir, campaign_mgr)
         
     character_studio_fragment()
 

@@ -238,8 +238,18 @@ def build_character_prompt(attributes):
         full_prompt += f", {description}"
     
     # Identity Likeness (from slider)
-    likeness = attributes.get("likeness", 50)
-    if likeness >= 80:
+    likeness = attributes.get("likeness", 80)
+    if likeness >= 90:
+        full_prompt += (
+            ", (ultra-high fidelity face match:1.6), (DO NOT deviate from reference face:1.5), "
+            "(identical face to reference:1.5), (exact same person:1.5), "
+            "(preserve facial features exactly:1.4), (same bone structure:1.4), "
+            "(same nose shape:1.4), (same jawline:1.4), (same eye shape:1.4), "
+            "(same skin tone:1.3), (same brow shape:1.3), "
+            "(photographic identity match:1.5), DO NOT alter facial features, "
+            "(face clone:1.4)"
+        )
+    elif likeness >= 80:
         full_prompt += (
             ", (identical face to reference:1.5), (exact same person:1.5), "
             "(preserve facial features exactly:1.4), (same bone structure:1.3), "
@@ -248,11 +258,12 @@ def build_character_prompt(attributes):
         )
     elif likeness >= 60:
         full_prompt += (
-            ", (strong resemblance to reference:1.3), (same face:1.3), "
-            "(preserve key facial features:1.2), (similar bone structure:1.2)"
+            ", (strong resemblance to reference:1.4), (same face:1.4), "
+            "(preserve key facial features:1.3), (similar bone structure:1.3), "
+            "(match skin tone:1.2), (match eye shape:1.2)"
         )
     elif likeness >= 40:
-        full_prompt += ", (inspired by reference:1.1), similar features to reference"
+        full_prompt += ", (inspired by reference:1.2), similar features to reference, (match overall look:1.1)"
     # Below 40: no identity constraints, fully creative
     
     return full_prompt

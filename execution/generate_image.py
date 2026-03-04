@@ -39,6 +39,13 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
         "while EXPERTLY matching the visual identities of the provided character reference images. "
         "You must match their face, hair, and outfit details exactly. Do not hallucinate new features. Pay close attention to character-outfit pairings indicated by binding text. \n\n"
     )
+    multi_ref_instruction = (
+        "MULTI-REFERENCE FUSION MODE: Multiple reference images of the SAME person have been provided. "
+        "You MUST fuse all provided facial references into ONE single composite identity. "
+        "Analyze all reference images together and extract the definitive facial structure, skin tone, "
+        "eye shape, nose, lips, and distinctive features. The output must portray ONE person whose face "
+        "is consistent across all provided references. Do NOT treat these as different people. \n\n"
+    )
     if "SYSTEM INSTRUCTION" not in positive_prompt:
         positive_prompt = system_instruction + positive_prompt
     aspect_ratio = prompt_data.get("aspect_ratio")
@@ -77,6 +84,19 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
         all_outfits.append({"path": outfit_path, "label": "Outfit: Primary"})
     if vibe_path and not location_ref:
         location_ref = vibe_path
+
+    # MULTI-REFERENCE FUSION: detect when same character has 2+ images (same base name)
+    # e.g. "Cast: Alex (Ref 1)", "Cast: Alex (Ref 2)" → activate composite fusion mode
+    if len(all_cast_members) >= 2:
+        import re as _re
+        base_names = set()
+        for cm in all_cast_members:
+            lbl = cm.get("label", "")
+            base = _re.sub(r'\s*\(Ref \d+\)', '', lbl).strip()
+            base_names.add(base)
+        # If all refs share one base name → multi-angle of same person; prepend fusion instruction
+        if len(base_names) == 1:
+            positive_prompt = multi_ref_instruction + positive_prompt
 
     try:
         # Switching to explicit Image Generation model from list (Nano/1.5 aliases are unstable)
