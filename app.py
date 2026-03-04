@@ -297,6 +297,23 @@ try:
     relations_data = assets.get('relations', {})
     characters_data.update(relations_data)
     
+    # ── Inject Celebrity Roster ──────────────────────────────────────────
+    # Celebrities appear in every dropdown as text-only references (⭐ prefix)
+    try:
+        from execution.celebrities import CELEBRITIES as _CELEBS
+        for _celeb in _CELEBS:
+            _key = f"⭐ {_celeb['name']}"
+            characters_data[_key] = {
+                "name": _celeb["name"],
+                "default_img": None,        # no image — text description only
+                "is_celebrity": True,
+                "celebrity_desc": _celeb["prompt_description"],
+                "category": _celeb["category"]
+            }
+    except Exception as _e:
+        pass  # Non-fatal: celebrities.py missing or import error
+    # ────────────────────────────────────────────────────────────────────
+    
     vibes_list = list(vibes_data.keys())
     outfits_list = list(outfits_data.keys())
     characters_list = list(characters_data.keys())
@@ -316,6 +333,19 @@ except FileNotFoundError:
 
 # Initialize Campaign Manager
 campaign_mgr = CampaignManager()
+
+# --- HELPER: Resolve character to asset dict (handles both image chars & celebrity text refs) ---
+def resolve_char_asset(char_key, char_val):
+    """Returns an asset dict for generate_image. Handles image refs and celebrity text refs."""
+    if isinstance(char_val, dict) and char_val.get("is_celebrity"):
+        return {
+            "path": None,
+            "label": f"Cast: {char_val['name']}",
+            "celebrity_desc": char_val.get("celebrity_desc", "")
+        }
+    path = char_val.get("default_img") if isinstance(char_val, dict) else char_val
+    name = char_val.get("name", char_key) if isinstance(char_val, dict) else os.path.splitext(os.path.basename(str(char_key)))[0]
+    return {"path": path, "label": f"Cast: {name}"}
 
 # Helper: Scan Models - DEPRECATED for Cloud
 
@@ -1031,8 +1061,10 @@ if selection == "Workflow Wizard":
                 s_outfit = st.session_state.get("wiz_outfit")
                 s_vibe = st.session_state.get("wiz_vibe")
 
-                # Get path for Vision
-                char_path = characters_data.get(s_char, s_char)
+                # Get path for Vision — celebrity uses text-only asset
+                char_val = characters_data.get(s_char)
+                char_asset = resolve_char_asset(s_char, char_val) if char_val else None
+                char_path = char_asset.get("path") if char_asset else None
                 outfit_path = outfits_data.get(s_outfit)
                 vibe_path = vibes_data.get(s_vibe)
                 
@@ -1062,7 +1094,9 @@ if selection == "Workflow Wizard":
                 
                 prompt_data["model_type"] = render_engine 
                 prompt_data["image_size"] = sel_res
-                # prompt_data["checkpoint"] removed
+                # Inject celebrity text asset into prompt_data if needed
+                if char_asset and char_asset.get("celebrity_desc"):
+                    prompt_data.setdefault("assets", []).insert(0, char_asset)
                 
                 job_name = f"{s_outfit} - {clean_val(s_vibe)}"
                 campaign_mgr.add_job(
@@ -1111,8 +1145,10 @@ if selection == "Workflow Wizard":
                 custom_scenario = st.session_state.get('wiz_custom_scenario', '')
                 custom_notes = st.session_state.get('wiz_custom_notes', '')
 
-                # Get path for Vision
-                char_path = characters_data.get(s_char, s_char)
+                # Get path for Vision — celebrity uses text-only asset
+                char_val = characters_data.get(s_char)
+                char_asset = resolve_char_asset(s_char, char_val) if char_val else None
+                char_path = char_asset.get("path") if char_asset else None
                 outfit_path = outfits_data.get(s_outfit)
                 vibe_path = vibes_data.get(s_vibe)
                 
@@ -1171,12 +1207,16 @@ if selection == "Workflow Wizard":
                  final_prompt_data["positive_prompt"] = wiz_prompt_text
                  final_prompt_data["likeness_strength"] = likeness
                  final_prompt_data["model_type"] = render_engine 
-                 
-                 # Re-resolve paths
+                 # Re-resolve paths — celebrity uses text-only asset
                  s_char = st.session_state.get("wiz_char")
                  s_outfit = st.session_state.get("wiz_outfit")
                  s_vibe = st.session_state.get("wiz_vibe")
-                 char_path = characters_data.get(s_char, s_char)
+                 char_val = characters_data.get(s_char)
+                 char_asset = resolve_char_asset(s_char, char_val) if char_val else None
+                 char_path = char_asset.get("path") if char_asset else None
+                 # Inject celebrity asset into prompt_data assets if needed
+                 if char_asset and char_asset.get("celebrity_desc"):
+                     final_prompt_data.setdefault("assets", []).insert(0, char_asset)
                  outfit_path = outfits_data.get(s_outfit)
                  vibe_path = vibes_data.get(s_vibe)
                  
@@ -1202,14 +1242,17 @@ if selection == "Workflow Wizard":
                     final_prompt_data["positive_prompt"] = wiz_prompt_text
                     final_prompt_data["likeness_strength"] = likeness
                     final_prompt_data["model_type"] = render_engine 
-                    
-                    # Re-resolve paths for execution
-                    # Re-resolve paths for execution
+                    # Re-resolve paths for execution — celebrity uses text-only asset
                     s_char = st.session_state.get("wiz_char")
                     s_outfit = st.session_state.get("wiz_outfit")
                     s_vibe = st.session_state.get("wiz_vibe")
 
-                    char_path = characters_data.get(s_char, s_char)
+                    char_val = characters_data.get(s_char)
+                    char_asset = resolve_char_asset(s_char, char_val) if char_val else None
+                    char_path = char_asset.get("path") if char_asset else None
+                    # Inject celebrity asset into prompt_data assets if needed
+                    if char_asset and char_asset.get("celebrity_desc"):
+                        final_prompt_data.setdefault("assets", []).insert(0, char_asset)
                     outfit_path = outfits_data.get(s_outfit)
                     vibe_path = vibes_data.get(s_vibe)
                     

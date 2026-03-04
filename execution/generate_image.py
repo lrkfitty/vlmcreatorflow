@@ -196,6 +196,20 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                  })
                  local_logs.append(f"multimodal: Included text context: {label}")
 
+            # Case E: Celebrity / Named person — text description reference (no image needed)
+            elif not b64_data and asset_item.get("celebrity_desc"):
+                celeb_desc = asset_item["celebrity_desc"]
+                asset_parts.append({
+                    "text": (
+                        f"\n[VISUAL IDENTITY: {label} — TEXT-BASED REFERENCE]\n"
+                        f"Recreate this person's appearance with high fidelity based on the following description:\n"
+                        f"{celeb_desc}\n"
+                        f"Match their face, skin tone, hair color and style, eye shape, and all distinctive features exactly. "
+                        f"Treat this description as if you had received a photograph of them.\n"
+                    )
+                })
+                local_logs.append(f"multimodal: Celebrity text reference injected for {label}")
+
             # Case D: Failure / Skip
             elif not b64_data:
                  local_logs.append(f"⚠️ SKIPPED ASSET: {label}. Path/URL invalid or inaccessible: '{img_path}'")
