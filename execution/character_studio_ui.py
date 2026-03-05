@@ -454,7 +454,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                                  "positive_prompt": full_prompt,
                                  "width": target_w, "height": target_h,
                                  "aspect_ratio": ar,
-                                 "image_size": "1K",
+                                 "image_size": "4K",
                                  "model_type": "nano",
                                  "assets": assets
                              }
@@ -536,6 +536,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                     payload = {
                         "positive_prompt": full_prompt,
                         "width": target_w, "height": target_h,
+                        "image_size": "4K",
                         "model_type": "nano",
                         "assets": assets
                     }
