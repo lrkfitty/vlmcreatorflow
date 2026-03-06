@@ -21,7 +21,7 @@ def generate_storyboard_prompts(scenario_name, context, model="gemini", camera_s
     
     DIRECTOR'S RULES:
     1. **CINEMATIC FIDELITY**: Use terms like "Chiaroscuro", "Volumetric Fog", "Arriflex 35mm", "Golden Hour Glow".
-    2. **MANDATORY CAMERA & STYLE SETTINGS**: {camera_settings or 'Director\\'s Choice'}. You must strictly adhere to these requested camera placements, lighting, angles, and styles for EVERY shot.
+    2. **MANDATORY CAMERA & STYLE SETTINGS**: {camera_settings or "Director's Choice"}. You must strictly adhere to these requested camera placements, lighting, angles, and styles for EVERY shot.
     3. **CHARACTER & PROP CONTEXT**: Ensure the following visual assets are present in the scene: {reference_context or 'None specifically requested'}.
     4. **CHARACTER CHEMISTRY**: If "Friends" or "Cast" are mentioned, they are NOT extras. They are co-leads. They should be looking at each other, interacting, and sharing emotions.
     5. **VISUAL CONTINUITY**: Keep the setting and outfits consistent across all 4 shots.
