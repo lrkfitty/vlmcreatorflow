@@ -466,7 +466,7 @@ def _scan_s3_gallery(bucket_name, prefix, region):
                     "time": obj.get('LastModified').timestamp()
                 })
     all_images_meta.sort(key=lambda x: x["time"], reverse=True)
-    return all_images_meta[:500]
+    return all_images_meta[:200]
 
 # --- Cached Presigned URL batch (avoids re-signing on rerun) ---
 @st.cache_data(ttl=3500, show_spinner=False)
@@ -505,7 +505,7 @@ def _scan_local_gallery(user_root):
                     "is_local": True
                 })
     local_imgs.sort(key=lambda x: x["time"], reverse=True)
-    return local_imgs[:500]
+    return local_imgs[:200]
 
 # --- Zoom Dialog ---
 @st.dialog("🔍 Image Viewer", width="large")

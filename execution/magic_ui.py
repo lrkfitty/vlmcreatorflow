@@ -43,8 +43,8 @@ def inject_magic_css():
         /* We target the container directly if possible, or use our wrapper */
         .glass-card {
             background: rgba(20, 20, 20, 0.6); /* Darker base */
-            backdrop-filter: blur(24px) saturate(180%);
-            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            backdrop-filter: blur(8px) saturate(180%);
+            -webkit-backdrop-filter: blur(8px) saturate(180%);
             border: 1px solid rgba(255, 255, 255, 0.1);
             box-shadow: 
                 0 4px 6px -1px rgba(0, 0, 0, 0.1), 
@@ -88,19 +88,16 @@ def inject_magic_css():
             background-clip: text;
             font-weight: 900;
             letter-spacing: -0.03em;
-            animation: aurora-text 6s linear infinite;
         }
         
         /* --- SHINY BUTTONS (Aggressive Override) --- */
         div.stButton > button {
              background: linear-gradient(110deg, #1e293b 0%, #334155 25%, #475569 50%, #334155 75%, #1e293b 100%);
-             background-size: 200% 200%;
              color: #FFF !important;
              border: 1px solid rgba(255,255,255,0.2) !important;
              border-radius: 8px !important;
              font-weight: 600 !important;
              transition: all 0.3s ease !important;
-             animation: shine 4s linear infinite;
              box-shadow: 0 1px 2px 0 rgba(0,0,0,0.05);
         }
         div.stButton > button:hover {
@@ -153,7 +150,7 @@ def inject_magic_css():
         /* Sidebar Glass */
         [data-testid="stSidebar"] {
             background-color: rgba(0, 0, 0, 0.7) !important;
-            backdrop-filter: blur(20px);
+            backdrop-filter: blur(8px);
             border-right: 1px solid rgba(255,255,255,0.1);
         }
         
