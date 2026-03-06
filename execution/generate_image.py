@@ -381,6 +381,24 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                                         f.write(image_bytes)
                                     logs.append(f"✅ Generation Successful. Saved: {filename}")
                                     
+                                    # Create thumbnail
+                                    thumb_filepath = None
+                                    thumb_filename = None
+                                    try:
+                                        from PIL import Image
+                                        from io import BytesIO
+                                        thumb_filename = filename.rsplit('.', 1)[0] + "_thumb.jpg"
+                                        thumb_filepath = os.path.join(output_folder, thumb_filename)
+                                        img_for_thumb = Image.open(BytesIO(image_bytes))
+                                        if img_for_thumb.mode in ('RGBA', 'P'): img_for_thumb = img_for_thumb.convert('RGB')
+                                        img_for_thumb.thumbnail((512, 512), Image.Resampling.LANCZOS)
+                                        img_for_thumb.save(thumb_filepath, format="JPEG", quality=80)
+                                        logs.append(f"✅ Created thumbnail: {thumb_filename}")
+                                    except Exception as e:
+                                        logs.append(f"⚠️ Failed to create thumbnail: {e}")
+                                        thumb_filepath = None
+                                        thumb_filename = None
+
                                     # S3 Upload (Preserved)
                                     s3_url = None
                                     if os.getenv("S3_BUCKET_NAME"):
@@ -392,12 +410,22 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
                                             if "users" in output_folder:
                                                 relative_path = output_folder.replace("output/", "").replace("output\\", "")
                                                 s3_key = f"{relative_path}/{filename}"
+                                                if thumb_filename:
+                                                    thumb_s3_key = f"{relative_path}/{thumb_filename}"
                                             else:
                                                 # Fallback for non-user paths
                                                 s3_key = f"generated/{filename}"
+                                                if thumb_filename:
+                                                    thumb_s3_key = f"generated/{thumb_filename}"
+                                                    
                                             with open(filepath, "rb") as f_up:
                                                 s3_url = upload_file_obj(f_up, object_name=s3_key)
-                                            logs.append(f"☁️ Uploaded to S3: {s3_key}")
+                                                
+                                            if thumb_filepath:
+                                                with open(thumb_filepath, "rb") as f_up_thumb:
+                                                    upload_file_obj(f_up_thumb, object_name=thumb_s3_key)
+                                                    
+                                            logs.append(f"☁️ Uploaded to S3: {s3_key} (and thumbnail)")
                                         except Exception as e:
                                             logs.append(f"⚠️ S3 Upload Warning: {e}")
                                             

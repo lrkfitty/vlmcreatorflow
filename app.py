@@ -456,15 +456,25 @@ def _scan_s3_gallery(bucket_name, prefix, region):
     s3 = boto3.client('s3', region_name=region)
     all_images_meta = []
     paginator = s3.get_paginator('list_objects_v2')
+    
+    all_objects = []
     for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
         for obj in page.get('Contents', []):
-            key = obj['Key']
-            if key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and '/Assets/' not in key:
-                all_images_meta.append({
-                    "key": key,
-                    "name": os.path.basename(key),
-                    "time": obj.get('LastModified').timestamp()
-                })
+            all_objects.append(obj)
+            
+    thumb_keys_set = set([obj['Key'] for obj in all_objects if obj['Key'].endswith('_thumb.jpg')])
+    
+    for obj in all_objects:
+        key = obj['Key']
+        if key.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and '/Assets/' not in key and not key.endswith('_thumb.jpg'):
+            thumb_key_pred = key.rsplit('.', 1)[0] + "_thumb.jpg"
+            has_thumb = thumb_key_pred in thumb_keys_set
+            all_images_meta.append({
+                "key": key,
+                "thumb_key": thumb_key_pred if has_thumb else key,
+                "name": os.path.basename(key),
+                "time": obj.get('LastModified').timestamp()
+            })
     all_images_meta.sort(key=lambda x: x["time"], reverse=True)
     return all_images_meta[:200]
 
@@ -490,20 +500,31 @@ def _scan_local_gallery(user_root):
     local_imgs = []
     if not os.path.exists(user_root):
         return local_imgs
+        
+    all_files = []
     for root, dirs, files in os.walk(user_root):
         for file in files:
-            if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and "Assets" not in root:
-                full_path = os.path.join(root, file)
-                try:
-                    mtime = os.path.getmtime(full_path)
-                except OSError:
-                    mtime = 0
-                local_imgs.append({
-                    "src": full_path,
-                    "name": file,
-                    "time": mtime,
-                    "is_local": True
-                })
+            all_files.append((root, file))
+            
+    thumb_paths = set([os.path.join(root, file) for root, file in all_files if file.endswith('_thumb.jpg')])
+    
+    for root, file in all_files:
+        if file.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')) and "Assets" not in root and not file.endswith('_thumb.jpg'):
+            full_path = os.path.join(root, file)
+            thumb_path_pred = full_path.rsplit('.', 1)[0] + "_thumb.jpg"
+            has_thumb = thumb_path_pred in thumb_paths
+            
+            try:
+                mtime = os.path.getmtime(full_path)
+            except OSError:
+                mtime = 0
+            local_imgs.append({
+                "src": full_path,
+                "thumb_src": thumb_path_pred if has_thumb else full_path,
+                "name": file,
+                "time": mtime,
+                "is_local": True
+            })
     local_imgs.sort(key=lambda x: x["time"], reverse=True)
     return local_imgs[:200]
 
@@ -599,12 +620,17 @@ if selection == "My Gallery":
                     page_meta = all_images_meta[start_idx:end_idx]
                     
                     # 3. Batch-sign URLs (cached separately so page changes are instant)
-                    page_keys = tuple(item["key"] for item in page_meta)
-                    signed_urls = _sign_urls(bucket, region, page_keys)
+                    keys_to_sign = set()
+                    for item in page_meta:
+                        keys_to_sign.add(item["key"])
+                        keys_to_sign.add(item["thumb_key"])
+                        
+                    signed_urls = _sign_urls(bucket, region, tuple(list(keys_to_sign)))
                     
                     for item in page_meta:
                         my_images.append({
                             "src": signed_urls[item["key"]],
+                            "thumb_src": signed_urls[item["thumb_key"]],
                             "name": item['name'],
                             "time": item['time']
                         })
@@ -696,12 +722,12 @@ if selection == "My Gallery":
                     with cols[idx % 4]:
                         # Render image
                         if is_local:
-                            st.image(item["src"], use_container_width=True)
+                            st.image(item.get("thumb_src", item["src"]), use_container_width=True)
                             st.markdown(f"<div class='gal-name'>{item['name']}</div>", unsafe_allow_html=True)
                         else:
                             st.markdown(
                                 f"""<div class="gallery-card">
-                                    <img src="{item['src']}" loading="lazy" alt="{item['name']}" />
+                                    <img src="{item.get('thumb_src', item['src'])}" loading="lazy" alt="{item['name']}" />
                                     <div class="gal-name">{item['name']}</div>
                                 </div>""",
                                 unsafe_allow_html=True
