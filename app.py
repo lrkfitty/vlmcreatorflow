@@ -2302,8 +2302,28 @@ Write an immersive, detailed prompt now:"""
             st.markdown("#### 🎞️ Storyboard Generator")
             if st.button("Draft Storyboard (4 Shots)"):
                 with st.spinner("AI Director is writing script..."):
-                    # Pass the FULL prompt (with custom details) as context
-                    sb_prompts = generate_storyboard_prompts(scenario['name'], final_prompt)
+                    # Extract Camera Settings for Context
+                    camera_settings_summary = []
+                    if sel_camera != "Auto": camera_settings_summary.append(f"Shot: {sel_camera}")
+                    if sel_lens != "Auto": camera_settings_summary.append(f"Lens: {sel_lens}")
+                    if sel_shot != "Auto": camera_settings_summary.append(f"Shot Type: {sel_shot}")
+                    if sel_angle != "Auto": camera_settings_summary.append(f"Angle: {sel_angle}")
+                    if sel_lighting != "Auto": camera_settings_summary.append(f"Lighting: {sel_lighting}")
+                    if sel_film_stock != "Auto": camera_settings_summary.append(f"Film Stock: {sel_film_stock}")
+                    if sel_filter_look != "Auto": camera_settings_summary.append(f"Look: {sel_filter_look}")
+                    camera_str = ", ".join(camera_settings_summary) if camera_settings_summary else ""
+
+                    # Extract Asset Labels for Context
+                    asset_labels = [a.get('label', 'Unknown Asset') for a in assets_to_inject]
+                    reference_context_str = ", ".join(asset_labels) if asset_labels else ""
+
+                    # Pass the FULL prompt + specs as context
+                    sb_prompts = generate_storyboard_prompts(
+                        scenario['name'], 
+                        final_prompt,
+                        camera_settings=camera_str,
+                        reference_context=reference_context_str
+                    )
                     st.session_state['sb_prompts'] = sb_prompts
                     if sb_prompts and not isinstance(sb_prompts[0], str) or (len(sb_prompts) > 0 and "Error" not in sb_prompts[0]):
                         st.success("Storyboard Drafted! See below.")
