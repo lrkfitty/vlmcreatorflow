@@ -623,14 +623,15 @@ if selection == "My Gallery":
                     keys_to_sign = set()
                     for item in page_meta:
                         keys_to_sign.add(item["key"])
-                        keys_to_sign.add(item["thumb_key"])
+                        if "thumb_key" in item:
+                            keys_to_sign.add(item["thumb_key"])
                         
-                    signed_urls = _sign_urls(bucket, region, tuple(list(keys_to_sign)))
+                    signed_urls = _sign_urls(bucket, region, tuple(sorted(list(keys_to_sign))))
                     
                     for item in page_meta:
                         my_images.append({
-                            "src": signed_urls[item["key"]],
-                            "thumb_src": signed_urls[item["thumb_key"]],
+                            "src": signed_urls.get(item["key"], ""),
+                            "thumb_src": signed_urls.get(item.get("thumb_key", item["key"]), ""),
                             "name": item['name'],
                             "time": item['time']
                         })
