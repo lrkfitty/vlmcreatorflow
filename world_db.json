@@ -1,5 +1,11 @@
 {
   "characters": {
+    "asmr_baby_food": {
+      "name": "Baby Veggie",
+      "type": "protagonist",
+      "description": "Cute, surreal anthropomorphic baby made entirely out of raw foods and salmon sashimi, highly detailed, moist texture, ASMR aesthetic.",
+      "default_img": ""
+    },
     "shay_main": {
       "name": "Shay",
       "type": "protagonist",
@@ -37,6 +43,12 @@
     }
   },
   "locations": {
+    "asmr_eating_studio": {
+      "name": "ASMR Eating Studio",
+      "type": "indoor",
+      "description": "Macro photography setup, wooden cutting board surface, soft warm studio lighting, clean background.",
+      "default_img": ""
+    },
     "luxury_apt_kitchen": {
       "name": "Luxury Apartment Kitchen",
       "type": "indoor",
@@ -51,6 +63,13 @@
     }
   },
   "scenarios": {
+    "asmr_spoon_feeding": {
+      "name": "ASMR Spoon Feeding (Close-Up)",
+      "template_prompt": "A macro close-up shot of [PROTAGONIST] sitting on a minimalist surface in [LOCATION]. A silver spoon is gently feeding the baby a piece of fruit. Highly detailed, moist texture, ASMR food aesthetic, surreal and cute.",
+      "required_slots": [
+        "location"
+      ]
+    },
     "cooking_with_friends": {
       "name": "Cooking with Friend",
       "template_prompt": "[PROTAGONIST] and [RELATION] standing in [LOCATION], preparing a meal. They are laughing and cutting vegetables. Ingredients visible on counter. [PROTAGONIST] is wearing [OUTFIT].",
