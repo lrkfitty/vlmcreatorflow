@@ -1001,7 +1001,13 @@ if selection == "Workflow Wizard":
             with c_c:
                 card_begin()
                 st.markdown("#### 3. Character")
-                c = st.selectbox("Choose Model", characters, label_visibility="collapsed", key="wiz_char")
+                # Format character dropdown to use 'name' if it's a dict
+                def format_char(x):
+                    if x in c_data and isinstance(c_data[x], dict):
+                        return c_data[x].get('name', x)
+                    return x
+                    
+                c = st.selectbox("Choose Model", characters, format_func=format_char, label_visibility="collapsed", key="wiz_char")
                 if c and c in c_data:
                     char_entry = c_data[c]
                     if isinstance(char_entry, dict) and char_entry.get("is_celebrity"):
@@ -1009,8 +1015,13 @@ if selection == "Workflow Wizard":
                         st.info(f"⭐ **{char_entry['name']}** ({char_entry.get('category', '')})", icon=None)
                         st.caption(char_entry.get("celebrity_desc", "")[:120] + "...")
                     elif isinstance(char_entry, dict):
+                        # World DB character: show image if exists, else show description
                         img = char_entry.get("default_img")
-                        if img: st.image(img, use_container_width=True)
+                        if img: 
+                            st.image(img, use_container_width=True)
+                        else:
+                            st.info(f"👤 **{char_entry.get('name', c)}**", icon=None)
+                            st.caption(char_entry.get("description", "Custom character object")[:120] + "...")
                     elif char_entry:
                         st.image(char_entry, use_container_width=True)
                 card_end()
