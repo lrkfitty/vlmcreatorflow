@@ -291,7 +291,12 @@ try:
     vibes_data = assets.get('vibes', {})
     outfits_data = assets.get('outfits', {})
 
+    # Read from world_db
+    from execution.world_manager import load_world_db
+    db = load_world_db()
+
     characters_data = assets.get('characters', {}).copy()
+    characters_data.update(db.get('characters', {}))
     
     # Merge Friends/Relations into Characters options
     relations_data = assets.get('relations', {})
