@@ -2838,6 +2838,16 @@ if selection == "Art Director":
             st.markdown(f"#### {conf_icon} Scene Setup — Confidence: `{confidence.upper()}`")
             st.info("Review and edit fields before generating. Add multiple characters — each gets its own outfit.")
 
+            # ── Debug: show exactly what was detected and resolved ──────────
+            with st.expander("🔍 Debug: Mapping Results", expanded=True):
+                st.write("**Gemini detected characters:**", parsed.get("characters", []))
+                st.write("**Primary char session state:**", st.session_state.get("ad_primary_char", "NOT SET"))
+                st.write("**Additional cast session state:**", st.session_state.get("ad_additional_cast", "NOT SET"))
+                st.write("**Vibe session state:**", st.session_state.get("ad_vibe_edit", "NOT SET"))
+                st.write("**Ratio session state:**", st.session_state.get("ad_ratio", "NOT SET"))
+                # Show first 10 character keys so we can see naming convention
+                st.write("**Sample characters_data keys (first 10):**", list(characters_data.keys())[:10])
+
             # ── Primary Character + Outfit ──────────────────────────────────
             st.markdown("##### 🌟 Primary Character")
 
