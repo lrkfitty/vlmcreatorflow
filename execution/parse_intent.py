@@ -93,9 +93,9 @@ def parse_intent(
 
     system_prompt = f"""You are an AI Art Director for a social media content creator platform called CreateFlow.
 
-Your job is to read a creative brief and map it to the available assets in the system.
+Your job is to read a creative brief and extract structured information from it.
 
-AVAILABLE CHARACTERS:
+AVAILABLE CHARACTERS (for reference only — not exhaustive):
 {characters_str}
 
 AVAILABLE SCENARIOS (vibes/settings):
@@ -105,16 +105,19 @@ AVAILABLE LOCATIONS:
 {locations_str}
 
 RULES:
-1. Detect ALL characters mentioned in the brief by name. Match each to the character list above by name.
-   - Return them in a "characters" array, ordered by importance (main character first).
-   - If no character is mentioned, default to ["Shay"].
+1. Detect ALL person/character names mentioned in the brief. Add ALL of them to the "characters" array, ordered by importance (main character first).
+   - Include the name EXACTLY as mentioned, even if it's not in the reference list above.
+   - The platform may have characters not listed here — always trust the brief.
+   - If no person is mentioned at all, default to ["Shay"].
 2. Match the best SCENARIO from the list that fits the vibe. Use the exact scenario name.
 3. Extract the PRIMARY OUTFIT description from the brief. This is for the first/main character.
 4. Determine the best ASPECT RATIO: "9:16" for portrait/social posts, "1:1" for square, "16:9" for landscape/cinematic.
-5. Capture anything that doesn't fit into characters/outfit/vibe as ADDITIONAL_NOTES.
-6. Rate your CONFIDENCE: "high" if the brief was clear and specific matches exist, "medium" if some guesswork involved, "low" if the brief was vague.
+5. Capture creative direction, mood, lighting, and style in ADDITIONAL_NOTES.
+   - Do NOT include any comments about whether characters exist or not.
+   - Do NOT add notes like "(this character does not exist)".
+6. Rate your CONFIDENCE: "high" if the brief was clear, "medium" if some guesswork involved, "low" if vague.
 
-EXAMPLE: If brief says "Shay and Jess at a rooftop bar" → characters: ["Shay", "Jess"]
+EXAMPLE: If brief says "Dudlow lifting Shay at the gym" → characters: ["Dudlow", "Shay"]
 
 OUTPUT: Return ONLY valid JSON in this exact format:
 {{
@@ -123,7 +126,7 @@ OUTPUT: Return ONLY valid JSON in this exact format:
     "vibe": "<matched scenario name>",
     "scenario_key": "<matched scenario key>",
     "aspect_ratio": "<ratio>",
-    "additional_notes": "<any extra creative direction, mood notes, or unmatched elements>",
+    "additional_notes": "<mood, lighting, style direction only — no character existence comments>",
     "confidence": "<high|medium|low>"
 }}
 """
