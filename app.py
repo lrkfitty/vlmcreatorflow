@@ -2768,6 +2768,32 @@ if selection == "Art Director":
                         from execution.parse_intent import parse_intent
                         parsed = parse_intent(ad_brief.strip())
                         st.session_state.ad_parsed = parsed
+
+                        # Pre-seed additional cast HERE (before next render)
+                        # so Streamlit picks it up before initializing the widget key
+                        def _resolve_char_key_seed(name: str):
+                            name_lower = name.lower().strip()
+                            for k, v in characters_data.items():
+                                cname = v.get("name", k) if isinstance(v, dict) else k
+                                if cname.lower() == name_lower:
+                                    return k
+                            for k, v in characters_data.items():
+                                cname = v.get("name", k) if isinstance(v, dict) else k
+                                if name_lower in cname.lower() or cname.lower() in name_lower:
+                                    return k
+                            return None
+
+                        parsed_names = parsed.get("characters", [])
+                        primary_key_seed = _resolve_char_key_seed(parsed_names[0]) if parsed_names else None
+                        secondary_names_seed = parsed_names[1:]
+                        auto_keys = [
+                            _resolve_char_key_seed(n) for n in secondary_names_seed
+                        ]
+                        # Filter to valid keys that exist in characters_data
+                        auto_keys = [k for k in auto_keys if k and k in characters_data]
+                        # Force-write — overwrite whatever was there before
+                        st.session_state["ad_additional_cast"] = auto_keys
+
                     except Exception as parse_err:
                         st.error(f"Parsing failed: {parse_err}")
                         st.session_state.ad_parsed = None
@@ -2784,26 +2810,23 @@ if selection == "Art Director":
             # ── Primary Character + Outfit ──────────────────────────────────
             st.markdown("##### 🌟 Primary Character")
 
-            # Resolve ALL detected characters from parsed["characters"] list
+            # Resolve primary character from parsed characters list
             parsed_char_names = parsed.get("characters", [parsed.get("character", "Shay")])
+            primary_name = parsed_char_names[0] if parsed_char_names else "Shay"
 
-            def _resolve_char_key(name: str) -> str | None:
+            def _resolve_char_key(name: str):
                 """Find the characters_data key that best matches a character name string."""
                 name_lower = name.lower().strip()
-                # Exact name match first
                 for k, v in characters_data.items():
                     cname = v.get("name", k) if isinstance(v, dict) else k
                     if cname.lower() == name_lower:
                         return k
-                # Partial match fallback
                 for k, v in characters_data.items():
                     cname = v.get("name", k) if isinstance(v, dict) else k
                     if name_lower in cname.lower() or cname.lower() in name_lower:
                         return k
                 return None
 
-            # Primary = first character in the list
-            primary_name = parsed_char_names[0] if parsed_char_names else "Shay"
             primary_key = _resolve_char_key(primary_name)
 
             pc_col1, pc_col2, pc_col3 = st.columns([2, 2, 1])
@@ -2839,14 +2862,7 @@ if selection == "Art Director":
             st.markdown("##### 👥 Additional Cast (Optional)")
             cast_pool_ad = {k: v for k, v in characters_data.items() if k != ad_primary_char}
 
-            # Auto-populate the multiselect with secondary characters detected in the brief
-            # Set session state BEFORE the widget renders so it picks them up
-            secondary_names = parsed_char_names[1:] if len(parsed_char_names) > 1 else []
-            auto_cast_keys = [_resolve_char_key(n) for n in secondary_names]
-            auto_cast_keys = [k for k in auto_cast_keys if k and k in cast_pool_ad]
-            if auto_cast_keys and "ad_additional_cast" not in st.session_state:
-                st.session_state["ad_additional_cast"] = auto_cast_keys
-
+            # ad_additional_cast was pre-seeded in the parse button handler above
             additional_cast_keys = st.multiselect(
                 "Add more characters to the scene",
                 options=sorted(cast_pool_ad.keys()),
