@@ -2783,22 +2783,37 @@ if selection == "Art Director":
 
             # ── Primary Character + Outfit ──────────────────────────────────
             st.markdown("##### 🌟 Primary Character")
+
+            # Resolve ALL detected characters from parsed["characters"] list
+            parsed_char_names = parsed.get("characters", [parsed.get("character", "Shay")])
+
+            def _resolve_char_key(name: str) -> str | None:
+                """Find the characters_data key that best matches a character name string."""
+                name_lower = name.lower().strip()
+                # Exact name match first
+                for k, v in characters_data.items():
+                    cname = v.get("name", k) if isinstance(v, dict) else k
+                    if cname.lower() == name_lower:
+                        return k
+                # Partial match fallback
+                for k, v in characters_data.items():
+                    cname = v.get("name", k) if isinstance(v, dict) else k
+                    if name_lower in cname.lower() or cname.lower() in name_lower:
+                        return k
+                return None
+
+            # Primary = first character in the list
+            primary_name = parsed_char_names[0] if parsed_char_names else "Shay"
+            primary_key = _resolve_char_key(primary_name)
+
             pc_col1, pc_col2, pc_col3 = st.columns([2, 2, 1])
             with pc_col1:
-                ad_char_resolved = parsed.get("character", "Shay")
-                char_match = next(
-                    (k for k, v in characters_data.items()
-                     if (isinstance(v, dict) and v.get("name", "").lower() == ad_char_resolved.lower())
-                     or k.lower() == ad_char_resolved.lower()),
-                    None
-                )
-                char_idx = characters_list.index(char_match) if char_match and char_match in characters_list else 0
+                char_idx = characters_list.index(primary_key) if primary_key and primary_key in characters_list else 0
                 ad_primary_char = st.selectbox("Character", characters_list, index=char_idx, key="ad_primary_char")
 
             with pc_col2:
                 # Primary outfit — dropdown from asset library
                 outfit_opts = list(outfits_data.keys())
-                # Try to pre-select based on parsed outfit text (fuzzy first-word match)
                 parsed_outfit_text = parsed.get("outfit", "").lower()
                 outfit_match_idx = 0
                 if parsed_outfit_text:
@@ -2815,7 +2830,6 @@ if selection == "Art Director":
                     st.text_input("Outfit Description", value=parsed_outfit_text, key="ad_primary_outfit_text")
 
             with pc_col3:
-                # Preview primary char image
                 pchar_val = characters_data.get(ad_primary_char, {})
                 pchar_path = pchar_val.get("default_img") if isinstance(pchar_val, dict) else None
                 if pchar_path and os.path.exists(str(pchar_path)):
@@ -2824,12 +2838,22 @@ if selection == "Art Director":
             # ── Additional Cast ─────────────────────────────────────────────
             st.markdown("##### 👥 Additional Cast (Optional)")
             cast_pool_ad = {k: v for k, v in characters_data.items() if k != ad_primary_char}
+
+            # Auto-populate the multiselect with secondary characters detected in the brief
+            # Set session state BEFORE the widget renders so it picks them up
+            secondary_names = parsed_char_names[1:] if len(parsed_char_names) > 1 else []
+            auto_cast_keys = [_resolve_char_key(n) for n in secondary_names]
+            auto_cast_keys = [k for k in auto_cast_keys if k and k in cast_pool_ad]
+            if auto_cast_keys and "ad_additional_cast" not in st.session_state:
+                st.session_state["ad_additional_cast"] = auto_cast_keys
+
             additional_cast_keys = st.multiselect(
                 "Add more characters to the scene",
                 options=sorted(cast_pool_ad.keys()),
                 format_func=lambda x: cast_pool_ad[x].get("name", x) if isinstance(cast_pool_ad[x], dict) else x,
                 key="ad_additional_cast"
             )
+
 
             # Per-character outfit selectors (one column per extra cast member)
             extra_cast_outfits = {}   # {char_key: outfit_key}

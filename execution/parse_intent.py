@@ -105,17 +105,21 @@ AVAILABLE LOCATIONS:
 {locations_str}
 
 RULES:
-1. Match the best CHARACTER from the list above. Use the exact character name. If no match, use "Shay" as default.
+1. Detect ALL characters mentioned in the brief by name. Match each to the character list above by name.
+   - Return them in a "characters" array, ordered by importance (main character first).
+   - If no character is mentioned, default to ["Shay"].
 2. Match the best SCENARIO from the list that fits the vibe. Use the exact scenario name.
-3. Extract the OUTFIT description from the brief (can be free text — no need to match a list).
+3. Extract the PRIMARY OUTFIT description from the brief. This is for the first/main character.
 4. Determine the best ASPECT RATIO: "9:16" for portrait/social posts, "1:1" for square, "16:9" for landscape/cinematic.
-5. Capture anything that doesn't fit into character/outfit/vibe as ADDITIONAL_NOTES.
+5. Capture anything that doesn't fit into characters/outfit/vibe as ADDITIONAL_NOTES.
 6. Rate your CONFIDENCE: "high" if the brief was clear and specific matches exist, "medium" if some guesswork involved, "low" if the brief was vague.
+
+EXAMPLE: If brief says "Shay and Jess at a rooftop bar" → characters: ["Shay", "Jess"]
 
 OUTPUT: Return ONLY valid JSON in this exact format:
 {{
-    "character": "<matched character name>",
-    "outfit": "<outfit description from brief or inferred>",
+    "characters": ["<primary character name>", "<secondary character name if any>"],
+    "outfit": "<outfit description for the PRIMARY character from the brief>",
     "vibe": "<matched scenario name>",
     "scenario_key": "<matched scenario key>",
     "aspect_ratio": "<ratio>",
@@ -145,6 +149,25 @@ OUTPUT: Return ONLY valid JSON in this exact format:
             raw = raw[start:end]
 
         result = json.loads(raw)
+
+        # Normalize: ensure `characters` is always a list
+        if "characters" not in result:
+            # Old schema fallback — wrap single character in a list
+            single = result.get("character", "Shay")
+            result["characters"] = [single] if single else ["Shay"]
+        elif not isinstance(result["characters"], list):
+            result["characters"] = [str(result["characters"])]
+
+        # Remove placeholder strings like "<secondary character name if any>"
+        result["characters"] = [
+            c for c in result["characters"]
+            if c and not c.startswith("<")
+        ]
+        if not result["characters"]:
+            result["characters"] = ["Shay"]
+
+        # Backward-compat alias
+        result["character"] = result["characters"][0]
         result["raw_brief"] = brief
         return result
 
@@ -156,7 +179,8 @@ OUTPUT: Return ONLY valid JSON in this exact format:
 def _fallback_parse(brief: str, error: str = "") -> dict:
     """Graceful fallback — pass the brief through as additional_notes."""
     return {
-        "character": "Shay",
+        "characters": ["Shay"],
+        "character": "Shay",    # backward-compat alias
         "outfit": "",
         "vibe": "",
         "scenario_key": None,
@@ -170,8 +194,9 @@ def _fallback_parse(brief: str, error: str = "") -> dict:
 
 # ─── Quick Test (run directly) ────────────────────────────────────────────────
 if __name__ == "__main__":
-    test_brief = "moody rooftop bar at night, Shay in a sleek black dress, editorial and cinematic"
+    test_brief = "Shay and Jess at a moody rooftop bar at night, sleek black outfit, editorial and cinematic"
     print("\n📋 Brief:", test_brief)
     result = parse_intent(test_brief)
     print("\n✅ Parsed Intent:")
     print(json.dumps(result, indent=2))
+
