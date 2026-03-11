@@ -2731,20 +2731,24 @@ if selection == "Art Director":
         try:
             ad_audio = st.audio_input("Hold to record, release to transcribe", key="ad_audio_input_widget")
             if ad_audio is not None:
-                with st.spinner("Transcribing..."):
-                    try:
-                        from execution.transcribe_voice import transcribe_voice
-                        audio_bytes = ad_audio.read()
-                        transcription = transcribe_voice(audio_bytes)
-                        if transcription:
-                            # Auto-fill: set the text area's own session state key so it
-                            # appears immediately on rerender without a separate button press
-                            st.session_state["ad_brief_input"] = transcription
-                            st.success(f'🎙️ I heard: *"{transcription}"*')
-                        else:
-                            st.warning("No audio detected — please try again or type your brief below.")
-                    except Exception as voice_err:
-                        st.warning(f"Transcription unavailable: {voice_err}")
+                # Hash-guard: only transcribe when audio content is new
+                # Without this, every widget interaction rerenders → re-transcribes → loop
+                audio_bytes = ad_audio.read()
+                audio_hash = hash(audio_bytes)
+                if st.session_state.get("ad_last_audio_hash") != audio_hash:
+                    st.session_state["ad_last_audio_hash"] = audio_hash
+                    with st.spinner("Transcribing..."):
+                        try:
+                            from execution.transcribe_voice import transcribe_voice
+                            transcription = transcribe_voice(audio_bytes)
+                            if transcription:
+                                st.session_state["ad_brief_input"] = transcription
+                                st.success(f'🎙️ I heard: *"{transcription}"*')
+                            else:
+                                st.warning("No audio detected — please try again or type your brief below.")
+                        except Exception as voice_err:
+                            st.warning(f"Transcription unavailable: {voice_err}")
+
         except Exception:
             st.caption("🎙️ Mic not available in this browser — type your brief below.")
 
@@ -2847,15 +2851,7 @@ if selection == "Art Director":
             st.markdown(f"#### {conf_icon} Scene Setup — Confidence: `{confidence.upper()}`")
             st.info("Review and edit fields before generating. Add multiple characters — each gets its own outfit.")
 
-            # ── Debug: show exactly what was detected and resolved ──────────
-            with st.expander("🔍 Debug: Mapping Results", expanded=True):
-                st.write("**Gemini detected characters:**", parsed.get("characters", []))
-                st.write("**Primary char session state:**", st.session_state.get("ad_primary_char", "NOT SET"))
-                st.write("**Additional cast session state:**", st.session_state.get("ad_additional_cast", "NOT SET"))
-                st.write("**Vibe session state:**", st.session_state.get("ad_vibe_edit", "NOT SET"))
-                st.write("**Ratio session state:**", st.session_state.get("ad_ratio", "NOT SET"))
-                # Show first 10 character keys so we can see naming convention
-                st.write("**Sample characters_data keys (first 10):**", list(characters_data.keys())[:10])
+
 
             # ── Primary Character + Outfit ──────────────────────────────────
             st.markdown("##### 🌟 Primary Character")
