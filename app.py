@@ -2708,7 +2708,6 @@ if selection == "Campaign Queue":
                     st.write(f"**Created:** {job.get('created_at', 'Unknown')}")
                     if job['status'] == 'completed':
                          st.write("**Results:**")
-                         # Display Logic?
             
             with col_q_del:
                 # Only allow deleting pending or completed tasks, not running ones (to match index)
@@ -2716,7 +2715,6 @@ if selection == "Campaign Queue":
                     campaign_mgr.remove_job(i)
                     st.rerun()
 
-# ==========================================
 # ==========================================
 # TAB: ART DIRECTOR (NL Brief + Voice Dictation)
 # ==========================================
@@ -2731,7 +2729,7 @@ if selection == "Art Director":
         # ── Voice Dictation ─────────────────────────────────────────────────
         st.markdown("#### 🎙️ Speak Your Brief (Optional)")
         try:
-            ad_audio = st.audio_input("Hold to record, release to transcribe", key="ad_audio_input")
+            ad_audio = st.audio_input("Hold to record, release to transcribe", key="ad_audio_input_widget")
             if ad_audio is not None:
                 with st.spinner("Transcribing..."):
                     try:
@@ -2739,7 +2737,9 @@ if selection == "Art Director":
                         audio_bytes = ad_audio.read()
                         transcription = transcribe_voice(audio_bytes)
                         if transcription:
-                            st.session_state.ad_brief = transcription
+                            # Auto-fill: set the text area's own session state key so it
+                            # appears immediately on rerender without a separate button press
+                            st.session_state["ad_brief_input"] = transcription
                             st.success(f'🎙️ I heard: *"{transcription}"*')
                         else:
                             st.warning("No audio detected — please try again or type your brief below.")
@@ -2750,21 +2750,17 @@ if selection == "Art Director":
 
         # ── Text Brief ──────────────────────────────────────────────────────
         st.markdown("#### ✏️ Your Brief")
-        ad_brief_val = st.session_state.get("ad_brief", "")
         ad_brief = st.text_area(
             "Describe the shot",
-            value=ad_brief_val,
             placeholder="e.g. moody rooftop bar at night, Shay in a sleek black dress, editorial and cinematic",
             height=100,
-            key="ad_brief_input"
+            key="ad_brief_input"   # voice dictation writes directly to this key
         )
-        # Keep session state in sync
-        st.session_state.ad_brief = ad_brief
 
         ad_parse_btn = st.button("🧠 Parse Brief", type="primary", key="ad_parse_btn")
 
         if ad_parse_btn:
-            if not ad_brief.strip():
+            if not (ad_brief or "").strip():
                 st.warning("Please enter a brief or record your voice.")
             else:
                 with st.spinner("Mapping brief to your assets..."):
@@ -2776,22 +2772,20 @@ if selection == "Art Director":
                         st.error(f"Parsing failed: {parse_err}")
                         st.session_state.ad_parsed = None
 
-        # ── Parsed Result + Confirm ──────────────────────────────────────────
+        # ── Parsed Result + Scene Builder ────────────────────────────────────
         if "ad_parsed" in st.session_state and st.session_state.ad_parsed:
             parsed = st.session_state.ad_parsed
             confidence = parsed.get("confidence", "low")
             conf_icon = {"high": "✅", "medium": "⚠️", "low": "❓"}.get(confidence, "❓")
 
-            st.markdown(f"#### {conf_icon} Parsed Brief — Confidence: `{confidence.upper()}`")
-            st.info(
-                "Review and edit any field before generating. "
-                "Fields are pre-filled from your brief — adjust if needed."
-            )
+            st.markdown(f"#### {conf_icon} Scene Setup — Confidence: `{confidence.upper()}`")
+            st.info("Review and edit fields before generating. Add multiple characters — each gets its own outfit.")
 
-            ad_col1, ad_col2 = st.columns(2)
-            with ad_col1:
+            # ── Primary Character + Outfit ──────────────────────────────────
+            st.markdown("##### 🌟 Primary Character")
+            pc_col1, pc_col2, pc_col3 = st.columns([2, 2, 1])
+            with pc_col1:
                 ad_char_resolved = parsed.get("character", "Shay")
-                # Try to match to known character list
                 char_match = next(
                     (k for k, v in characters_data.items()
                      if (isinstance(v, dict) and v.get("name", "").lower() == ad_char_resolved.lower())
@@ -2799,11 +2793,71 @@ if selection == "Art Director":
                     None
                 )
                 char_idx = characters_list.index(char_match) if char_match and char_match in characters_list else 0
-                ad_char_sel = st.selectbox("Character", characters_list, index=char_idx, key="ad_char_sel")
-                ad_outfit_edit = st.text_input("Outfit", value=parsed.get("outfit", ""), key="ad_outfit_edit")
+                ad_primary_char = st.selectbox("Character", characters_list, index=char_idx, key="ad_primary_char")
 
-            with ad_col2:
+            with pc_col2:
+                # Primary outfit — dropdown from asset library
+                outfit_opts = list(outfits_data.keys())
+                # Try to pre-select based on parsed outfit text (fuzzy first-word match)
+                parsed_outfit_text = parsed.get("outfit", "").lower()
+                outfit_match_idx = 0
+                if parsed_outfit_text:
+                    for i, ok in enumerate(outfit_opts):
+                        if any(word in ok.lower() for word in parsed_outfit_text.split()[:3]):
+                            outfit_match_idx = i
+                            break
+                if outfit_opts:
+                    ad_primary_outfit_key = st.selectbox(
+                        "Outfit", outfit_opts, index=outfit_match_idx, key="ad_primary_outfit"
+                    )
+                else:
+                    ad_primary_outfit_key = None
+                    st.text_input("Outfit Description", value=parsed_outfit_text, key="ad_primary_outfit_text")
+
+            with pc_col3:
+                # Preview primary char image
+                pchar_val = characters_data.get(ad_primary_char, {})
+                pchar_path = pchar_val.get("default_img") if isinstance(pchar_val, dict) else None
+                if pchar_path and os.path.exists(str(pchar_path)):
+                    st.image(pchar_path, use_container_width=True)
+
+            # ── Additional Cast ─────────────────────────────────────────────
+            st.markdown("##### 👥 Additional Cast (Optional)")
+            cast_pool_ad = {k: v for k, v in characters_data.items() if k != ad_primary_char}
+            additional_cast_keys = st.multiselect(
+                "Add more characters to the scene",
+                options=sorted(cast_pool_ad.keys()),
+                format_func=lambda x: cast_pool_ad[x].get("name", x) if isinstance(cast_pool_ad[x], dict) else x,
+                key="ad_additional_cast"
+            )
+
+            # Per-character outfit selectors (one column per extra cast member)
+            extra_cast_outfits = {}   # {char_key: outfit_key}
+            if additional_cast_keys:
+                st.caption("Select an outfit for each cast member:")
+                cast_outfit_cols = st.columns(len(additional_cast_keys))
+                for idx, char_key in enumerate(additional_cast_keys):
+                    char_val_ex = cast_pool_ad.get(char_key, {})
+                    char_name_ex = char_val_ex.get("name", char_key) if isinstance(char_val_ex, dict) else char_key
+                    char_path_ex = char_val_ex.get("default_img") if isinstance(char_val_ex, dict) else None
+                    with cast_outfit_cols[idx]:
+                        st.markdown(f"**{char_name_ex}**")
+                        if char_path_ex and os.path.exists(str(char_path_ex)):
+                            st.image(char_path_ex, use_container_width=True)
+                        if outfit_opts:
+                            ex_outfit_key = st.selectbox(
+                                f"Outfit", outfit_opts, key=f"ad_extra_outfit_{idx}"
+                            )
+                        else:
+                            ex_outfit_key = st.text_input(f"Outfit", key=f"ad_extra_outfit_text_{idx}")
+                        extra_cast_outfits[char_key] = ex_outfit_key
+
+            # ── Vibe, Ratio, Notes ──────────────────────────────────────────
+            st.markdown("##### 🌆 Scene Details")
+            sd_col1, sd_col2 = st.columns(2)
+            with sd_col1:
                 ad_vibe_edit = st.text_input("Vibe / Scenario", value=parsed.get("vibe", ""), key="ad_vibe_edit")
+            with sd_col2:
                 ad_ratio = st.selectbox(
                     "Aspect Ratio",
                     ["9:16", "1:1", "16:9"],
@@ -2822,17 +2876,45 @@ if selection == "Art Director":
             ad_gen_btn = st.button("🎬 Generate Image", type="primary", key="ad_gen_btn", use_container_width=True)
 
             if ad_gen_btn:
-                char_val = characters_data.get(ad_char_sel, {})
-                char_path = char_val.get("default_img") if isinstance(char_val, dict) else None
+                # Resolve primary character
+                pchar_val = characters_data.get(ad_primary_char, {})
+                pchar_path = pchar_val.get("default_img") if isinstance(pchar_val, dict) else None
+
+                # Resolve primary outfit
+                primary_outfit_path = None
+                primary_outfit_name = ""
+                if ad_primary_outfit_key and outfit_opts:
+                    pfit_val = outfits_data.get(ad_primary_outfit_key, {})
+                    primary_outfit_name = pfit_val.get("name", ad_primary_outfit_key) if isinstance(pfit_val, dict) else ad_primary_outfit_key
+                    primary_outfit_path = pfit_val.get("default_img") if isinstance(pfit_val, dict) else pfit_val
+
+                # Build extra_images list for multi-cast
+                ad_extra_images = []
+                for char_key in additional_cast_keys:
+                    char_val_ex = cast_pool_ad.get(char_key, {})
+                    char_name_ex = char_val_ex.get("name", char_key) if isinstance(char_val_ex, dict) else char_key
+                    char_path_ex = char_val_ex.get("default_img") if isinstance(char_val_ex, dict) else None
+                    if char_path_ex:
+                        ad_extra_images.append({"path": char_path_ex, "label": f"Cast: {char_name_ex}"})
+                    # Attach their outfit
+                    ex_outfit_key = extra_cast_outfits.get(char_key)
+                    if ex_outfit_key and outfit_opts:
+                        ex_fit_val = outfits_data.get(ex_outfit_key, {})
+                        ex_fit_name = ex_fit_val.get("name", ex_outfit_key) if isinstance(ex_fit_val, dict) else ex_outfit_key
+                        ex_fit_path = ex_fit_val.get("default_img") if isinstance(ex_fit_val, dict) else ex_fit_val
+                        if ex_fit_path:
+                            ad_extra_images.append({"path": ex_fit_path, "label": f"Outfit for {char_name_ex}: {ex_fit_name}"})
 
                 with st.spinner("Crafting prompt and generating image..."):
                     try:
                         prompt_data = generate_prompt_content(
                             vibe=ad_vibe_edit or ad_notes,
-                            outfit=ad_outfit_edit,
-                            character=char_path or ad_char_sel,
+                            outfit=primary_outfit_name,
+                            character=pchar_path or ad_primary_char,
+                            outfit_path=primary_outfit_path,
                             additional_notes=ad_notes,
-                            aspect_ratio=ad_ratio
+                            aspect_ratio=ad_ratio,
+                            extra_images=ad_extra_images if ad_extra_images else None
                         )
 
                         out_dir_ad = get_user_out_dir("ArtDirector")
