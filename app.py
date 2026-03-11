@@ -2760,43 +2760,74 @@ if selection == "Art Director":
         ad_parse_btn = st.button("🧠 Parse Brief", type="primary", key="ad_parse_btn")
 
         if ad_parse_btn:
-            if not (ad_brief or "").strip():
-                st.warning("Please enter a brief or record your voice.")
-            else:
-                with st.spinner("Mapping brief to your assets..."):
-                    try:
-                        from execution.parse_intent import parse_intent
-                        parsed = parse_intent(ad_brief.strip())
-                        st.session_state.ad_parsed = parsed
+            with st.spinner("Mapping brief to your assets..."):
+                try:
+                    from execution.parse_intent import parse_intent
+                    parsed = parse_intent(ad_brief.strip())
+                    st.session_state.ad_parsed = parsed
 
-                        # Pre-seed additional cast HERE (before next render)
-                        # so Streamlit picks it up before initializing the widget key
-                        def _resolve_char_key_seed(name: str):
-                            name_lower = name.lower().strip()
-                            for k, v in characters_data.items():
-                                cname = v.get("name", k) if isinstance(v, dict) else k
-                                if cname.lower() == name_lower:
-                                    return k
-                            for k, v in characters_data.items():
-                                cname = v.get("name", k) if isinstance(v, dict) else k
-                                if name_lower in cname.lower() or cname.lower() in name_lower:
-                                    return k
-                            return None
+                    # ── Force-write ALL widget state keys BEFORE next render ──────────
+                    # Streamlit ignores `index=` / `value=` params once a key exists
+                    # in session_state, so we must set them here, immediately after parse.
 
-                        parsed_names = parsed.get("characters", [])
-                        primary_key_seed = _resolve_char_key_seed(parsed_names[0]) if parsed_names else None
-                        secondary_names_seed = parsed_names[1:]
-                        auto_keys = [
-                            _resolve_char_key_seed(n) for n in secondary_names_seed
-                        ]
-                        # Filter to valid keys that exist in characters_data
-                        auto_keys = [k for k in auto_keys if k and k in characters_data]
-                        # Force-write — overwrite whatever was there before
-                        st.session_state["ad_additional_cast"] = auto_keys
+                    def _resolve_char_key_seed(name: str):
+                        name_lower = name.lower().strip()
+                        # 1. Exact name match
+                        for k, v in characters_data.items():
+                            cname = v.get("name", k) if isinstance(v, dict) else k
+                            if cname.lower() == name_lower:
+                                return k
+                        # 2. Partial match (handles "(My) Dudlow" → "Dudlow")
+                        for k, v in characters_data.items():
+                            cname = v.get("name", k) if isinstance(v, dict) else k
+                            if name_lower in cname.lower() or cname.lower() in name_lower:
+                                return k
+                        return None
 
-                    except Exception as parse_err:
-                        st.error(f"Parsing failed: {parse_err}")
-                        st.session_state.ad_parsed = None
+                    parsed_names = parsed.get("characters", [])
+
+                    # Primary character selectbox
+                    primary_key_seed = _resolve_char_key_seed(parsed_names[0]) if parsed_names else None
+                    if primary_key_seed and primary_key_seed in characters_list:
+                        st.session_state["ad_primary_char"] = primary_key_seed
+                    elif characters_list:
+                        st.session_state["ad_primary_char"] = characters_list[0]
+
+                    # Additional cast multiselect
+                    secondary_names_seed = parsed_names[1:]
+                    auto_keys = [_resolve_char_key_seed(n) for n in secondary_names_seed]
+                    auto_keys = [k for k in auto_keys if k and k in characters_data]
+                    st.session_state["ad_additional_cast"] = auto_keys
+
+                    # Vibe / scenario
+                    if parsed.get("vibe"):
+                        st.session_state["ad_vibe_edit"] = parsed["vibe"]
+
+                    # Aspect ratio
+                    ratio = parsed.get("aspect_ratio", "9:16")
+                    if ratio in ["9:16", "1:1", "16:9"]:
+                        st.session_state["ad_ratio"] = ratio
+
+                    # Primary outfit — fuzzy-match against outfit_opts
+                    outfit_opts_seed = list(outfits_data.keys())
+                    parsed_outfit_lower = parsed.get("outfit", "").lower()
+                    if parsed_outfit_lower and outfit_opts_seed:
+                        outfit_match = next(
+                            (ok for ok in outfit_opts_seed
+                             if any(word in ok.lower() for word in parsed_outfit_lower.split()[:3])),
+                            None
+                        )
+                        if outfit_match:
+                            st.session_state["ad_primary_outfit"] = outfit_match
+
+                    # Additional notes
+                    if parsed.get("additional_notes"):
+                        st.session_state["ad_notes"] = parsed["additional_notes"]
+
+                except Exception as parse_err:
+                    st.error(f"Parsing failed: {parse_err}")
+                    st.session_state.ad_parsed = None
+
 
         # ── Parsed Result + Scene Builder ────────────────────────────────────
         if "ad_parsed" in st.session_state and st.session_state.ad_parsed:
