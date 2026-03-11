@@ -2945,7 +2945,7 @@ if selection == "Art Director":
                         result = generate_image_from_prompt(
                             prompt_data,
                             output_folder=out_dir_ad,
-                            reference_image_path=char_path
+                            reference_image_path=pchar_path
                         )
 
                         if result.get("status") == "success":
