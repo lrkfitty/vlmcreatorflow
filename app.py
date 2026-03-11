@@ -2772,15 +2772,24 @@ if selection == "Art Director":
 
                     def _resolve_char_key_seed(name: str):
                         name_lower = name.lower().strip()
-                        # 1. Exact name match
+                        # 1. Exact name-field match
                         for k, v in characters_data.items():
                             cname = v.get("name", k) if isinstance(v, dict) else k
                             if cname.lower() == name_lower:
                                 return k
-                        # 2. Partial match (handles "(My) Dudlow" → "Dudlow")
+                        # 2. Exact key match
+                        for k in characters_data:
+                            if k.lower() == name_lower:
+                                return k
+                        # 3. Partial name-field match (handles "(My) Dudlow" → "Dudlow")
                         for k, v in characters_data.items():
                             cname = v.get("name", k) if isinstance(v, dict) else k
-                            if name_lower in cname.lower() or cname.lower() in name_lower:
+                            if name_lower in cname.lower() or cname.lower().startswith(name_lower):
+                                return k
+                        # 4. Partial key match (handles path-style keys like
+                        #    "Shay Stock Photo / Shay High Bun Front" → matches "shay")
+                        for k in characters_data:
+                            if name_lower in k.lower():
                                 return k
                         return None
 

@@ -106,8 +106,10 @@ AVAILABLE LOCATIONS:
 
 RULES:
 1. Detect ALL person/character names mentioned in the brief. Add ALL of them to the "characters" array, ordered by importance (main character first).
-   - Include the name EXACTLY as mentioned, even if it's not in the reference list above.
-   - The platform may have characters not listed here — always trust the brief.
+   - Return names EXACTLY as spoken/written in the brief. Do NOT expand, guess, or infer full names.
+   - If someone says "Shay", return "Shay" — not "Shea Blondback" or any variation.
+   - If someone says "Dudlow", return "Dudlow" — verbatim.
+   - Include the name even if it's not in the reference list above.
    - If no person is mentioned at all, default to ["Shay"].
 2. Match the best SCENARIO from the list that fits the vibe. Use the exact scenario name.
 3. Extract the PRIMARY OUTFIT description from the brief. This is for the first/main character.
