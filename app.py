@@ -426,7 +426,8 @@ nav_options = [
     "Asset Library",
     "Mini Series",
     "World Builder",
-    "Campaign Queue", 
+    "Campaign Queue",
+    "Art Director",
     "Video Studio",
     "Character Studio",
     "Multi-Shot Generator"
@@ -2580,6 +2581,74 @@ if selection == "Campaign Queue":
         pending_count = len([x for x in st.session_state.campaign_queue if x['status'] == 'pending'])
         
         st.metric("Pending Jobs", pending_count)
+
+        # ── AUTO-PLAN CAMPAIGN (New Agentic Feature) ────────────────────────
+        with st.expander("🤖 Auto-Plan Campaign", expanded=(pending_count == 0)):
+            st.markdown(
+                "**Describe your content goal in plain English.** "
+                "The AI Director will generate a full content calendar and queue all jobs automatically."
+            )
+            ac_brief = st.text_area(
+                "Campaign Brief",
+                placeholder="e.g. 30 days of luxury lifestyle content for Shay — rooftop moments, travel vibes, and editorial fashion",
+                height=80,
+                key="ac_brief"
+            )
+            ac_col1, ac_col2, ac_col3 = st.columns([2, 1, 1])
+            with ac_col1:
+                ac_num_posts = st.slider("Number of Posts", min_value=5, max_value=30, value=10, step=1, key="ac_num_posts")
+            with ac_col2:
+                ac_character = st.text_input("Lock Character (optional)", placeholder="Shay", key="ac_character")
+            with ac_col3:
+                ac_plan_btn = st.button("✨ Generate Plan", type="primary", key="ac_plan_btn", use_container_width=True)
+
+            if ac_plan_btn:
+                if not ac_brief.strip():
+                    st.warning("Please enter a campaign brief.")
+                else:
+                    with st.spinner(f"Planning {ac_num_posts} posts..."):
+                        try:
+                            from execution.plan_campaign import plan_campaign, build_campaign_job
+                            planned_posts = plan_campaign(
+                                ac_brief.strip(),
+                                num_posts=ac_num_posts,
+                                character=ac_character.strip() if ac_character.strip() else None
+                            )
+                            st.session_state.ac_planned_posts = planned_posts
+                        except Exception as plan_err:
+                            st.error(f"Planning failed: {plan_err}")
+                            st.session_state.ac_planned_posts = []
+
+            # Preview Table + Queue All
+            if "ac_planned_posts" in st.session_state and st.session_state.ac_planned_posts:
+                posts = st.session_state.ac_planned_posts
+                st.success(f"✅ {len(posts)} posts planned. Review below then queue them all.")
+
+                import pandas as pd
+                preview_df = pd.DataFrame([{
+                    "#": p["post_number"],
+                    "Name": p["name"],
+                    "Character": p["character"],
+                    "Vibe / Scenario": p["vibe"],
+                    "Outfit": p["outfit"][:40] + "..." if len(p.get("outfit", "")) > 40 else p.get("outfit", ""),
+                    "Ratio": p["aspect_ratio"],
+                    "Day": p["day_of_week"]
+                } for p in posts])
+                st.dataframe(preview_df, use_container_width=True, hide_index=True)
+
+                if st.button("⚡ Queue All", type="primary", key="ac_queue_all"):
+                    from execution.plan_campaign import build_campaign_job
+                    queued_count = 0
+                    username_ac = st.session_state.current_user.get("username", "guest")
+                    out_dir_ac = get_user_out_dir("Campaign")
+                    for post_plan in posts:
+                        job_kwargs = build_campaign_job(post_plan, out_dir_ac, username_ac)
+                        campaign_mgr.add_job(**job_kwargs)
+                        queued_count += 1
+                    st.session_state.ac_planned_posts = []
+                    st.success(f"✅ {queued_count} jobs added to the queue!")
+                    st.rerun()
+        # ────────────────────────────────────────────────────────────────────
     
         # 2. Controls - Auto-Advancing with Stop Capability
         if "campaign_running" not in st.session_state:
@@ -2646,6 +2715,143 @@ if selection == "Campaign Queue":
                 if st.button("DEL", key=f"del_job_{i}", help="Delete this task"):
                     campaign_mgr.remove_job(i)
                     st.rerun()
+
+# ==========================================
+# ==========================================
+# TAB: ART DIRECTOR (NL Brief + Voice Dictation)
+# ==========================================
+if selection == "Art Director":
+    with st.container():
+        st.markdown("### 🎨 Art Director")
+        st.markdown(
+            "Describe the shot you want in plain language — or record your brief with your voice. "
+            "The AI maps your words to your assets and generates the image."
+        )
+
+        # ── Voice Dictation ─────────────────────────────────────────────────
+        st.markdown("#### 🎙️ Speak Your Brief (Optional)")
+        try:
+            ad_audio = st.audio_input("Hold to record, release to transcribe", key="ad_audio_input")
+            if ad_audio is not None:
+                with st.spinner("Transcribing..."):
+                    try:
+                        from execution.transcribe_voice import transcribe_voice
+                        audio_bytes = ad_audio.read()
+                        transcription = transcribe_voice(audio_bytes)
+                        if transcription:
+                            st.session_state.ad_brief = transcription
+                            st.success(f'🎙️ I heard: *"{transcription}"*')
+                        else:
+                            st.warning("No audio detected — please try again or type your brief below.")
+                    except Exception as voice_err:
+                        st.warning(f"Transcription unavailable: {voice_err}")
+        except Exception:
+            st.caption("🎙️ Mic not available in this browser — type your brief below.")
+
+        # ── Text Brief ──────────────────────────────────────────────────────
+        st.markdown("#### ✏️ Your Brief")
+        ad_brief_val = st.session_state.get("ad_brief", "")
+        ad_brief = st.text_area(
+            "Describe the shot",
+            value=ad_brief_val,
+            placeholder="e.g. moody rooftop bar at night, Shay in a sleek black dress, editorial and cinematic",
+            height=100,
+            key="ad_brief_input"
+        )
+        # Keep session state in sync
+        st.session_state.ad_brief = ad_brief
+
+        ad_parse_btn = st.button("🧠 Parse Brief", type="primary", key="ad_parse_btn")
+
+        if ad_parse_btn:
+            if not ad_brief.strip():
+                st.warning("Please enter a brief or record your voice.")
+            else:
+                with st.spinner("Mapping brief to your assets..."):
+                    try:
+                        from execution.parse_intent import parse_intent
+                        parsed = parse_intent(ad_brief.strip())
+                        st.session_state.ad_parsed = parsed
+                    except Exception as parse_err:
+                        st.error(f"Parsing failed: {parse_err}")
+                        st.session_state.ad_parsed = None
+
+        # ── Parsed Result + Confirm ──────────────────────────────────────────
+        if "ad_parsed" in st.session_state and st.session_state.ad_parsed:
+            parsed = st.session_state.ad_parsed
+            confidence = parsed.get("confidence", "low")
+            conf_icon = {"high": "✅", "medium": "⚠️", "low": "❓"}.get(confidence, "❓")
+
+            st.markdown(f"#### {conf_icon} Parsed Brief — Confidence: `{confidence.upper()}`")
+            st.info(
+                "Review and edit any field before generating. "
+                "Fields are pre-filled from your brief — adjust if needed."
+            )
+
+            ad_col1, ad_col2 = st.columns(2)
+            with ad_col1:
+                ad_char_resolved = parsed.get("character", "Shay")
+                # Try to match to known character list
+                char_match = next(
+                    (k for k, v in characters_data.items()
+                     if (isinstance(v, dict) and v.get("name", "").lower() == ad_char_resolved.lower())
+                     or k.lower() == ad_char_resolved.lower()),
+                    None
+                )
+                char_idx = characters_list.index(char_match) if char_match and char_match in characters_list else 0
+                ad_char_sel = st.selectbox("Character", characters_list, index=char_idx, key="ad_char_sel")
+                ad_outfit_edit = st.text_input("Outfit", value=parsed.get("outfit", ""), key="ad_outfit_edit")
+
+            with ad_col2:
+                ad_vibe_edit = st.text_input("Vibe / Scenario", value=parsed.get("vibe", ""), key="ad_vibe_edit")
+                ad_ratio = st.selectbox(
+                    "Aspect Ratio",
+                    ["9:16", "1:1", "16:9"],
+                    index=["9:16", "1:1", "16:9"].index(parsed.get("aspect_ratio", "9:16")),
+                    key="ad_ratio"
+                )
+
+            ad_notes = st.text_input(
+                "Additional Notes",
+                value=parsed.get("additional_notes", ""),
+                placeholder="Extra mood, lighting, or style direction",
+                key="ad_notes"
+            )
+
+            st.divider()
+            ad_gen_btn = st.button("🎬 Generate Image", type="primary", key="ad_gen_btn", use_container_width=True)
+
+            if ad_gen_btn:
+                char_val = characters_data.get(ad_char_sel, {})
+                char_path = char_val.get("default_img") if isinstance(char_val, dict) else None
+
+                with st.spinner("Crafting prompt and generating image..."):
+                    try:
+                        prompt_data = generate_prompt_content(
+                            vibe=ad_vibe_edit or ad_notes,
+                            outfit=ad_outfit_edit,
+                            character=char_path or ad_char_sel,
+                            additional_notes=ad_notes,
+                            aspect_ratio=ad_ratio
+                        )
+
+                        out_dir_ad = get_user_out_dir("ArtDirector")
+                        result = generate_image_from_prompt(
+                            prompt_data,
+                            output_folder=out_dir_ad,
+                            reference_image_path=char_path
+                        )
+
+                        if result.get("status") == "success":
+                            st.image(result["image_path"], use_container_width=True)
+                            st.success("Image generated successfully!")
+                            # Reset parsed state after success
+                            st.session_state.ad_parsed = None
+                            st.session_state.ad_brief = ""
+                        else:
+                            st.error(f"Generation failed: {result.get('logs', 'Unknown error')}")
+                    except Exception as gen_err:
+                        st.error(f"Error during generation: {gen_err}")
 
 # ==========================================
 # ==========================================
