@@ -2942,9 +2942,9 @@ if selection == "Art Director":
                             ex_outfit_key = st.text_input(f"Outfit", key=f"ad_extra_outfit_text_{idx}")
                         extra_cast_outfits[char_key] = ex_outfit_key
 
-            # ── Vibe, Ratio, Notes ──────────────────────────────────────────
+            # ── Vibe, Ratio, Resolution, Notes ──────────────────────────────
             st.markdown("##### 🌆 Scene Details")
-            sd_col1, sd_col2 = st.columns(2)
+            sd_col1, sd_col2, sd_col3 = st.columns([3, 2, 2])
             with sd_col1:
                 ad_vibe_edit = st.text_input("Vibe / Scenario", value=parsed.get("vibe", ""), key="ad_vibe_edit")
             with sd_col2:
@@ -2953,6 +2953,14 @@ if selection == "Art Director":
                     ["9:16", "1:1", "16:9"],
                     index=["9:16", "1:1", "16:9"].index(parsed.get("aspect_ratio", "9:16")),
                     key="ad_ratio"
+                )
+            with sd_col3:
+                ad_resolution = st.selectbox(
+                    "Resolution",
+                    ["1K", "2K", "4K", "512px"],
+                    index=0,
+                    key="ad_resolution",
+                    help="512px = fast draft • 1K = standard • 2K/4K = high quality (slower)"
                 )
 
             ad_notes = st.text_input(
@@ -3006,6 +3014,8 @@ if selection == "Art Director":
                             aspect_ratio=ad_ratio,
                             extra_images=ad_extra_images if ad_extra_images else None
                         )
+                        # Inject resolution into prompt_data so generate_image picks it up
+                        prompt_data["image_size"] = ad_resolution
 
                         out_dir_ad = get_user_out_dir("ArtDirector")
                         result = generate_image_from_prompt(
