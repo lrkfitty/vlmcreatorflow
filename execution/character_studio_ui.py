@@ -108,7 +108,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             
             # 2. Output Mode
             st.markdown("**2. Output Format**")
-            output_mode = st.selectbox("Generation Mode", ["Concept Portrait (Vertical)", "Character Sheet (7-Angle Views)"])
+            output_mode = st.selectbox("Generation Mode", ["Concept Portrait (Vertical)", "Character Sheet (5 Angles - Vertical)"])
             
             st.divider()
             
@@ -379,7 +379,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 
                 base_prompt = build_character_prompt(attrs)
                 
-                if output_mode == "Character Sheet (7-Angle Views)":
+                if output_mode == "Character Sheet (5 Angles - Vertical)":
                     full_prompt = get_character_sheet_prompt(base_prompt)
                     ar = "4:5" # User requested 4:5 for all Studio generations
                     target_w, target_h = 896, 1152
@@ -419,7 +419,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                              "positive_prompt": full_prompt,
                              "width": target_w, "height": target_h,
                              "aspect_ratio": ar,
-                             "image_size": "1K",
+                             "image_size": "4K",
                              "model_type": "nano",
                              "assets": assets
                         },
@@ -517,29 +517,30 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             
             if attrs and lock_path:
                 # Re-import not needed as we imported at top
-                base_prompt = build_character_prompt(attrs)
-                full_prompt = get_character_sheet_prompt(base_prompt)
-                target_w, target_h = 1344, 768
-                
-                user = st.session_state.current_user.get("username")
-                if auth_mgr.deduct_credits(user, 1):
-                    prog_ph = st.empty()
-                    # from execution.magic_ui import circular_progress
-                    with prog_ph.container():
-                         circular_progress()
-                         st.caption("Creating in Studio...")
-                         
-                    assets = [{
-                        "path": lock_path,
-                        "label": f"Cast: {char_name or 'Main'}"
-                    }]
-                    payload = {
-                        "positive_prompt": full_prompt,
-                        "width": target_w, "height": target_h,
-                        "image_size": "4K",
-                        "model_type": "nano",
-                        "assets": assets
-                    }
+                    base_prompt = build_character_prompt(attrs)
+                    full_prompt = get_character_sheet_prompt(base_prompt)
+                    target_w, target_h = 896, 1152  # 4:5 vertical
+                    
+                    user = st.session_state.current_user.get("username")
+                    if auth_mgr.deduct_credits(user, 1):
+                        prog_ph = st.empty()
+                        # from execution.magic_ui import circular_progress
+                        with prog_ph.container():
+                             circular_progress()
+                             st.caption("Creating in Studio...")
+                             
+                        assets = [{
+                            "path": lock_path,
+                            "label": f"Cast: {char_name or 'Main'}"
+                        }]
+                        payload = {
+                            "positive_prompt": full_prompt,
+                            "width": target_w, "height": target_h,
+                            "aspect_ratio": "4:5",
+                            "image_size": "4K",
+                            "model_type": "nano",
+                            "assets": assets
+                        }
                     res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
                     if res["status"] == "success":
                         st.session_state['char_preview'] = res['image_path']
