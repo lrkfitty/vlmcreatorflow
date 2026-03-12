@@ -564,6 +564,29 @@ def render_multishot_ui(get_user_out_dir_func):
     
     st.divider()
     
+    # --- Fidelity / Likeness ---
+    st.markdown("**🎯 Identity Fidelity**")
+    likeness_val = st.slider(
+        "Likeness Strength",
+        min_value=0, max_value=100, value=80, step=5,
+        key="ms_likeness",
+        help="How strictly the model must match the reference face."
+    )
+    # Tier label
+    if likeness_val >= 90:
+        fidelity_label = "🔴 **Ultra** — Face clone, zero deviation allowed"
+    elif likeness_val >= 80:
+        fidelity_label = "🟠 **High** — Strong identity lock on facial structure"
+    elif likeness_val >= 60:
+        fidelity_label = "🟡 **Medium** — Strong resemblance, some creative latitude"
+    elif likeness_val >= 40:
+        fidelity_label = "🟢 **Low** — Inspired by the reference, loose match"
+    else:
+        fidelity_label = "⚪ **None** — No identity constraints, fully creative"
+    st.caption(fidelity_label)
+
+    st.divider()
+
     # --- Generate Button (minimal form) ---
     with st.form("multishot_form"):
         col_q, col_gen = st.columns([1, 2])
@@ -596,6 +619,35 @@ def render_multishot_ui(get_user_out_dir_func):
             )
             if additional_prompt:
                 base_prompt += f", {additional_prompt}"
+
+            # --- Inject fidelity tokens (same tiers as Character Creator) ---
+            likeness = st.session_state.get("ms_likeness", 80)
+            if likeness >= 90:
+                base_prompt += (
+                    ", (ultra-high fidelity face match:1.6), (DO NOT deviate from reference face:1.5), "
+                    "(identical face to reference:1.5), (exact same person:1.5), "
+                    "(preserve facial features exactly:1.4), (same bone structure:1.4), "
+                    "(same nose shape:1.4), (same jawline:1.4), (same eye shape:1.4), "
+                    "(same skin tone:1.3), (same brow shape:1.3), "
+                    "(photographic identity match:1.5), DO NOT alter facial features, "
+                    "(face clone:1.4)"
+                )
+            elif likeness >= 80:
+                base_prompt += (
+                    ", (identical face to reference:1.5), (exact same person:1.5), "
+                    "(preserve facial features exactly:1.4), (same bone structure:1.3), "
+                    "(same nose shape:1.3), (same jawline:1.3), (same eye shape:1.3), "
+                    "(photographic identity match:1.4), DO NOT alter facial features"
+                )
+            elif likeness >= 60:
+                base_prompt += (
+                    ", (strong resemblance to reference:1.4), (same face:1.4), "
+                    "(preserve key facial features:1.3), (similar bone structure:1.3), "
+                    "(match skin tone:1.2), (match eye shape:1.2)"
+                )
+            elif likeness >= 40:
+                base_prompt += ", (inspired by reference:1.2), similar features to reference, (match overall look:1.1)"
+            # Below 40: no identity constraints
             
             # Build common asset list — main ref + face identity locks + char/outfit library refs
             def build_assets_list(start_frame_path, label="Main Character (SOURCE OF TRUTH — match outfit, pose, environment)"):
