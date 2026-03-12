@@ -18,6 +18,18 @@ def render_multishot_ui(get_user_out_dir_func):
     Args:
         get_user_out_dir_func: Function to get user output directory
     """
+    # ── Session state migration: clear stale dropdown keys from old names ──
+    stale_mode = st.session_state.get("multishot_mode_select", "")
+    if stale_mode not in [
+        "Character Sheet (5 Angles - Vertical)",
+        "Individual Shots (Batch)",
+        "Single Custom Angle",
+        "End Frame Generator",
+        "Cinematic Coverage (Scene)",
+        ""
+    ]:
+        del st.session_state["multishot_mode_select"]
+
     st.markdown("### Multi-Shot Reference Generator")
     st.info("Upload a character reference and generate multiple angles for consistency across your content.")
     
@@ -497,14 +509,17 @@ def render_multishot_ui(get_user_out_dir_func):
     
     st.divider()
     
-    # --- Face Likeness Reference Uploads ---
-    st.markdown("**🔒 Face Likeness References (Optional but Recommended)**")
-    st.caption("Upload 1–5 photos of the character's face from different angles. These are used STRICTLY for identity locking — the model will fuse them into a single face composite and match it across all generated angles.")
+    # --- Additional Reference Images ---
+    st.markdown("**🔒 Additional Reference Images (Up to 13)**")
+    st.caption(
+        "Upload up to 13 additional photos of the character — different angles, lighting, outfits, or facial close-ups. "
+        "More references = stronger character identity lock across all generated panels."
+    )
     face_ref_uploads = st.file_uploader(
-        "Face Reference Images",
+        "Additional Reference Images",
         type=['png', 'jpg', 'jpeg'],
         accept_multiple_files=True,
-        help="Close-up face shots, headshots, or face-forward photos. More references = more accurate likeness.",
+        help="Any photos that show the character: face close-ups, 3/4 views, body shots, etc.",
         key="multishot_face_refs"
     )
     
@@ -512,33 +527,40 @@ def render_multishot_ui(get_user_out_dir_func):
     temp_face_ref_dir = os.path.join("output", "temp_face_refs")
     os.makedirs(temp_face_ref_dir, exist_ok=True)
     face_ref_paths = []
+    MAX_REFS = 13
     
     if face_ref_uploads:
+        # Cap to 13
+        face_ref_uploads = face_ref_uploads[:MAX_REFS]
+        if len(face_ref_uploads) > MAX_REFS:
+            st.warning(f"Only the first {MAX_REFS} images will be used.")
         # Clear old refs
         import glob
         for old in glob.glob(os.path.join(temp_face_ref_dir, "face_ref_*.png")):
             try: os.remove(old)
             except: pass
         
-        cols = st.columns(min(len(face_ref_uploads), 5))
+        cols = st.columns(min(len(face_ref_uploads), 7))
         for idx, face_file in enumerate(face_ref_uploads):
             fpath = os.path.join(temp_face_ref_dir, f"face_ref_{idx}.png")
             with open(fpath, "wb") as f:
                 f.write(face_file.getbuffer())
             face_ref_paths.append(fpath)
-            with cols[idx % 5]:
-                st.image(face_file, caption=f"Face Ref {idx+1}", use_container_width=True)
+            with cols[idx % 7]:
+                st.image(face_file, caption=f"Ref {idx+1}", use_container_width=True)
         st.session_state["multishot_face_ref_count"] = len(face_ref_paths)
+        st.caption(f"✅ {len(face_ref_paths)} reference image(s) loaded")
     elif st.session_state.get("multishot_face_ref_count", 0) > 0:
         # Reload saved refs
         import glob
         saved = sorted(glob.glob(os.path.join(temp_face_ref_dir, "face_ref_*.png")))
         face_ref_paths = saved
         if saved:
-            cols = st.columns(min(len(saved), 5))
+            cols = st.columns(min(len(saved), 7))
             for idx, fp in enumerate(saved):
-                with cols[idx % 5]:
-                    st.image(fp, caption=f"Face Ref {idx+1}", use_container_width=True)
+                with cols[idx % 7]:
+                    st.image(fp, caption=f"Ref {idx+1}", use_container_width=True)
+            st.caption(f"✅ {len(saved)} reference image(s) loaded")
     
     st.divider()
     
