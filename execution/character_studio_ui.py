@@ -119,6 +119,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 angle_opts = [
                     "Front View", "Side View (Left)", "Side View (Right)",
                     "3/4 View (Left)", "3/4 View (Right)", "Back View",
+                    "Close Up (Face)", "Extreme Close Up",
                     "Over Shoulder", "Low Angle", "High Angle"
                 ]
                 selected_angles = st.multiselect(
