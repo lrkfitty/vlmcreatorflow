@@ -994,7 +994,7 @@ if selection == "Workflow Wizard":
                 "Characters",
                 char_carousel_data,
                 state_key="wiz_char",
-                thumb_cols=5,
+                thumb_cols=3,
                 show_label=False
             )
 
@@ -1006,7 +1006,7 @@ if selection == "Workflow Wizard":
                     "Outfits",
                     outfit_carousel_data,
                     state_key="wiz_outfit",
-                    thumb_cols=5,
+                    thumb_cols=3,
                     show_label=False
                 )
 
@@ -1628,7 +1628,7 @@ if selection == "World Builder":
                         "Select Protagonist",
                         wb_char_opts,
                         state_key="wb_protag",
-                        thumb_cols=4,
+                        thumb_cols=3,
                         show_label=True
                     )
 
@@ -1678,7 +1678,7 @@ if selection == "World Builder":
                         "Select Outfit",
                         {"None": None, **fit_opts},
                         state_key="wb_outfit_main",
-                        thumb_cols=4,
+                        thumb_cols=3,
                         show_label=False
                     )
                     

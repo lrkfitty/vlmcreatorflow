@@ -136,6 +136,10 @@ def load_assets(base_path="assets", user_assets_dir=None, skip_base=False, targe
     
             for rel_path in manifest:
                 # manifest path: "AI Content Creators/Category/Sub/File.png"
+                # Skip ui_icons files — never load them as assets
+                if "ui_icons" in rel_path.lower() or "/icons/" in rel_path.lower():
+                    continue
+                
                 parts = rel_path.split("/")
                 
                 # Skip root if present
@@ -395,7 +399,8 @@ def load_assets(base_path="assets", user_assets_dir=None, skip_base=False, targe
             "Environments", "Influencer CLothing ", "Influencer CLothing", 
             "Random Influencer Models", "Vibes", "Outfits", "Characters",
             "Friends", "Pets", "Props", "Vehicles", "Foods", ".DS_Store",
-            "AI Content Creators", "ai content creators", "Ai Content Creators", "Assets"
+            "AI Content Creators", "ai content creators", "Ai Content Creators", "Assets",
+            "ui_icons", "UI_Icons", "Ui_icons", "icons", "Icons",  # Never load UI icon folders
         ]
         
         if os.path.exists(base_path):
