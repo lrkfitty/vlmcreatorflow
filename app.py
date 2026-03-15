@@ -554,7 +554,15 @@ def _gallery_zoom_dialog(src, name, is_local=False):
         with open(src, "rb") as f:
             st.download_button("⬇️ Download", data=f, file_name=name, key="dlg_dl", use_container_width=True)
     elif not is_local:
-        st.link_button("⬇️ Download", src, use_container_width=True)
+        # Use HTML link styled as a button to force download without opening a new tab
+        st.markdown(
+            f'''
+            <a href="{src}" download="{name}" style="display: block; width: 100%; border-radius: 8px; padding: 0.5rem 1rem; color: inherit; background-color: transparent; border: 1px solid rgba(250, 250, 250, 0.2); text-decoration: none; text-align: center; font-size: 16px; font-weight: 500; font-family: 'Source Sans Pro', sans-serif; box-sizing: border-box; transition: border-color 0.2s, color 0.2s;" onmouseover="this.style.borderColor='#FF4B4B'; this.style.color='#FF4B4B';" onmouseout="this.style.borderColor='rgba(250, 250, 250, 0.2)'; this.style.color='inherit';">
+                ⬇️ Download
+            </a>
+            ''',
+            unsafe_allow_html=True
+        )
 
 if selection == "My Gallery":
     with st.container():
@@ -753,7 +761,15 @@ if selection == "My Gallery":
                                 with open(item["src"], "rb") as f:
                                     st.download_button("⬇️ Save", data=f, file_name=item["name"], key=f"gal_dl_{idx}", use_container_width=True)
                             elif not is_local:
-                                st.link_button("⬇️ Save", item["src"], use_container_width=True)
+                                # Use an HTML download link styled as a button for S3 presigned URLs
+                                st.markdown(
+                                    f'''
+                                    <a href="{item['src']}" download="{item['name']}" style="display: block; width: 100%; border-radius: 8px; padding: 0.25rem 0.75rem; color: inherit; background-color: transparent; border: 1px solid rgba(250, 250, 250, 0.2); text-decoration: none; text-align: center; font-size: 14px; box-sizing: border-box; transition: border-color 0.2s, color 0.2s;" onmouseover="this.style.borderColor='#FF4B4B'; this.style.color='#FF4B4B';" onmouseout="this.style.borderColor='rgba(250, 250, 250, 0.2)'; this.style.color='inherit';">
+                                        ⬇️ Save
+                                    </a>
+                                    ''',
+                                    unsafe_allow_html=True
+                                )
 
 # ==========================================
 # TAB: ASSET LIBRARY
