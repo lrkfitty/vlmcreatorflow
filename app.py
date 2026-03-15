@@ -240,8 +240,9 @@ try:
     # V4.1: Cached Loading (Performance Fix)
     # V4.2: Split Caching (Ultra Performance)
     # 1. Base Assets (Persisted to Disk, Updates Hourly or Manual)
+    # V4.3: Renamed to get_global_assets to force hard cache bust of old stale ui_icons
     @st.cache_data(ttl=3600, persist="disk", show_spinner="Loading Global Catalog...")
-    def get_base_assets():
+    def get_global_assets():
         return load_assets(user_assets_dir=None, skip_base=False)
 
     # 2. User Assets (Session Cache, Fast, Updates often)
@@ -251,7 +252,7 @@ try:
         return load_assets(user_assets_dir=user_path, skip_base=True, target_username=username)
 
     # Load & Merge
-    base_assets = get_base_assets()
+    base_assets = get_global_assets()
     user_assets_raw = get_user_assets(user_asset_path, username) if user_asset_path else {} # Return empty dict structure
 
     # Deep Merge (Naive update overwrites dicts, we need to merge keys within categories)
