@@ -14,6 +14,8 @@ try:
     import load_assets as la_module
     importlib.reload(la_module)
     from load_assets import load_assets, promote_image_to_asset
+    import execution.magic_ui as magic_ui_module
+    importlib.reload(magic_ui_module)
     from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button, icon_grid_selector, thumbnail_carousel, fidelity_mode_selector
     import generate_image as gi_module
     importlib.reload(gi_module)
