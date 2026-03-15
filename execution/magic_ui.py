@@ -784,24 +784,20 @@ def thumbnail_carousel(label, items_dict, state_key, thumb_cols=5, show_label=Tr
                           <div style="font-size:0.65rem;font-weight:700;color:#CBD5E1;padding:3px 4px 2px;">{star}{short}</div>
                         </div>""", unsafe_allow_html=True)
                     except Exception:
-                        icon = "⭐" if is_celeb else "👤"
                         st.markdown(f"""
                         <div style="border-radius:12px;border:2px solid {border_col};box-shadow:{shadow};
                                     transform:{scale};background:rgba(15,23,42,0.7);text-align:center;
                                     aspect-ratio:1;display:flex;flex-direction:column;align-items:center;
-                                    justify-content:center;gap:4px;">
-                          <span style="font-size:1.8rem;">{icon}</span>
-                          <div style="font-size:0.65rem;font-weight:700;color:#CBD5E1;">{star}{short}</div>
+                                    justify-content:center;padding:8px;">
+                          <div style="font-size:0.7rem;font-weight:700;color:#94A3B8;word-break:break-word;">{star}{short}</div>
                         </div>""", unsafe_allow_html=True)
                 else:
-                    icon = "⭐" if is_celeb else "👤"
                     st.markdown(f"""
                     <div style="border-radius:12px;border:2px solid {border_col};box-shadow:{shadow};
                                 transform:{scale};background:rgba(15,23,42,0.7);text-align:center;
                                 aspect-ratio:1;display:flex;flex-direction:column;align-items:center;
-                                justify-content:center;gap:4px;padding:8px;">
-                      <span style="font-size:1.8rem;">{icon}</span>
-                      <div style="font-size:0.65rem;font-weight:700;color:#CBD5E1;">{star}{short}</div>
+                                justify-content:center;padding:8px;">
+                      <div style="font-size:0.7rem;font-weight:700;color:#94A3B8;word-break:break-word;">{star}{short}</div>
                     </div>""", unsafe_allow_html=True)
 
                 # Clickable select button below the visual card
