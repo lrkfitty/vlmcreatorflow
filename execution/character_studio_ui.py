@@ -707,6 +707,14 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             # Show prominent preview for the first image
             first = batch[0]
             st.image(first['path'], caption=f"{char_name} - {first['angle']}", use_container_width=True)
+            with open(first['path'], "rb") as f:
+                st.download_button(
+                    label="⬇️ Download",
+                    data=f,
+                    file_name=f"{char_name}_{first['angle'].replace(' ', '_').lower()}.jpg",
+                    mime="image/jpeg",
+                    key="dl_batch_main"
+                )
             
             # Show the rest below in columns
             if len(batch) > 1:
@@ -715,10 +723,28 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 for i, item in enumerate(batch[1:]):
                     with cols[i % len(cols)]:
                          st.image(item['path'], caption=item['angle'], use_container_width=True)
+                         with open(item['path'], "rb") as f:
+                             st.download_button(
+                                 label="⬇️ Download",
+                                 data=f,
+                                 file_name=f"{char_name}_{item['angle'].replace(' ', '_').lower()}.jpg",
+                                 mime="image/jpeg",
+                                 key=f"dl_batch_{i}"
+                             )
                          
         elif 'char_preview' in st.session_state:
             preview_path = st.session_state['char_preview']
             st.image(preview_path, caption="Concept Preview", use_container_width=True)
+            
+            with open(preview_path, "rb") as f:
+                st.download_button(
+                    label="⬇️ Download Image",
+                    data=f,
+                    file_name=f"{char_name}_concept.jpg",
+                    mime="image/jpeg",
+                    key="dl_single_preview"
+                )
+                
             # Save Actions
             c_save, c_sheet = st.columns(2)
             with c_save:
