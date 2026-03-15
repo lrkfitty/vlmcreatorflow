@@ -108,7 +108,24 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             
             # 2. Output Mode
             st.markdown("**2. Output Format**")
-            output_mode = st.selectbox("Generation Mode", ["Concept Portrait (Vertical)", "Character Sheet (5 Angles - Vertical)"])
+            output_mode = st.selectbox("Generation Mode", [
+                "Concept Portrait (Vertical)", 
+                "Character Sheet (5 Angles - Vertical)",
+                "Individual Shots (Batch)"
+            ])
+            
+            selected_angles = []
+            if output_mode == "Individual Shots (Batch)":
+                angle_opts = [
+                    "Front View", "Side View (Left)", "Side View (Right)",
+                    "3/4 View (Left)", "3/4 View (Right)", "Back View",
+                    "Over Shoulder", "Low Angle", "High Angle"
+                ]
+                selected_angles = st.multiselect(
+                    "Select Angles to Generate",
+                    angle_opts,
+                    default=["Front View", "Side View (Left)", "3/4 View (Left)", "Back View"]
+                )
             
             st.divider()
             
@@ -255,7 +272,15 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 st.markdown("**Eyes**")
                 c_eye = st.selectbox("Eye Color", ["Any", "Blue", "Green", "Brown", "Hazel", "Grey", "Amber", "Heterochromia (Two Colors)"])
                 
+
+                
                 st.divider()
+                
+                # Skin
+                c_skin = st.multiselect("Skin Details", ["Freckles", "Beauty Marks", "Moles", "Vitiligo", "Scarring", "Acne", "Perfect Skin", "Textured Skin", "Wrinkles", "Dimples"])
+
+            with st.expander("✒️ Tattoos & Body Art", expanded=False):
+                st.caption("Apply contextual tattoos, ink styles, and define sleeve and placement mapping.")
                 
                 # Tattoos — Granular Controls
                 st.markdown("**Tattoos**")
@@ -263,30 +288,17 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 tat_col1, tat_col2 = st.columns(2)
                 with tat_col1:
                     c_tat_style = st.selectbox("Art Style", [
-                        "None",
-                        "Minimalist / Fine Line",
-                        "Traditional American",
-                        "Neo-Traditional",
-                        "Japanese / Irezumi",
-                        "Tribal",
-                        "Geometric",
-                        "Blackwork / Dotwork",
-                        "Watercolor",
-                        "Realism / Portrait",
-                        "Chicano / Black & Grey",
-                        "New School",
-                        "Henna / Mehndi",
-                        "Script / Lettering",
-                        "Ignorant Style",
-                        "Biomechanical",
+                        "None", "Minimalist / Fine Line", "Traditional American",
+                        "Neo-Traditional", "Japanese / Irezumi", "Tribal",
+                        "Geometric", "Blackwork / Dotwork", "Watercolor",
+                        "Realism / Portrait", "Chicano / Black & Grey", "New School",
+                        "Henna / Mehndi", "Script / Lettering", "Ignorant Style", "Biomechanical"
                     ])
                     
                     if c_tat_style != "None":
                         c_tat_coverage = st.selectbox("Coverage / Density", [
-                            "Light (a few small pieces)",
-                            "Moderate (scattered pieces)",
-                            "Heavy (large coverage)",
-                            "Very Heavy (nearly filled)",
+                            "Light (a few small pieces)", "Moderate (scattered pieces)",
+                            "Heavy (large coverage)", "Very Heavy (nearly filled)"
                         ])
                     else:
                         c_tat_coverage = "None"
@@ -294,58 +306,29 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 with tat_col2:
                     if c_tat_style != "None":
                         c_sleeve_style = st.selectbox("Sleeve Style", [
-                            "None",
-                            "Quarter Sleeve (shoulder cap)",
-                            "Half Sleeve (upper arm)",
-                            "Half Sleeve (forearm)",
-                            "Three-Quarter Sleeve",
-                            "Full Sleeve (one arm)",
-                            "Full Sleeve (both arms)",
-                            "Leg Sleeve (one leg)",
-                            "Leg Sleeve (both legs)",
-                            "Body Suit (full torso + arms)",
+                            "None", "Quarter Sleeve (shoulder cap)", "Half Sleeve (upper arm)",
+                            "Half Sleeve (forearm)", "Three-Quarter Sleeve", "Full Sleeve (one arm)",
+                            "Full Sleeve (both arms)", "Leg Sleeve (one leg)", "Leg Sleeve (both legs)",
+                            "Body Suit (full torso + arms)"
                         ])
                         
                         tat_place_opts = [
-                            # Arms
-                            "Full Sleeve — Left Arm", "Full Sleeve — Right Arm",
-                            "Forearm — Left", "Forearm — Right",
-                            "Upper Arm — Left", "Upper Arm — Right",
-                            "Elbow (ditch) — Left", "Elbow (ditch) — Right",
-                            "Wrist — Left", "Wrist — Right",
-                            "Hands", "Fingers / Knuckles",
-                            # Chest & Torso
-                            "Chest — Left Pec", "Chest — Right Pec", "Full Chest Panel",
-                            "Sternum / Underboob",
-                            "Stomach / Abs (upper)", "Lower Stomach / Below Navel", "Full Stomach",
-                            "Ribs / Side — Left", "Ribs / Side — Right",
-                            # Back
-                            "Upper Back", "Full Back", "Lower Back", "Spine / Backbone",
-                            "Traps", "Shoulders",
-                            # Neck & Head
-                            "Neck — Front", "Neck — Side Left", "Neck — Side Right",
-                            "Behind Ear — Left", "Behind Ear — Right",
-                            "Face — Minimal (teardrop / small)",
-                            "Face — Heavy Coverage",
-                            "Scalp / Head",
-                            # Legs
-                            "Full Leg — Left", "Full Leg — Right",
-                            "Thigh — Left", "Thigh — Right",
-                            "Knee (kneecap)",
-                            "Shin / Calf — Left", "Shin / Calf — Right",
-                            "Ankles", "Feet / Top of Foot", "Sole / Bottom of Foot",
-                            # Full Body
-                            "Full Body Coverage",
+                            "Full Sleeve — Left Arm", "Full Sleeve — Right Arm", "Forearm — Left", "Forearm — Right",
+                            "Upper Arm — Left", "Upper Arm — Right", "Elbow (ditch) — Left", "Elbow (ditch) — Right",
+                            "Wrist — Left", "Wrist — Right", "Hands", "Fingers / Knuckles",
+                            "Chest — Left Pec", "Chest — Right Pec", "Full Chest Panel", "Sternum / Underboob",
+                            "Stomach / Abs (upper)", "Lower Stomach / Below Navel", "Full Stomach", "Ribs / Side — Left", "Ribs / Side — Right",
+                            "Upper Back", "Full Back", "Lower Back", "Spine / Backbone", "Traps", "Shoulders",
+                            "Neck — Front", "Neck — Side Left", "Neck — Side Right", "Behind Ear — Left", "Behind Ear — Right",
+                            "Face — Minimal (teardrop / small)", "Face — Heavy Coverage", "Scalp / Head",
+                            "Full Leg — Left", "Full Leg — Right", "Thigh — Left", "Thigh — Right", "Knee (kneecap)",
+                            "Shin / Calf — Left", "Shin / Calf — Right", "Ankles", "Feet / Top of Foot", "Sole / Bottom of Foot",
+                            "Full Body Coverage"
                         ]
                         c_tat_place = st.multiselect("Placement", tat_place_opts)
                     else:
                         c_sleeve_style = "None"
                         c_tat_place = []
-                
-                st.divider()
-                
-                # Skin
-                c_skin = st.multiselect("Skin Details", ["Freckles", "Beauty Marks", "Moles", "Vitiligo", "Scarring", "Acne", "Perfect Skin", "Textured Skin", "Wrinkles", "Dimples"])
 
             with st.expander("💍 Accessories & Jewelry", expanded=False):
                 st.caption("Add earrings, piercings, necklaces, watches, rings, and bracelets")
@@ -607,50 +590,118 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 else:
                     # SYNC MODE
                     user = st.session_state.current_user.get("username")
-                    if auth_mgr.deduct_credits(user, 1):
-                        with st.spinner("Creating Character in Studio..."):
-                             # Build multi-reference asset list
-                             import tempfile
-                             assets = []
-                             for i, uploaded_ref in enumerate(ref_imgs or []):
-                                 tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
-                                 tmp.write(uploaded_ref.getbuffer())
-                                 tmp.flush()
-                                 assets.append({"path": tmp.name, "label": f"Cast: {char_name or 'Main'} (Ref {i+1})"})
-                             # Library identity lock (fallback)
-                             if not assets and st.session_state.get("lock_identity_path"):
-                                 assets.append({
-                                     "path": st.session_state["lock_identity_path"],
-                                     "label": f"Cast: {char_name or 'Main'}"
-                                 })
-                             
-                             # Payload
-                             payload = {
-                                 "positive_prompt": full_prompt,
-                                 "width": target_w, "height": target_h,
-                                 "aspect_ratio": ar,
-                                 "image_size": "4K",
-                                 "model_type": "nano",
-                                 "assets": assets
-                             }
-                             
-                             res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
-                             
-                             if res["status"] == "success":
-                                 st.session_state['char_preview'] = res['image_path']
-                                 st.session_state['char_final_prompt'] = full_prompt
-                                 st.toast("Character Generated!")
-                             else:
-                                 auth_mgr.add_credits(user, 1) # Refund
-                                 st.error(f"Failed: {res.get('logs')}")
+                    
+                    if output_mode == "Individual Shots (Batch)":
+                        if not selected_angles:
+                            st.error("Please select at least one angle.")
+                        else:
+                            total_credits = len(selected_angles)
+                            if auth_mgr.deduct_credits(user, total_credits):
+                                st.session_state['char_batch_results'] = []
+                                # Clear single preview
+                                if 'char_preview' in st.session_state:
+                                    del st.session_state['char_preview']
+                                
+                                import tempfile
+                                assets = []
+                                for i, uploaded_ref in enumerate(ref_imgs or []):
+                                    tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
+                                    tmp.write(uploaded_ref.getbuffer())
+                                    tmp.flush()
+                                    assets.append({"path": tmp.name, "label": f"Cast: IdentityLock (Ref {i+1})"})
+                                if not assets and st.session_state.get("lock_identity_path"):
+                                    assets.append({"path": st.session_state["lock_identity_path"], "label": f"Cast: {char_name or 'Main'}"})
+                                
+                                for angle in selected_angles:
+                                    with st.spinner(f"Generating angle: {angle}..."):
+                                        angle_prompt = f"{base_prompt}, {angle.lower()}, professional photography"
+                                        payload = {
+                                            "positive_prompt": angle_prompt,
+                                            "width": target_w, "height": target_h,
+                                            "aspect_ratio": ar,
+                                            "image_size": "4K",
+                                            "model_type": "nano",
+                                            "assets": assets
+                                        }
+                                        res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
+                                        if res["status"] == "success":
+                                            st.session_state['char_batch_results'].append({
+                                                "angle": angle,
+                                                "path": res['image_path']
+                                            })
+                                            st.toast(f"✅ {angle} complete!")
+                                        else:
+                                            auth_mgr.add_credits(user, 1)  # Refund
+                                            st.error(f"{angle} failed: {res.get('logs')}")
+                                
+                                st.success("✅ Batch generation complete!")
+                            else:
+                                st.error(f"Need {total_credits} credits for this batch.")
+                                
                     else:
-                        st.error("Not enough credits.")
+                        if auth_mgr.deduct_credits(user, 1):
+                            with st.spinner("Creating Character in Studio..."):
+                                 # Clear batch results if standard creation
+                                 if 'char_batch_results' in st.session_state:
+                                     del st.session_state['char_batch_results']
+                                     
+                                 # Build multi-reference asset list
+                                 import tempfile
+                                 assets = []
+                                 for i, uploaded_ref in enumerate(ref_imgs or []):
+                                     tmp = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg')
+                                     tmp.write(uploaded_ref.getbuffer())
+                                     tmp.flush()
+                                     assets.append({"path": tmp.name, "label": f"Cast: {char_name or 'Main'} (Ref {i+1})"})
+                                 # Library identity lock (fallback)
+                                 if not assets and st.session_state.get("lock_identity_path"):
+                                     assets.append({
+                                         "path": st.session_state["lock_identity_path"],
+                                         "label": f"Cast: {char_name or 'Main'}"
+                                     })
+                                 
+                                 # Payload
+                                 payload = {
+                                     "positive_prompt": full_prompt,
+                                     "width": target_w, "height": target_h,
+                                     "aspect_ratio": ar,
+                                     "image_size": "4K",
+                                     "model_type": "nano",
+                                     "assets": assets
+                                 }
+                                 
+                                 res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
+                                 
+                                 if res["status"] == "success":
+                                     st.session_state['char_preview'] = res['image_path']
+                                     st.session_state['char_final_prompt'] = full_prompt
+                                     st.toast("Character Generated!")
+                                 else:
+                                     auth_mgr.add_credits(user, 1) # Refund
+                                     st.error(f"Failed: {res.get('logs')}")
+                        else:
+                            st.error("Not enough credits.")
 
         # Display Result
-        if 'char_preview' in st.session_state:
+        if 'char_batch_results' in st.session_state and st.session_state['char_batch_results']:
+            st.markdown("#### Batch Generation Complete")
+            batch = st.session_state['char_batch_results']
+            
+            # Show prominent preview for the first image
+            first = batch[0]
+            st.image(first['path'], caption=f"{char_name} - {first['angle']}", use_container_width=True)
+            
+            # Show the rest below in columns
+            if len(batch) > 1:
+                st.markdown("##### Additional Angles")
+                cols = st.columns(min(len(batch)-1, 3))
+                for i, item in enumerate(batch[1:]):
+                    with cols[i % len(cols)]:
+                         st.image(item['path'], caption=item['angle'], use_container_width=True)
+                         
+        elif 'char_preview' in st.session_state:
             preview_path = st.session_state['char_preview']
             st.image(preview_path, caption="Concept Preview", use_container_width=True)
-            
             # Save Actions
             c_save, c_sheet = st.columns(2)
             with c_save:
