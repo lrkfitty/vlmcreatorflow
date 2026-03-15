@@ -704,20 +704,21 @@ def icon_grid_selector(label, options, icons_dir, key, cols_per_row=4):
     return selected
 
 
-def thumbnail_carousel(label, items_dict, state_key, thumb_cols=5, show_label=True):
+def thumbnail_carousel(label, items_dict, state_key, thumb_cols=3, show_label=True):
     """
-    Renders a scrollable grid of clickable thumbnail cards for character/outfit selection.
+    Paginated photo-gallery carousel — shows `thumb_cols` items at a time
+    with ◀ / ▶ navigation. Uses st.image() for local files (no base64 crash).
 
     Args:
-        label:       Section header (e.g. "Choose Character")
-        items_dict:  Dict of {display_name: value} where value is an image path/URL, 
-                     a dict with 'default_img'/'name', or None for celebrities.
-        state_key:   Session state key storing the currently selected name.
-        thumb_cols:  Number of columns per row.
-        show_label:  Whether to show the section header.
+        label:       Section header
+        items_dict:  Dict {display_name: value}  value can be a path string,
+                     a dict with 'default_img'/'name', or None.
+        state_key:   Session-state key storing the currently selected name.
+        thumb_cols:  Items visible per page (default 3).
+        show_label:  Whether to render the section header.
 
     Returns:
-        The currently selected key (display name) or None.
+        Currently selected key (display name) or None.
     """
     import os
 
@@ -728,95 +729,100 @@ def thumbnail_carousel(label, items_dict, state_key, thumb_cols=5, show_label=Tr
         st.caption("No items available.")
         return st.session_state.get(state_key)
 
-    items = list(items_dict.items())
+    items   = list(items_dict.items())
+    total   = len(items)
+    page_key = f"_tc_page_{state_key}"
+
+    if page_key not in st.session_state:
+        st.session_state[page_key] = 0
+
+    # Keep page in bounds
+    max_page = max(0, (total - 1) // thumb_cols)
+    if st.session_state[page_key] > max_page:
+        st.session_state[page_key] = max_page
+
+    page     = st.session_state[page_key]
+    start    = page * thumb_cols
+    end      = min(start + thumb_cols, total)
+    page_items = items[start:end]
+
+    # ── Navigation bar ────────────────────────────────────────────────────────
+    nav_l, nav_mid, nav_r = st.columns([1, 6, 1])
+    with nav_l:
+        if st.button("◀", key=f"_tc_prev_{state_key}", disabled=(page == 0),
+                     use_container_width=True):
+            st.session_state[page_key] -= 1
+            st.rerun()
+    with nav_mid:
+        st.caption(f"{start + 1}–{end} of {total}   |   {'✅ ' + str(st.session_state.get(state_key, '')) if st.session_state.get(state_key) else 'None selected'}")
+    with nav_r:
+        if st.button("▶", key=f"_tc_next_{state_key}", disabled=(page >= max_page),
+                     use_container_width=True):
+            st.session_state[page_key] += 1
+            st.rerun()
+
+    # ── Gallery row ───────────────────────────────────────────────────────────
     current = st.session_state.get(state_key)
-    new_selection = current
+    cols    = st.columns(thumb_cols)
 
-    for row_start in range(0, len(items), thumb_cols):
-        row_items = items[row_start : row_start + thumb_cols]
-        cols = st.columns(thumb_cols)
-        for col_idx, (name, val) in enumerate(row_items):
-            with cols[col_idx]:
-                is_selected = (current == name)
+    for col_idx, (name, val) in enumerate(page_items):
+        with cols[col_idx]:
+            is_selected  = (current == name)
 
-                # Resolve image path and display name
-                img_path = None
-                is_celeb = False
-                display_name = name
+            # Resolve metadata
+            img_path     = None
+            is_celeb     = False
+            display_name = name
 
-                if isinstance(val, dict):
-                    display_name = val.get("name", name)
-                    img_path = val.get("default_img")
-                    is_celeb = val.get("is_celebrity", False)
-                elif isinstance(val, str) and val:
-                    img_path = val
+            if isinstance(val, dict):
+                display_name = val.get("name", name)
+                img_path     = val.get("default_img")
+                is_celeb     = val.get("is_celebrity", False)
+            elif isinstance(val, str) and val:
+                img_path = val
 
-                star = "⭐ " if is_celeb else ""
-                short = display_name.replace("⭐ ", "")
-                short = (short[:14] + "…") if len(short) > 14 else short
+            star  = "⭐ " if is_celeb else ""
+            short = display_name.replace("⭐ ", "")
+            short = (short[:16] + "…") if len(short) > 16 else short
 
-                # Border styling
-                border_col = "#38BDF8" if is_selected else "rgba(255,255,255,0.12)"
-                shadow = "0 0 18px rgba(56,189,248,0.55)" if is_selected else "none"
-                scale = "scale(1.04)" if is_selected else "scale(1)"
+            # Selected border/glow via container markdown
+            border = "#38BDF8" if is_selected else "rgba(255,255,255,0.1)"
+            shadow = "0 0 16px rgba(56,189,248,0.5)" if is_selected else "none"
+            st.markdown(
+                f'<div style="border-radius:12px;border:2px solid {border};'
+                f'box-shadow:{shadow};padding:4px;margin-bottom:4px;transition:all 0.2s;">',
+                unsafe_allow_html=True
+            )
 
-                # Render visual thumbnail card
-                if img_path and isinstance(img_path, str) and img_path.startswith("http"):
-                    st.markdown(f"""
-                    <div style="border-radius:12px;overflow:hidden;border:2px solid {border_col};
-                                box-shadow:{shadow};transform:{scale};transition:all 0.25s ease;
-                                background:rgba(15,23,42,0.7);text-align:center;padding-bottom:4px;">
-                      <img src="{img_path}" style="width:100%;aspect-ratio:1;object-fit:cover;" loading="lazy">
-                      <div style="font-size:0.65rem;font-weight:700;color:#CBD5E1;padding:3px 4px 2px;">{star}{short}</div>
-                    </div>""", unsafe_allow_html=True)
-                elif img_path and os.path.exists(str(img_path)):
-                    try:
-                        import base64
-                        ext = os.path.splitext(img_path)[1].lstrip(".").lower()
-                        if ext == "jpg": ext = "jpeg"
-                        with open(img_path, "rb") as f:
-                            b64 = base64.b64encode(f.read()).decode()
-                        st.markdown(f"""
-                        <div style="border-radius:12px;overflow:hidden;border:2px solid {border_col};
-                                    box-shadow:{shadow};transform:{scale};transition:all 0.25s ease;
-                                    background:rgba(15,23,42,0.7);text-align:center;padding-bottom:4px;">
-                          <img src="data:image/{ext};base64,{b64}" style="width:100%;aspect-ratio:1;object-fit:cover;">
-                          <div style="font-size:0.65rem;font-weight:700;color:#CBD5E1;padding:3px 4px 2px;">{star}{short}</div>
-                        </div>""", unsafe_allow_html=True)
-                    except Exception:
-                        st.markdown(f"""
-                        <div style="border-radius:12px;border:2px solid {border_col};box-shadow:{shadow};
-                                    transform:{scale};background:rgba(15,23,42,0.7);text-align:center;
-                                    aspect-ratio:1;display:flex;flex-direction:column;align-items:center;
-                                    justify-content:center;padding:8px;">
-                          <div style="font-size:0.7rem;font-weight:700;color:#94A3B8;word-break:break-word;">{star}{short}</div>
-                        </div>""", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"""
-                    <div style="border-radius:12px;border:2px solid {border_col};box-shadow:{shadow};
-                                transform:{scale};background:rgba(15,23,42,0.7);text-align:center;
-                                aspect-ratio:1;display:flex;flex-direction:column;align-items:center;
-                                justify-content:center;padding:8px;">
-                      <div style="font-size:0.7rem;font-weight:700;color:#94A3B8;word-break:break-word;">{star}{short}</div>
-                    </div>""", unsafe_allow_html=True)
+            # Image — use st.image() for local, <img> for URLs (no base64)
+            if img_path:
+                try:
+                    if isinstance(img_path, str) and img_path.startswith("http"):
+                        st.markdown(
+                            f'<img src="{img_path}" style="width:100%;border-radius:8px;'
+                            f'aspect-ratio:1;object-fit:cover;" loading="lazy">',
+                            unsafe_allow_html=True
+                        )
+                    elif os.path.exists(str(img_path)):
+                        st.image(img_path, use_container_width=True)
+                except Exception:
+                    pass  # No image fallback — just show name + button
 
-                # Clickable select button below the visual card
-                btn_type = "primary" if is_selected else "secondary"
-                if st.button("✔ Selected" if is_selected else "Select",
-                             key=f"tc_{state_key}_{row_start}_{col_idx}",
-                             use_container_width=True, type=btn_type):
-                    st.session_state[state_key] = name
-                    new_selection = name
-                    st.rerun()
+            st.markdown("</div>", unsafe_allow_html=True)
 
-    if new_selection:
-        selected_val = items_dict.get(new_selection)
-        disp = new_selection
-        if isinstance(selected_val, dict):
-            disp = selected_val.get("name", new_selection)
-        st.caption(f"✅ Selected: **{disp}**")
+            # Name label
+            st.caption(f"{star}{short}")
 
-    return new_selection
+            # Select button — state update only, no manual rerun
+            btn_label = "✔ Selected" if is_selected else "Select"
+            btn_type  = "primary" if is_selected else "secondary"
+            if st.button(btn_label, key=f"tc_{state_key}_{start}_{col_idx}",
+                         use_container_width=True, type=btn_type):
+                st.session_state[state_key] = name
+                st.rerun()
+
+    return st.session_state.get(state_key)
+
 
 
 def fidelity_mode_selector(state_key="fidelity_mode"):
