@@ -1011,14 +1011,15 @@ if selection == "Workflow Wizard":
                     show_label=False
                 )
 
-            # Vibe selector (keep as selectbox — vibes are less visual)
             st.markdown("#### 3. Vibe / Atmosphere")
-            c_v_row = st.columns([3, 1])
-            with c_v_row[0]:
-                v = st.selectbox("Choose Aesthetic", vibes, label_visibility="collapsed", key="wiz_vibe")
-            with c_v_row[1]:
-                if v and v in v_data:
-                    st.image(v_data[v], use_container_width=True)
+            vibe_carousel_data = {k: v for k, v in v_data.items()}
+            thumbnail_carousel(
+                "Vibes",
+                vibe_carousel_data,
+                state_key="wiz_vibe",
+                thumb_cols=3,
+                show_label=False
+            )
     
         # Call Fragment
         wizard_selectors(vibes_list, outfits_list, characters_list, vibes_data, outfits_data, characters_data)
@@ -1795,9 +1796,17 @@ if selection == "World Builder":
                     st.divider()
                     st.markdown("###### 5. Location")
                     loc_opts = get_assets_by_category("locations")
-                    loc_key = st.selectbox("Select Location", ["None"] + list(loc_opts.keys()))
+                    
+                    loc_key = thumbnail_carousel(
+                        "Select Location",
+                        {"None": None, **loc_opts},
+                        state_key="wb_location",
+                        thumb_cols=3,
+                        show_label=False
+                    )
+                    
                     if loc_key and loc_key != "None":
-                          val = loc_opts[loc_key]
+                          val = loc_opts.get(loc_key)
                           path = val['default_img'] if isinstance(val, dict) else val
                           loc_name = loc_key.split('/')[-1]
                           if os.path.sep in loc_name: loc_name = os.path.splitext(loc_name)[0]
@@ -1806,7 +1815,6 @@ if selection == "World Builder":
 
                           temp_selections["LOCATION"] = loc_name
                           temp_assets.append({"path": path, "label": "Location"})
-                          if path: st.image(path, caption=loc_name, width=300)
                     else:
                           temp_selections["LOCATION"] = "generic location"
                     
