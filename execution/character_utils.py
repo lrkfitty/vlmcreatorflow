@@ -92,9 +92,14 @@ def get_age_description(value):
     else: return f"{value} years old, very elderly, aged"
 
 def get_character_sheet_prompt(base_prompt):
-    """Wraps the prompt to generate a reference sheet."""
+    """Wraps the prompt to generate a character reference sheet."""
     # Strong weights for sheet structure + High Fidelity Enforcement
     suffix = "(character reference sheet:1.5), (split into 5 panels:1.5), (top half 2 images: close up of facial details straight at camera, close up of 3/4 view:1.4), (bottom half 3 images: side profile right, side profile left, full body shot:1.4), white background, consistent character, detailed anatomy, 8k, (photorealistic:1.4), (raw photo:1.3), (hyperrealistic:1.3), (not illustration:1.5), (not cartoon:1.5), (not 3d render:1.5)"
+    return f"{base_prompt}, {suffix}"
+
+def get_product_sheet_prompt(base_prompt):
+    """Wraps the prompt to generate a product reference sheet."""
+    suffix = "(product reference sheet:1.5), (split into 4 panels:1.5), (four different angles:1.5), (front view, side profile, back view, angled top-down view:1.4), clean studio background, consistent product design, detailed materials, 8k, (commercial product photography:1.4), (photorealistic:1.4), (macro details:1.3)"
     return f"{base_prompt}, {suffix}"
 
 def build_character_prompt(attributes):

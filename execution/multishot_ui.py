@@ -5,7 +5,7 @@ Generates multiple angles of a character from a single reference image.
 """
 
 import streamlit as st
-from execution.character_utils import get_character_sheet_prompt
+from execution.character_utils import get_character_sheet_prompt, get_product_sheet_prompt
 from execution.generate_image import generate_image_from_prompt
 from execution.auth import auth_mgr
 import os
@@ -22,6 +22,7 @@ def render_multishot_ui(get_user_out_dir_func):
     stale_mode = st.session_state.get("multishot_mode_select", "")
     if stale_mode not in [
         "Character Sheet (5 Angles - Vertical)",
+        "Product Sheet (4 Angles)",
         "Individual Shots (Batch)",
         "Single Custom Angle",
         "End Frame Generator",
@@ -31,7 +32,7 @@ def render_multishot_ui(get_user_out_dir_func):
         del st.session_state["multishot_mode_select"]
 
     st.markdown("### Multi-Shot Reference Generator")
-    st.info("Upload a character reference and generate multiple angles for consistency across your content.")
+    st.info("Upload a character or product reference and generate multiple angles for consistency across your content.")
     
     # --- Character & Outfit Reference Dropdowns ---
     assets_data = st.session_state.get("global_assets", {})
@@ -42,7 +43,7 @@ def render_multishot_ui(get_user_out_dir_func):
     char_list = ["None (use uploaded reference only)"] + sorted(characters_data.keys())
     outfit_list = ["None"] + sorted(outfits_data.keys())
     
-    st.markdown("**🎭 Character & Outfit Reference**")
+    st.markdown("**🎭 Character/Product & Outfit Reference**")
     ref_col1, ref_col2 = st.columns(2)
     with ref_col1:
         selected_char = st.selectbox(
@@ -85,6 +86,7 @@ def render_multishot_ui(get_user_out_dir_func):
             "Generation Mode",
             [
                 "Character Sheet (5 Angles - Vertical)", 
+                "Product Sheet (4 Angles)",
                 "Individual Shots (Batch)", 
                 "Single Custom Angle",
                 "End Frame Generator",
@@ -487,10 +489,10 @@ def render_multishot_ui(get_user_out_dir_func):
     st.divider()
     
     # --- Image Upload (OUTSIDE form so it persists across reruns) ---
-    st.markdown("**📸 Main Character Image**")
-    st.caption("Upload your best single-view of the character — this becomes the source of truth for outfit, pose, and environment.")
+    st.markdown("**📸 Main Target Image (Character or Product)**")
+    st.caption("Upload your best single-view of the character or product — this becomes the source of truth for outfit, pose, or design.")
     ref_upload = st.file_uploader(
-        "Main Character Image (single view)", 
+        "Main Reference Image (single view)", 
         type=['png', 'jpg', 'jpeg'],
         help="Your best generated image — the one you want to rotate into other angles",
         key="multishot_ref_uploader"
@@ -512,14 +514,14 @@ def render_multishot_ui(get_user_out_dir_func):
     # --- Additional Reference Images ---
     st.markdown("**🔒 Additional Reference Images (Up to 13)**")
     st.caption(
-        "Upload up to 13 additional photos of the character — different angles, lighting, outfits, or facial close-ups. "
-        "More references = stronger character identity lock across all generated panels."
+        "Upload up to 13 additional photos — different angles, lighting, outfits, or close-ups. "
+        "More references = stronger identity/design lock across all generated panels."
     )
     face_ref_uploads = st.file_uploader(
         "Additional Reference Images",
         type=['png', 'jpg', 'jpeg'],
         accept_multiple_files=True,
-        help="Any photos that show the character: face close-ups, 3/4 views, body shots, etc.",
+        help="Any photos that show the subject: face close-ups, product details, 3/4 views, etc.",
         key="multishot_face_refs"
     )
     
@@ -603,19 +605,28 @@ def render_multishot_ui(get_user_out_dir_func):
         else:
             user = st.session_state.current_user.get("username") if st.session_state.get("current_user") else "guest"
             
-            # Build base prompt with strong face-lock instruction
-            face_lock_instruction = ""
+            # Build base prompt with strong identity-lock instruction
+            identity_lock_instruction = ""
             if face_ref_paths:
-                face_lock_instruction = (
-                    " CRITICAL FACE LOCK: Additional face reference images are provided. "
-                    "You MUST match the face in those references EXACTLY — same bone structure, "
-                    "skin tone, eye shape, nose, lips. The face must remain IDENTICAL "
-                    "across all angle changes. Only the camera angle changes, NOT the face."
-                )
+                if multishot_mode == "Product Sheet (4 Angles)":
+                    identity_lock_instruction = (
+                        " CRITICAL IDENTITY LOCK: Additional reference images of the product are provided. "
+                        "You MUST match the product design EXACTLY — same materials, branding, shape, colors, "
+                        "and texture. The physical product must remain IDENTICAL across all angle changes. "
+                        "Only the camera perspective changes, NOT the product."
+                    )
+                else:
+                    identity_lock_instruction = (
+                        " CRITICAL FACE LOCK: Additional face reference images are provided. "
+                        "You MUST match the face in those references EXACTLY — same bone structure, "
+                        "skin tone, eye shape, nose, lips. The face must remain IDENTICAL "
+                        "across all angle changes. Only the camera angle changes, NOT the face."
+                    )
             
+            subject_noun = "product" if multishot_mode == "Product Sheet (4 Angles)" else "character"
             base_prompt = (
-                "character maintaining EXACT identity, face, outfit, and features from the main reference image"
-                + face_lock_instruction
+                f"{subject_noun} maintaining EXACT identity, shape, colors, and features from the main reference image"
+                + identity_lock_instruction
             )
             if additional_prompt:
                 base_prompt += f", {additional_prompt}"
@@ -650,16 +661,16 @@ def render_multishot_ui(get_user_out_dir_func):
             # Below 40: no identity constraints
             
             # Build common asset list — main ref + face identity locks + char/outfit library refs
-            def build_assets_list(start_frame_path, label="Main Character (SOURCE OF TRUTH — match outfit, pose, environment)"):
-                """Builds asset payload with main ref, face locks, and library refs."""
+            def build_assets_list(start_frame_path, label="Main Subject (SOURCE OF TRUTH — match design, outfit, and environment)"):
+                """Builds asset payload with main ref, identity locks, and library refs."""
                 asset_list = [{"path": start_frame_path, "label": label}]
                 
-                # Face likeness locks — IDENTITY ONLY
+                # Identity likeness locks
                 for idx, fp in enumerate(face_ref_paths):
                     if os.path.exists(fp):
                         asset_list.append({
                             "path": fp,
-                            "label": f"Cast: FaceLock (Ref {idx+1}) — FACE AND IDENTITY ONLY — DO NOT use for pose or outfit"
+                            "label": f"Cast/Object: IdentityLock (Ref {idx+1}) — SPECIFIC DESIGN/IDENTITY ONLY — DO NOT use for pose or environment"
                         })
                 
                 # Library character reference
@@ -698,6 +709,34 @@ def render_multishot_ui(get_user_out_dir_func):
                         if res["status"] == "success":
                             st.session_state['multishot_result'] = res['image_path']
                             st.success("✅ Character sheet generated!")
+                            st.rerun()
+                        else:
+                            auth_mgr.add_credits(user, 1)  # Refund
+                            st.error(f"Generation failed: {res.get('logs')}")
+                else:
+                    st.error("Not enough credits.")
+            
+            elif multishot_mode == "Product Sheet (4 Angles)":
+                # Generate 4-angle product sheet
+                full_prompt = get_product_sheet_prompt(base_prompt)
+                
+                # Credit check
+                if auth_mgr.deduct_credits(user, 1):
+                    with st.spinner("Generating 4-angle product sheet..."):
+                        assets = build_assets_list(temp_ref_path)
+                        payload = {
+                            "positive_prompt": full_prompt,
+                            "aspect_ratio": "1:1",  # Square is best for 4-panel grids (2x2)
+                            "image_size": st.session_state.get("ms_res", "1K"),
+                            "model_type": "nano",
+                            "assets": assets
+                        }
+                        
+                        res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
+                        
+                        if res["status"] == "success":
+                            st.session_state['multishot_result'] = res['image_path']
+                            st.success("✅ Product sheet generated!")
                             st.rerun()
                         else:
                             auth_mgr.add_credits(user, 1)  # Refund
