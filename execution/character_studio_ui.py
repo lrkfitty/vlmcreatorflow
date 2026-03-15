@@ -612,16 +612,33 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                                 if not assets and st.session_state.get("lock_identity_path"):
                                     assets.append({"path": st.session_state["lock_identity_path"], "label": f"Cast: {char_name or 'Main'}"})
                                 
-                                for angle in selected_angles:
+                                for idx, angle in enumerate(selected_angles):
                                     with st.spinner(f"Generating angle: {angle}..."):
                                         angle_prompt = f"{base_prompt}, {angle.lower()}, professional photography"
+                                        
+                                        current_assets = list(assets)
+                                        modified_prompt = angle_prompt
+                                        
+                                        # CASADE LOGIC: If this is not the first angle, use the first generated image as the anchor
+                                        if idx > 0 and len(st.session_state['char_batch_results']) > 0:
+                                            first_img_path = st.session_state['char_batch_results'][0]['path']
+                                            current_assets.append({
+                                                "path": first_img_path,
+                                                "label": "Main Subject (SOURCE OF TRUTH — match face, identity, tattoos, and proportions exactly)"
+                                            })
+                                            modified_prompt += (
+                                                ", (identical face to reference:1.5), (exact same person:1.5), "
+                                                "(preserve facial features exactly:1.4), (same bone structure:1.3), "
+                                                "(maintain exact tattoo placement and style:1.4), DO NOT alter facial features"
+                                            )
+                                        
                                         payload = {
-                                            "positive_prompt": angle_prompt,
+                                            "positive_prompt": modified_prompt,
                                             "width": target_w, "height": target_h,
                                             "aspect_ratio": ar,
                                             "image_size": "4K",
                                             "model_type": "nano",
-                                            "assets": assets
+                                            "assets": current_assets
                                         }
                                         res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
                                         if res["status"] == "success":
