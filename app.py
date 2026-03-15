@@ -1684,7 +1684,15 @@ if selection == "World Builder":
                         show_label=False
                     )
                     
-                    if fit_key and fit_key != "None":
+                    custom_outfit = st.text_input("Or describe a custom outfit", placeholder="e.g., vintage leather jacket and blue jeans")
+                    if custom_outfit:
+                        temp_selections["OUTFIT"] = custom_outfit
+                        # We still keep the reference image path if selected, for visual locking
+                        if fit_key and fit_key != "None":
+                            path = fit_opts.get(fit_key)
+                            if isinstance(path, dict): path = path.get('default_img')
+                            temp_assets.append({"path": path, "label": f"Outfit style roughly matching description"})
+                    elif fit_key and fit_key != "None":
                         path = fit_opts.get(fit_key)
                         if isinstance(path, dict): path = path.get('default_img')
                         
