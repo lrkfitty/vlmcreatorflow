@@ -375,7 +375,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                         "Signet Ring", "Statement Ring (large gem)",
                         "Snake Ring", "Stackable Rings (multiple)",
                         "Knuckle Rings", "Full Finger Ring (armor)",
-                        "Wedding Band", "Eternity Band"
+                    "Wedding Band", "Eternity Band"
                     ])
                     c_bracelets = st.multiselect("Bracelets / Bangles", [
                         "Gold Bangle", "Silver Bangle",
@@ -394,7 +394,8 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                         "Tragus Piercing", "Conch Piercing",
                         "Belly Button Ring / Navel Piercing",
                         "Cheek Piercings (dimple piercings)",
-                        "Multiple Ear Piercings (stacked)"
+                        "Multiple Ear Piercings (stacked)",
+                        "Nipple Piercings"
                     ])
 
 
