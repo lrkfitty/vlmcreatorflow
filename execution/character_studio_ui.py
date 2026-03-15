@@ -644,7 +644,8 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                                         if res["status"] == "success":
                                             st.session_state['char_batch_results'].append({
                                                 "angle": angle,
-                                                "path": res['image_path']
+                                                "path": res['image_path'],
+                                                "payload": payload
                                             })
                                             st.toast(f"✅ {angle} complete!")
                                         else:
@@ -707,30 +708,77 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             # Show prominent preview for the first image
             first = batch[0]
             st.image(first['path'], caption=f"{char_name} - {first['angle']}", use_container_width=True)
-            with open(first['path'], "rb") as f:
-                st.download_button(
-                    label="⬇️ Download",
-                    data=f,
-                    file_name=f"{char_name}_{first['angle'].replace(' ', '_').lower()}.jpg",
-                    mime="image/jpeg",
-                    key="dl_batch_main"
-                )
+            
+            c_dl_main, c_rerun_main = st.columns(2)
+            with c_dl_main:
+                with open(first['path'], "rb") as f:
+                    st.download_button(
+                        label="⬇️ Download",
+                        data=f,
+                        file_name=f"{char_name}_{first['angle'].replace(' ', '_').lower()}.jpg",
+                        mime="image/jpeg",
+                        key="dl_batch_main"
+                    )
+            with c_rerun_main:
+                if st.button("🔄 Rerun", key="rerun_batch_main"):
+                    stored_payload = first.get("payload")
+                    if not stored_payload:
+                        st.error("No stored payload found.")
+                    else:
+                        user = st.session_state.current_user.get("username") if 'current_user' in st.session_state and st.session_state.current_user else "guest"
+                        if auth_mgr.deduct_credits(user, 1):
+                            with st.spinner(f"🔄 Re-generating {first['angle']}..."):
+                                res = generate_image_from_prompt(stored_payload, get_user_out_dir_func("Characters/Concepts"))
+                                if res["status"] == "success":
+                                    # Overwrite path in session state
+                                    st.session_state['char_batch_results'][0]['path'] = res['image_path']
+                                    st.success(f"✅ Recreated {first['angle']}!")
+                                    st.rerun()
+                                else:
+                                    auth_mgr.add_credits(user, 1)
+                                    st.error(f"Failed to rerun: {res.get('logs')}")
+                        else:
+                            st.warning("Not enough credits to rerun.")
             
             # Show the rest below in columns
             if len(batch) > 1:
                 st.markdown("##### Additional Angles")
                 cols = st.columns(min(len(batch)-1, 3))
                 for i, item in enumerate(batch[1:]):
+                    actual_idx = i + 1
                     with cols[i % len(cols)]:
                          st.image(item['path'], caption=item['angle'], use_container_width=True)
-                         with open(item['path'], "rb") as f:
-                             st.download_button(
-                                 label="⬇️ Download",
-                                 data=f,
-                                 file_name=f"{char_name}_{item['angle'].replace(' ', '_').lower()}.jpg",
-                                 mime="image/jpeg",
-                                 key=f"dl_batch_{i}"
-                             )
+                         
+                         c_dl_sub, c_rerun_sub = st.columns(2)
+                         with c_dl_sub:
+                             with open(item['path'], "rb") as f:
+                                 st.download_button(
+                                     label="⬇️ Download",
+                                     data=f,
+                                     file_name=f"{char_name}_{item['angle'].replace(' ', '_').lower()}.jpg",
+                                     mime="image/jpeg",
+                                     key=f"dl_batch_{actual_idx}"
+                                 )
+                         with c_rerun_sub:
+                             if st.button("🔄 Rerun", key=f"rerun_batch_{actual_idx}"):
+                                 stored_payload = item.get("payload")
+                                 if not stored_payload:
+                                     st.error("No payload found.")
+                                 else:
+                                     user = st.session_state.current_user.get("username") if 'current_user' in st.session_state and st.session_state.current_user else "guest"
+                                     if auth_mgr.deduct_credits(user, 1):
+                                         with st.spinner(f"🔄 Re-generating {item['angle']}..."):
+                                             res = generate_image_from_prompt(stored_payload, get_user_out_dir_func("Characters/Concepts"))
+                                             if res["status"] == "success":
+                                                 # Overwrite path in session state
+                                                 st.session_state['char_batch_results'][actual_idx]['path'] = res['image_path']
+                                                 st.success(f"✅ Recreated {item['angle']}!")
+                                                 st.rerun()
+                                             else:
+                                                 auth_mgr.add_credits(user, 1)
+                                                 st.error(f"Failed: {res.get('logs')}")
+                                     else:
+                                         st.warning("Not enough credits.")
                          
         elif 'char_preview' in st.session_state:
             preview_path = st.session_state['char_preview']
