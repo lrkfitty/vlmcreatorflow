@@ -744,8 +744,16 @@ if selection == "My Gallery":
                             )
                         
                         # Single row: zoom + download (reduced from 2 columns to 1 button row)
-                        if st.button("🔍 View", key=f"view_{idx}", use_container_width=True):
-                            _gallery_zoom_dialog(item["src"], item["name"], is_local=is_local)
+                        c_view, c_dl = st.columns(2)
+                        with c_view:
+                            if st.button("🔍 View", key=f"view_{idx}", use_container_width=True):
+                                _gallery_zoom_dialog(item["src"], item["name"], is_local=is_local)
+                        with c_dl:
+                            if is_local and os.path.exists(os.path.abspath(item["src"])):
+                                with open(item["src"], "rb") as f:
+                                    st.download_button("⬇️ Save", data=f, file_name=item["name"], key=f"gal_dl_{idx}", use_container_width=True)
+                            elif not is_local:
+                                st.link_button("⬇️ Save", item["src"], use_container_width=True)
 
 # ==========================================
 # TAB: ASSET LIBRARY
@@ -1684,15 +1692,7 @@ if selection == "World Builder":
                         show_label=False
                     )
                     
-                    custom_outfit = st.text_input("Or describe a custom outfit", placeholder="e.g., vintage leather jacket and blue jeans")
-                    if custom_outfit:
-                        temp_selections["OUTFIT"] = custom_outfit
-                        # We still keep the reference image path if selected, for visual locking
-                        if fit_key and fit_key != "None":
-                            path = fit_opts.get(fit_key)
-                            if isinstance(path, dict): path = path.get('default_img')
-                            temp_assets.append({"path": path, "label": f"Outfit style roughly matching description"})
-                    elif fit_key and fit_key != "None":
+                    if fit_key and fit_key != "None":
                         path = fit_opts.get(fit_key)
                         if isinstance(path, dict): path = path.get('default_img')
                         
