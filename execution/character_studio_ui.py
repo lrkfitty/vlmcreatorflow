@@ -30,6 +30,31 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
 
         st.markdown("#### Design Specs")
         
+        # 2. Output Mode (Outside Form for Instant Reactivity)
+        st.markdown("**Output Format**")
+        output_mode = st.selectbox("Generation Mode", [
+            "Concept Portrait (Vertical)", 
+            "Character Sheet (5 Angles - Vertical)",
+            "Individual Shots (Batch)"
+        ])
+        
+        selected_angles = []
+        if output_mode == "Individual Shots (Batch)":
+            angle_opts = [
+                "Front View", "Side View (Left)", "Side View (Right)",
+                "3/4 View (Left)", "3/4 View (Right)", "Back View",
+                "Close Up (Face)", "Extreme Close Up",
+                "Over Shoulder", "Low Angle", "High Angle"
+            ]
+            selected_angles = st.multiselect(
+                "Select Angles to Generate",
+                angle_opts,
+                default=["Front View", "Side View (Left)", "3/4 View (Left)", "Back View"]
+            )
+            
+        st.divider()
+        
+        
         with st.form("character_creator_form"):
             # 1. Reference Images (Multi-Upload)
             st.markdown("**1. References (Optional)**")
@@ -106,29 +131,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             elif 'lock_identity_path' in st.session_state:
                 del st.session_state['lock_identity_path']
             
-            # 2. Output Mode
-            st.markdown("**2. Output Format**")
-            output_mode = st.selectbox("Generation Mode", [
-                "Concept Portrait (Vertical)", 
-                "Character Sheet (5 Angles - Vertical)",
-                "Individual Shots (Batch)"
-            ])
-            
-            selected_angles = []
-            if output_mode == "Individual Shots (Batch)":
-                angle_opts = [
-                    "Front View", "Side View (Left)", "Side View (Right)",
-                    "3/4 View (Left)", "3/4 View (Right)", "Back View",
-                    "Close Up (Face)", "Extreme Close Up",
-                    "Over Shoulder", "Low Angle", "High Angle"
-                ]
-                selected_angles = st.multiselect(
-                    "Select Angles to Generate",
-                    angle_opts,
-                    default=["Front View", "Side View (Left)", "3/4 View (Left)", "Back View"]
-                )
-            
-            st.divider()
+            # Form content continues...
             
             # 3. Attributes
             st.markdown("**3. Attributes**")
