@@ -239,6 +239,30 @@ def build_character_prompt(attributes):
     # Skin
     if skin_details:
         traits.append(", ".join(skin_details))
+
+    # Accessories & Jewelry
+    earrings = attributes.get("earrings", "None")
+    necklace = attributes.get("necklace", "None")
+    watch = attributes.get("watch", "None")
+    rings = attributes.get("rings", [])
+    bracelets = attributes.get("bracelets", [])
+    piercings = attributes.get("piercings", [])
+
+    acc_parts = []
+    if earrings and earrings not in ["None", "No Earrings"]:
+        acc_parts.append(f"wearing {earrings}")
+    if necklace and necklace not in ["None", "No Necklace"]:
+        acc_parts.append(f"{necklace}")
+    if watch and watch not in ["None", "No Watch"]:
+        acc_parts.append(f"{watch} on wrist")
+    if rings:
+        acc_parts.append(f"rings: {', '.join(rings)}")
+    if bracelets:
+        acc_parts.append(f"bracelets: {', '.join(bracelets)}")
+    if piercings:
+        acc_parts.append(f"piercings: {', '.join(piercings)}")
+    if acc_parts:
+        traits.append(f"({', '.join(acc_parts)}:1.2)")
         
     traits_str = ", ".join(traits)
     

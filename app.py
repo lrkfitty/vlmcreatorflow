@@ -14,7 +14,7 @@ try:
     import load_assets as la_module
     importlib.reload(la_module)
     from load_assets import load_assets, promote_image_to_asset
-    from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button, icon_grid_selector
+    from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button, icon_grid_selector, thumbnail_carousel, fidelity_mode_selector
     import generate_image as gi_module
     importlib.reload(gi_module)
     from generate_image import generate_image_from_prompt
@@ -982,56 +982,50 @@ if selection == "Workflow Wizard":
         # --- UI Inputs (Fragmented for Performance) ---
         @st.fragment
         def wizard_selectors(vibes, outfits, characters, v_data, o_data, c_data):
-            c_v, c_o, c_c = st.columns(3)
-            with c_v:
-                card_begin()
-                st.markdown("#### 1. Vibe")
+            st.markdown("#### 1. Choose Character")
+            # Build character carousel data — strip path strings for display
+            char_carousel_data = {}
+            for k, v in c_data.items():
+                char_carousel_data[k] = v
+
+            thumbnail_carousel(
+                "Characters",
+                char_carousel_data,
+                state_key="wiz_char",
+                thumb_cols=5,
+                show_label=False
+            )
+
+            # Outfit carousel — only show after character is selected
+            if st.session_state.get("wiz_char"):
+                st.markdown("#### 2. Choose Outfit")
+                outfit_carousel_data = {k: v for k, v in o_data.items()}
+                thumbnail_carousel(
+                    "Outfits",
+                    outfit_carousel_data,
+                    state_key="wiz_outfit",
+                    thumb_cols=5,
+                    show_label=False
+                )
+
+            # Vibe selector (keep as selectbox — vibes are less visual)
+            st.markdown("#### 3. Vibe / Atmosphere")
+            c_v_row = st.columns([3, 1])
+            with c_v_row[0]:
                 v = st.selectbox("Choose Aesthetic", vibes, label_visibility="collapsed", key="wiz_vibe")
+            with c_v_row[1]:
                 if v and v in v_data:
                     st.image(v_data[v], use_container_width=True)
-                card_end()
-                
-            with c_o:
-                card_begin()
-                st.markdown("#### 2. Outfit")
-                o = st.selectbox("Choose Outfit", outfits, label_visibility="collapsed", key="wiz_outfit")
-                if o and o in o_data:
-                    st.image(o_data[o], use_container_width=True)
-                card_end()
-    
-            with c_c:
-                card_begin()
-                st.markdown("#### 3. Character")
-                # Format character dropdown to use 'name' if it's a dict
-                def format_char(x):
-                    if x in c_data and isinstance(c_data[x], dict):
-                        return c_data[x].get('name', x)
-                    return x
-                    
-                c = st.selectbox("Choose Model", characters, format_func=format_char, label_visibility="collapsed", key="wiz_char")
-                if c and c in c_data:
-                    char_entry = c_data[c]
-                    if isinstance(char_entry, dict) and char_entry.get("is_celebrity"):
-                        # Celebrity: show info card instead of image
-                        st.info(f"⭐ **{char_entry['name']}** ({char_entry.get('category', '')})", icon=None)
-                        st.caption(char_entry.get("celebrity_desc", "")[:120] + "...")
-                    elif isinstance(char_entry, dict):
-                        # World DB character: show image if exists, else show description
-                        img = char_entry.get("default_img")
-                        if img: 
-                            st.image(img, use_container_width=True)
-                        else:
-                            st.info(f"👤 **{char_entry.get('name', c)}**", icon=None)
-                            st.caption(char_entry.get("description", "Custom character object")[:120] + "...")
-                    elif char_entry:
-                        st.image(char_entry, use_container_width=True)
-                card_end()
     
         # Call Fragment
         wizard_selectors(vibes_list, outfits_list, characters_list, vibes_data, outfits_data, characters_data)
     
+        # --- FIDELITY MODE ROW ---
+        fidelity_label, fidelity_modifier = fidelity_mode_selector(state_key="wiz_fidelity")
+        st.session_state['wiz_fidelity_modifier'] = fidelity_modifier
+
         st.divider()
-    
+
         # V3.9: Wrapped in Form to Prevent Reload Loop
         with st.form(key="wizard_form"):
             # Expandable Camera Controls
@@ -1123,13 +1117,14 @@ if selection == "Workflow Wizard":
                 
                 def clean_val(val): return None if val == "Auto" else val
                 
+                fidelity_mod = st.session_state.get('wiz_fidelity_modifier', '')
                 prompt_data = generate_prompt_content(
                     vibe=clean_val(s_vibe), 
                     outfit=s_outfit, 
                     character=char_path,
                     outfit_path=outfit_path,
                     vibe_path=vibe_path,
-                    additional_notes=f"{custom_notes} . Context: {custom_scenario} . Emotion: {clean_val(sel_emotion)} . Style: {clean_val(sel_style) or ''}", 
+                    additional_notes=f"{custom_notes} . Context: {custom_scenario} . Emotion: {clean_val(sel_emotion)} . Style: {clean_val(sel_style) or ''} . Look: {fidelity_mod}", 
                     camera=clean_val(sel_camera),
                     lens=clean_val(sel_lens),
                     shot_type=clean_val(sel_shot),
@@ -1208,13 +1203,14 @@ if selection == "Workflow Wizard":
                 # Filter "Auto" values (pass None if Auto)
                 def clean_val(val): return None if val == "Auto" else val
                 
+                fidelity_mod = st.session_state.get('wiz_fidelity_modifier', '')
                 prompt_data = generate_prompt_content(
                     vibe=s_vibe, 
                     outfit=s_outfit, 
                     character=char_path,
                     outfit_path=outfit_path,
                     vibe_path=vibe_path,
-                    additional_notes=f"{custom_notes} . Context: {custom_scenario} . Emotion: {clean_val(sel_emotion)} . Style: {clean_val(sel_style) or ''}", 
+                    additional_notes=f"{custom_notes} . Context: {custom_scenario} . Emotion: {clean_val(sel_emotion)} . Style: {clean_val(sel_style) or ''} . Look: {fidelity_mod}", 
                     camera=clean_val(sel_camera),
                     lens=clean_val(sel_lens),
                     shot_type=clean_val(sel_shot),
@@ -1624,28 +1620,29 @@ if selection == "World Builder":
                     except Exception:
                         pass
                     wb_char_opts = {**characters_data}
-                    wb_char_keys = sorted(list(wb_char_opts.keys()))
-                    
-                    protag_key = st.selectbox(
-                        "Select Protagonist", 
-                        wb_char_keys, 
-                        format_func=lambda x: wb_char_opts[x].get('name', x) if isinstance(wb_char_opts[x], dict) else x
+
+                    # --- CHARACTER CAROUSEL ---
+                    protag_key = thumbnail_carousel(
+                        "Select Protagonist",
+                        wb_char_opts,
+                        state_key="wb_protag",
+                        thumb_cols=4,
+                        show_label=True
                     )
-                    
+
                     protag_opts = wb_char_opts  
                     p_final_path = None
                     p_final_name = "Character"
     
                     if protag_key:
-                        p_val = protag_opts[protag_key]
+                        p_val = protag_opts.get(protag_key)
                         if isinstance(p_val, dict):
                             p_final_name = p_val['name']
                             p_final_path = p_val.get('default_img')
-                        else:
+                        elif p_val:
                             # Filesystem Asset
                             filename = protag_key.split('/')[-1]
                             if "default" in filename.lower():
-                                 # Use parent dir as name
                                  p_final_name = protag_key.split('/')[-2]
                             else:
                                  p_final_name = os.path.splitext(filename)[0]
@@ -1653,12 +1650,11 @@ if selection == "World Builder":
                     
                         temp_selections["PROTAGONIST"] = p_final_name
     
-                        if p_final_path:
+                        if p_final_path and os.path.exists(str(p_final_path)):
                             siblings = []
-                            if os.path.exists(p_final_path):
-                                char_dir = os.path.dirname(p_final_path)
-                                valid_exts = ('.png', '.jpg', '.jpeg', '.webp')
-                                siblings = [f for f in os.listdir(char_dir) if f.lower().endswith(valid_exts) and not f.startswith('.')]
+                            char_dir = os.path.dirname(p_final_path)
+                            valid_exts = ('.png', '.jpg', '.jpeg', '.webp')
+                            siblings = [f for f in os.listdir(char_dir) if f.lower().endswith(valid_exts) and not f.startswith('.')]
                         
                             if siblings:
                                 current_file = os.path.basename(p_final_path)
@@ -1666,31 +1662,34 @@ if selection == "World Builder":
                                     def_idx = siblings.index(current_file)
                                 except ValueError:
                                     def_idx = 0
-                                
                                 selected_var = st.selectbox("Select Specific Look", siblings, index=def_idx, key="protag_var")
                                 p_final_path = os.path.join(char_dir, selected_var)
                     
                         if p_final_path:
                             temp_assets.append({"path": p_final_path, "label": "Main Character"})
-                            st.image(p_final_path, width=200, caption="Reference LoRA/Image")
-    
-                    st.caption("Main Character Outfit")
+
+                    st.markdown("###### 1b. Main Character Outfit")
                     fit_opts = assets.get('outfits', {})
-                    fit_key = st.selectbox("Select Outfit", ["None"] + list(fit_opts.keys()), key="main_outfit")
+
+                    # --- OUTFIT CAROUSEL ---
+                    fit_key = thumbnail_carousel(
+                        "Select Outfit",
+                        {"None": None, **fit_opts},
+                        state_key="wb_outfit_main",
+                        thumb_cols=4,
+                        show_label=False
+                    )
                     
                     if fit_key and fit_key != "None":
-                        path = fit_opts[fit_key]
+                        path = fit_opts.get(fit_key)
                         if isinstance(path, dict): path = path.get('default_img')
                         
                         fit_name = fit_key.split('/')[-1] 
                         if os.path.sep in fit_name: fit_name = os.path.splitext(fit_name)[0]
-                        
                         if "default" in fit_name.lower(): fit_name = "Stylish Outfit"
                         
                         temp_selections["OUTFIT"] = fit_name
                         temp_assets.append({"path": path, "label": f"Outfit: {fit_name}"})
-                        if path:
-                            st.image(path, caption=fit_name)
     
                     st.markdown("###### 2. Friends & Cast")
                     rel_opts = assets.get('relations', {})
@@ -1834,51 +1833,28 @@ if selection == "World Builder":
         pet_names = st.session_state.get('wb_pet_names', [])
         prop_names = st.session_state.get('wb_prop_names', [])
         
-        # --- VISUAL CAMERA PICKERS (Primary Selectors) ---
-        st.markdown("##### 📸 Camera, Shot & Lighting")
-        st.caption("Tap a card to select your camera setup.")
-        vpc1, vpc2, vpc3 = st.columns(3)
-        with vpc1:
-            icon_grid_selector(
-                "Camera Angle",
-                knowledge_base.get("camera_angles", []),
-                "assets/ui_icons/camera_angles",
-                "wb_vp_angle",
-                cols_per_row=3
-            )
-        with vpc2:
-            icon_grid_selector(
-                "Shot Type",
-                ["Close Up", "Medium Shot", "Full Body", "Wide Shot", "Extreme Close Up", "Cowboy Shot", "Overhead"],
-                "assets/ui_icons/shot_types",
-                "wb_vp_shot",
-                cols_per_row=3
-            )
-        with vpc3:
-            icon_grid_selector(
-                "Lighting",
-                knowledge_base.get("lighting", []),
-                "assets/ui_icons/lighting",
-                "wb_vp_light",
-                cols_per_row=3
-            )
+        # Camera/Shot/Lighting are now dropdowns inside the form below (see Additional Settings)
 
-        # --- Read visual picker values as primary source ---
-        sel_angle = st.session_state.get("icon_grid_wb_vp_angle", "Auto")
-        sel_shot = st.session_state.get("icon_grid_wb_vp_shot", "Auto")
-        sel_lighting = st.session_state.get("icon_grid_wb_vp_light", "Auto")
+        # --- FIDELITY MODE ---
+        wb_fidelity_label, wb_fidelity_modifier = fidelity_mode_selector(state_key="wb_fidelity")
+        st.session_state['wb_fidelity_modifier'] = wb_fidelity_modifier
+
+        st.divider()
 
         # V3.9: Wrapped in Form to prevent Camera Settings Reload Loop
         with st.form(key="wb_camera_form"):
-            # --- REMAINING CAMERA CONTROLS (Non-visual settings) ---
-            with st.expander("Additional Settings", expanded=False):
+            # --- ALL CAMERA CONTROLS (Including angle/shot/lighting moved from card pickers) ---
+            with st.expander("📸 Camera & Scene Settings", expanded=False):
                 col_cam, col_mood, col_look = st.columns(3)
                 with col_cam:
-                    st.markdown("**Hardware**")
+                    st.markdown("**📷 Hardware**")
                     sel_camera = st.selectbox("Camera Type", ["Auto"] + knowledge_base.get("cameras", []), key="wb_cam")
                     sel_lens = st.selectbox("Lens", ["Auto"] + knowledge_base.get("lenses", []), key="wb_lens")
+                    sel_shot = st.selectbox("Shot Type", ["Auto"] + knowledge_base.get("shot_types", []), key="wb_shot")
+                    sel_angle = st.selectbox("Camera Angle", ["Auto"] + knowledge_base.get("camera_angles", []), key="wb_angle")
                     sel_ar = st.selectbox("Aspect Ratio", ["Auto", "4:5", "16:9", "9:16", "1:1", "3:2"], index=0, key="wb_ar")
                     sel_res = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, key="wb_res", help="Higher = sharper but slower")
+                    sel_lighting = st.selectbox("Lighting", ["Auto"] + knowledge_base.get("lighting", []), key="wb_lighting")
     
                 with col_mood:
                     st.markdown("**Direction & Mood**")

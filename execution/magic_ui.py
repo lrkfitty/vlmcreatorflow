@@ -703,3 +703,161 @@ def icon_grid_selector(label, options, icons_dir, key, cols_per_row=4):
     st.caption(f"Selected: **{selected}**")
     return selected
 
+
+def thumbnail_carousel(label, items_dict, state_key, thumb_cols=5, show_label=True):
+    """
+    Renders a scrollable grid of clickable thumbnail cards for character/outfit selection.
+
+    Args:
+        label:       Section header (e.g. "Choose Character")
+        items_dict:  Dict of {display_name: value} where value is an image path/URL, 
+                     a dict with 'default_img'/'name', or None for celebrities.
+        state_key:   Session state key storing the currently selected name.
+        thumb_cols:  Number of columns per row.
+        show_label:  Whether to show the section header.
+
+    Returns:
+        The currently selected key (display name) or None.
+    """
+    import os
+
+    if show_label:
+        st.markdown(f"**{label}**")
+
+    if not items_dict:
+        st.caption("No items available.")
+        return st.session_state.get(state_key)
+
+    items = list(items_dict.items())
+    current = st.session_state.get(state_key)
+    new_selection = current
+
+    for row_start in range(0, len(items), thumb_cols):
+        row_items = items[row_start : row_start + thumb_cols]
+        cols = st.columns(thumb_cols)
+        for col_idx, (name, val) in enumerate(row_items):
+            with cols[col_idx]:
+                is_selected = (current == name)
+
+                # Resolve image path and display name
+                img_path = None
+                is_celeb = False
+                display_name = name
+
+                if isinstance(val, dict):
+                    display_name = val.get("name", name)
+                    img_path = val.get("default_img")
+                    is_celeb = val.get("is_celebrity", False)
+                elif isinstance(val, str) and val:
+                    img_path = val
+
+                star = "⭐ " if is_celeb else ""
+                short = display_name.replace("⭐ ", "")
+                short = (short[:14] + "…") if len(short) > 14 else short
+
+                # Border styling
+                border_col = "#38BDF8" if is_selected else "rgba(255,255,255,0.12)"
+                shadow = "0 0 18px rgba(56,189,248,0.55)" if is_selected else "none"
+                scale = "scale(1.04)" if is_selected else "scale(1)"
+
+                # Render visual thumbnail card
+                if img_path and isinstance(img_path, str) and img_path.startswith("http"):
+                    st.markdown(f"""
+                    <div style="border-radius:12px;overflow:hidden;border:2px solid {border_col};
+                                box-shadow:{shadow};transform:{scale};transition:all 0.25s ease;
+                                background:rgba(15,23,42,0.7);text-align:center;padding-bottom:4px;">
+                      <img src="{img_path}" style="width:100%;aspect-ratio:1;object-fit:cover;" loading="lazy">
+                      <div style="font-size:0.65rem;font-weight:700;color:#CBD5E1;padding:3px 4px 2px;">{star}{short}</div>
+                    </div>""", unsafe_allow_html=True)
+                elif img_path and os.path.exists(str(img_path)):
+                    try:
+                        import base64
+                        ext = os.path.splitext(img_path)[1].lstrip(".").lower()
+                        if ext == "jpg": ext = "jpeg"
+                        with open(img_path, "rb") as f:
+                            b64 = base64.b64encode(f.read()).decode()
+                        st.markdown(f"""
+                        <div style="border-radius:12px;overflow:hidden;border:2px solid {border_col};
+                                    box-shadow:{shadow};transform:{scale};transition:all 0.25s ease;
+                                    background:rgba(15,23,42,0.7);text-align:center;padding-bottom:4px;">
+                          <img src="data:image/{ext};base64,{b64}" style="width:100%;aspect-ratio:1;object-fit:cover;">
+                          <div style="font-size:0.65rem;font-weight:700;color:#CBD5E1;padding:3px 4px 2px;">{star}{short}</div>
+                        </div>""", unsafe_allow_html=True)
+                    except Exception:
+                        icon = "⭐" if is_celeb else "👤"
+                        st.markdown(f"""
+                        <div style="border-radius:12px;border:2px solid {border_col};box-shadow:{shadow};
+                                    transform:{scale};background:rgba(15,23,42,0.7);text-align:center;
+                                    aspect-ratio:1;display:flex;flex-direction:column;align-items:center;
+                                    justify-content:center;gap:4px;">
+                          <span style="font-size:1.8rem;">{icon}</span>
+                          <div style="font-size:0.65rem;font-weight:700;color:#CBD5E1;">{star}{short}</div>
+                        </div>""", unsafe_allow_html=True)
+                else:
+                    icon = "⭐" if is_celeb else "👤"
+                    st.markdown(f"""
+                    <div style="border-radius:12px;border:2px solid {border_col};box-shadow:{shadow};
+                                transform:{scale};background:rgba(15,23,42,0.7);text-align:center;
+                                aspect-ratio:1;display:flex;flex-direction:column;align-items:center;
+                                justify-content:center;gap:4px;padding:8px;">
+                      <span style="font-size:1.8rem;">{icon}</span>
+                      <div style="font-size:0.65rem;font-weight:700;color:#CBD5E1;">{star}{short}</div>
+                    </div>""", unsafe_allow_html=True)
+
+                # Clickable select button below the visual card
+                btn_type = "primary" if is_selected else "secondary"
+                if st.button("✔ Selected" if is_selected else "Select",
+                             key=f"tc_{state_key}_{row_start}_{col_idx}",
+                             use_container_width=True, type=btn_type):
+                    st.session_state[state_key] = name
+                    new_selection = name
+                    st.rerun()
+
+    if new_selection:
+        selected_val = items_dict.get(new_selection)
+        disp = new_selection
+        if isinstance(selected_val, dict):
+            disp = selected_val.get("name", new_selection)
+        st.caption(f"✅ Selected: **{disp}**")
+
+    return new_selection
+
+
+def fidelity_mode_selector(state_key="fidelity_mode"):
+    """
+    Renders the Content Fidelity selector row.
+    Returns (selected_label, prompt_modifier_string)
+    """
+    modes = {
+        "🎬 Cinematic": ("ultra high fidelity, professional cinematography, perfect studio lighting, flawless editorial retouching, luxury production value, sharp focus, masterful color grade",
+                          "Perfect lighting, flawless retouching, luxury polish"),
+        "📱 UGC / Raw": ("authentic user-generated content style, slightly handheld, natural imperfections, no retouching, raw and real, casual framing, phone camera feel, genuine candid energy, unfiltered, lived-in",
+                          "Handheld, no retouching, real imperfections"),
+        "🌟 Influencer": ("ring light glow, clean polished background, Instagram-ready, soft natural lighting, effortlessly styled, beauty-tuned but approachable, socially optimized framing",
+                           "Ring light glow, polished but approachable"),
+        "🏃 Lifestyle": ("candid motion energy, authentic real-life moments, slight motion blur, dynamic angles, documentary feel, unposed and genuine, natural environment",
+                          "Candid energy, authentic moments, doc feel"),
+        "🎞️ Editorial": ("fashion editorial precision, dramatic studio shadows, avant-garde composition, high contrast, magazine-quality retouching, artistic direction, high concept",
+                           "Dramatic studio, magazine-quality, high concept"),
+    }
+
+    if state_key not in st.session_state:
+        st.session_state[state_key] = "🎬 Cinematic"
+
+    st.markdown("**🎨 Content Look & Fidelity**")
+
+    labels = list(modes.keys())
+    cols = st.columns(len(labels))
+    for i, lbl in enumerate(labels):
+        modifier, desc = modes[lbl]
+        with cols[i]:
+            is_active = st.session_state[state_key] == lbl
+            if st.button(lbl, key=f"fid_{state_key}_{i}", use_container_width=True,
+                         type="primary" if is_active else "secondary", help=desc):
+                st.session_state[state_key] = lbl
+                st.rerun()
+
+    selected_label = st.session_state[state_key]
+    modifier, desc = modes[selected_label]
+    st.caption(f"*{desc}*")
+    return selected_label, modifier

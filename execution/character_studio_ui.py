@@ -118,13 +118,83 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             with st.expander("Core Identity", expanded=True):
                 c_gender = st.selectbox("Gender", ["Female", "Male", "Non-Binary"])
                 eth_opts = [
+                    # ── General ──
                     "Any",
-                    "African American", "East Asian (Korean/Japanese)", "Southeast Asian", 
-                    "South Asian (Indian)", "Middle Eastern", "Mediterranean", 
-                    "Northern European", "Eastern European", "Latino/Hispanic", 
-                    "Indigenous", "Mixed Race", "Afro-Latina", "Nordic"
+                    "Mixed Race",
+                    # ── African Nations ──
+                    "Nigerian (Yoruba / Igbo / Hausa)",
+                    "Ghanaian",
+                    "Kenyan / East African",
+                    "Ethiopian / Eritrean",
+                    "Somali",
+                    "South African (Zulu / Xhosa)",
+                    "Congolese / Central African",
+                    "Senegalese / West African",
+                    "Ugandan / Rwandan",
+                    "Tanzanian",
+                    "Cameroonian",
+                    "Sudanese / Nubian",
+                    "Zimbabwean",
+                    "African American",
+                    "Afro-Caribbean",
+                    # ── Latino / Latin American ──
+                    "Mexican",
+                    "Puerto Rican",
+                    "Dominican",
+                    "Cuban",
+                    "Colombian",
+                    "Venezuelan",
+                    "Brazilian",
+                    "Argentinian",
+                    "Peruvian",
+                    "Chilean",
+                    "Ecuadorian",
+                    "Guatemalan / Central American",
+                    "Afro-Latina",
+                    "Indigenous Latin American",
+                    # ── East / Southeast Asian ──
+                    "Korean",
+                    "Japanese",
+                    "Chinese (Han)",
+                    "Chinese (Cantonese)",
+                    "Taiwanese",
+                    "Vietnamese",
+                    "Filipino",
+                    "Thai",
+                    "Indonesian / Javanese",
+                    "Malay",
+                    "Cambodian / Khmer",
+                    "Burmese / Myanmar",
+                    # ── South Asian ──
+                    "Indian (North — Punjabi / Hindi)",
+                    "Indian (South — Tamil / Telugu)",
+                    "Pakistani",
+                    "Bangladeshi",
+                    "Sri Lankan",
+                    "Nepali",
+                    # ── Middle Eastern / North African ──
+                    "Arab (Gulf — Saudi / Emirati / Kuwaiti)",
+                    "Arab (Levant — Lebanese / Syrian / Palestinian)",
+                    "Egyptian",
+                    "Moroccan / Maghrebi",
+                    "Turkish",
+                    "Iranian / Persian",
+                    "Israeli",
+                    # ── European ──
+                    "Nordic / Scandinavian (Swedish / Norwegian / Danish)",
+                    "Northern European (British / Irish / Dutch)",
+                    "Mediterranean (Italian / Greek / Spanish / Portuguese)",
+                    "Eastern European (Russian / Polish / Ukrainian)",
+                    "Slavic (Czech / Slovak / Serbian / Croatian)",
+                    "Balkan",
+                    "French",
+                    "German / Austrian)",
+                    # ── Other ──
+                    "Indigenous / Native American",
+                    "Pacific Islander (Hawaiian / Samoan / Tongan)",
+                    "Central Asian (Kazakh / Uzbek)",
                 ]
-                c_ethnicity = st.selectbox("Ethnicity", eth_opts)
+                c_ethnicity = st.selectbox("Ethnicity / Background", eth_opts)
                 c_age = st.slider("Age", 18, 90, 25)
             
 
@@ -237,19 +307,34 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                         ])
                         
                         tat_place_opts = [
+                            # Arms
                             "Full Sleeve — Left Arm", "Full Sleeve — Right Arm",
                             "Forearm — Left", "Forearm — Right",
                             "Upper Arm — Left", "Upper Arm — Right",
+                            "Elbow (ditch) — Left", "Elbow (ditch) — Right",
+                            "Wrist — Left", "Wrist — Right",
                             "Hands", "Fingers / Knuckles",
-                            "Chest", "Sternum / Underboob",
-                            "Stomach / Abs", "Full Stomach",
-                            "Ribs / Side", "Lower Back",
-                            "Full Back", "Upper Back", "Spine",
-                            "Shoulders", "Traps",
-                            "Neck — Front", "Neck — Side", "Behind Ear",
-                            "Face Tattoos", "Face — Minimal",
+                            # Chest & Torso
+                            "Chest — Left Pec", "Chest — Right Pec", "Full Chest Panel",
+                            "Sternum / Underboob",
+                            "Stomach / Abs (upper)", "Lower Stomach / Below Navel", "Full Stomach",
+                            "Ribs / Side — Left", "Ribs / Side — Right",
+                            # Back
+                            "Upper Back", "Full Back", "Lower Back", "Spine / Backbone",
+                            "Traps", "Shoulders",
+                            # Neck & Head
+                            "Neck — Front", "Neck — Side Left", "Neck — Side Right",
+                            "Behind Ear — Left", "Behind Ear — Right",
+                            "Face — Minimal (teardrop / small)",
+                            "Face — Heavy Coverage",
+                            "Scalp / Head",
+                            # Legs
                             "Full Leg — Left", "Full Leg — Right",
-                            "Thighs", "Calves", "Ankles / Feet",
+                            "Thigh — Left", "Thigh — Right",
+                            "Knee (kneecap)",
+                            "Shin / Calf — Left", "Shin / Calf — Right",
+                            "Ankles", "Feet / Top of Foot", "Sole / Bottom of Foot",
+                            # Full Body
                             "Full Body Coverage",
                         ]
                         c_tat_place = st.multiselect("Placement", tat_place_opts)
@@ -261,6 +346,69 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 
                 # Skin
                 c_skin = st.multiselect("Skin Details", ["Freckles", "Beauty Marks", "Moles", "Vitiligo", "Scarring", "Acne", "Perfect Skin", "Textured Skin", "Wrinkles", "Dimples"])
+
+            with st.expander("💍 Accessories & Jewelry", expanded=False):
+                st.caption("Add earrings, piercings, necklaces, watches, rings, and bracelets")
+                
+                acc1, acc2 = st.columns(2)
+                with acc1:
+                    c_earrings = st.selectbox("Earrings", [
+                        "None", "Studs (small)", "Studs (diamond/gem)",
+                        "Small Hoops", "Medium Hoops", "Large Statement Hoops",
+                        "Huggie Hoops", "Dangling / Drop Earrings",
+                        "Chandelier Earrings", "Ear Cuffs",
+                        "Pearl Earrings", "Gold Studs", "Silver Studs",
+                        "Mismatched / Asymmetrical", "No Earrings"
+                    ])
+                    c_necklace = st.selectbox("Necklace", [
+                        "None", "Dainty Gold Chain", "Dainty Silver Chain",
+                        "Layered Chains (2-3)", "Layered Chains (4+)",
+                        "Pendant Necklace", "Cross Necklace",
+                        "Diamond / Tennis Necklace", "Pearl Strand",
+                        "Choker (Velvet)", "Choker (Chain)",
+                        "Cuban Link Chain", "Rope Chain",
+                        "Body Chain", "Locket Necklace",
+                        "No Necklace"
+                    ])
+                    c_watch = st.selectbox("Watch", [
+                        "None", "Rolex (Classic Jubilee)", "Rolex Daytona",
+                        "AP Royal Oak (Audemars Piguet)", "Patek Philippe",
+                        "Cartier Santos / Tank", "Richard Mille",
+                        "Hublot Big Bang", "IWC Pilot",
+                        "Apple Watch (Sport)", "Apple Watch Ultra",
+                        "Samsung Galaxy Watch", "Casio G-Shock",
+                        "Minimalist Dress Watch", "Gold Watch", "Silver Watch",
+                        "No Watch"
+                    ])
+                with acc2:
+                    c_rings = st.multiselect("Rings", [
+                        "Gold Band (plain)", "Silver Band (plain)",
+                        "Diamond Engagement Ring", "Diamond Tennis Ring",
+                        "Pinky Ring (gold)", "Pinky Ring (silver)",
+                        "Signet Ring", "Statement Ring (large gem)",
+                        "Snake Ring", "Stackable Rings (multiple)",
+                        "Knuckle Rings", "Full Finger Ring (armor)",
+                        "Wedding Band", "Eternity Band"
+                    ])
+                    c_bracelets = st.multiselect("Bracelets / Bangles", [
+                        "Gold Bangle", "Silver Bangle",
+                        "Stacked Bangles", "Tennis Bracelet (diamonds)",
+                        "Chain Bracelet", "Cuff Bracelet",
+                        "Beaded Bracelet", "Evil Eye Bracelet",
+                        "Cartier Love Bracelet", "Hermes Clic Clac",
+                        "Thread / String Bracelet"
+                    ])
+                    c_piercings = st.multiselect("Body Piercings", [
+                        "Nose Ring (hoop)", "Nose Stud",
+                        "Septum Ring", "Eyebrow Piercing",
+                        "Lip Ring", "Labret Stud",
+                        "Tongue Piercing",
+                        "Industrial / Helix Piercing",
+                        "Tragus Piercing", "Conch Piercing",
+                        "Belly Button Ring / Navel Piercing",
+                        "Cheek Piercings (dimple piercings)",
+                        "Multiple Ear Piercings (stacked)"
+                    ])
 
 
             with st.expander("Makeup (Granular)", expanded=False):
@@ -313,6 +461,26 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             st.markdown("**5. Finalize**")
             char_name = st.text_input("Character Name", placeholder="e.g. Sarah")
             
+            # Safe defaults if Accessories expander was never opened in this session
+            if 'c_earrings' not in dir():
+                try: c_earrings
+                except NameError: c_earrings = "None"
+            if 'c_necklace' not in dir():
+                try: c_necklace
+                except NameError: c_necklace = "None"
+            if 'c_watch' not in dir():
+                try: c_watch
+                except NameError: c_watch = "None"
+            if 'c_rings' not in dir():
+                try: c_rings
+                except NameError: c_rings = []
+            if 'c_bracelets' not in dir():
+                try: c_bracelets
+                except NameError: c_bracelets = []
+            if 'c_piercings' not in dir():
+                try: c_piercings
+                except NameError: c_piercings = []
+
             # Submit
             st.markdown("<br>", unsafe_allow_html=True)
             col_q, col_sub = st.columns([1, 2])
@@ -372,6 +540,13 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                    "tattoo_places": c_tat_place,
                    "tattoo_coverage": c_tat_coverage,
                    "tattoo_sleeve": c_sleeve_style,
+                   # Accessories
+                   "earrings": c_earrings,
+                   "necklace": c_necklace,
+                   "watch": c_watch,
+                   "rings": c_rings,
+                   "bracelets": c_bracelets,
+                   "piercings": c_piercings,
                    "description": extra_description,
                    "likeness": likeness
                 }
