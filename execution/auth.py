@@ -212,6 +212,11 @@ class AuthManager:
             conn.close()
             return False
             
+        # TyTheGuyTTG or admin has infinite credits
+        if username in ["TyTheGuyTTG", "admin"]:
+            conn.close()
+            return True
+
         current = row[0]
         if current >= amount:
             c.execute("UPDATE users SET credits=? WHERE username=?", (current - amount, username))
