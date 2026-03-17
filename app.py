@@ -1616,6 +1616,7 @@ if selection == "World Builder":
         
         card_end()
     
+    gen_world = False  # default; set to True inside form when user submits
     if selected_scenario_key:
         # --- SCENE COMPOSITION UI (Synced with Filesystem) ---
         # Fragment to prevent full reload
