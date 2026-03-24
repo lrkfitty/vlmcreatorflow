@@ -138,11 +138,12 @@ def generate_video_kling(
         if negative_prompt:
             payload["negative_prompt"] = negative_prompt
 
-        # ── Kling 3.0: Native Audio ──────────────────────────────────
-        # enable_audio=True — Kling generates lip-sync / ambient audio (verified param name)
-        # Requires Pro mode on Kling 2.6+
+        # ── Native Audio ──────────────────────────────────────
+        # Official Kling API param: "sound": "on" (string, not boolean)
+        # Requires Pro mode on Kling 2.6+. Doubles credit cost.
         if native_audio:
-            payload["enable_audio"] = True
+            payload["sound"] = "on"
+            payload["enable_audio"] = True  # Fallback alias used by some versions
 
         # ── Kling 3.0: Custom Audio URL ──────────────────────────────
         # Provide a public audio URL — mutually exclusive with enable_audio

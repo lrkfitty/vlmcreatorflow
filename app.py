@@ -3586,6 +3586,8 @@ if selection == "Video Studio":
                         else:
                              st.write(f"Sending to Kling API (Model: {model_version_input}, Mode: {mode_val.upper()})...")
                              st.write("Processing... (Standard: ~2-5m, Pro: ~5-10m)")
+                             st.caption(f"🔍 Debug — native_audio: `{st.session_state.get('vt_native_audio', False)}` | audio_url: `{st.session_state.get('vt_audio_url', '') or 'None'}`")
+
 
                              # ── Resolve Kling 3.0 extras ──────────────────
                              # Character / element reference images
