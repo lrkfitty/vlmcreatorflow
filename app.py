@@ -3350,24 +3350,22 @@ if selection == "Video Studio":
                         _variant_label = st.selectbox("Model Variant", list(_variant_opts.keys()), key="vid_variant")
                         model_version_input = _variant_opts[_variant_label]
                         st.caption(f"Resolved model: `kling-v{model_version_input.replace('.', '-')}`")
-                         
-                         st.divider()
-                         st.markdown("**Cinematic Overrides (Prompt Injection)**")
-                         v_stock = st.selectbox("Film Stock", ["None"] + knowledge_base.get("film_stocks", []), key="vid_stock")
-                         v_filter = st.selectbox("Filter / Look", ["None"] + knowledge_base.get("filters", []), key="vid_filter")
-                         v_movie_style = st.selectbox("Movie Reference", ["None"] + knowledge_base.get("movie_styles", []), key="vid_style")
-                         
-                         st.markdown("**Action & Transition**")
-                         c_act, c_trans = st.columns(2)
-                         with c_act:
+                        st.divider()
+                        st.markdown("**Cinematic Overrides (Prompt Injection)**")
+                        v_stock = st.selectbox("Film Stock", ["None"] + knowledge_base.get("film_stocks", []), key="vid_stock")
+                        v_filter = st.selectbox("Filter / Look", ["None"] + knowledge_base.get("filters", []), key="vid_filter")
+                        v_movie_style = st.selectbox("Movie Reference", ["None"] + knowledge_base.get("movie_styles", []), key="vid_style")
+                        st.markdown("**Action & Transition**")
+                        c_act, c_trans = st.columns(2)
+                        with c_act:
                              # Actions relevant for video
                              vid_actions = ["None", "Slow Motion Walk", "Turning Head", "Running", "Dancing", "Talking", "Laughing", "Fighting", "Driving", "Flying", "Explosion", "Wind blowing hair"]
                              v_action = st.selectbox("Subject Action", vid_actions, key="vid_action_override")
-                         with c_trans:
+                        with c_trans:
                              v_trans = st.selectbox("Transition In", ["None"] + knowledge_base.get("transitions", []), key="vid_trans")
-    
+
                     mode_val = "pro" if "Professional" in quality else "std"
-                    
+
                     # Camera Controls
                     camera_data = None
                     with st.expander("Camera & Motion Control", expanded=False):
