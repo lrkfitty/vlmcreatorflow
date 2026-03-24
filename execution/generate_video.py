@@ -69,14 +69,29 @@ def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", qu
     else:
         return {"status": "failed", "error": f"Image path not found: {image_path}"}
 
-    # User Request: ALWAYS use Kling 2.6 (splits on mode parameter if API supports it, otherwise just use 2.6)
-    # DOCS UPDATE: 
-    # 1. Key is now 'model_name', not 'model'.
-    # 2. Format is 'kling-v2-6' (hyphens), not 'kling-v2.6' (dots).
-    
-    clean_version = model_version.replace(".", "-") if "2.6" in model_version else model_version
-    target_model_name = f"kling-v{clean_version}" 
-    target_model_name = target_model_name.replace(".", "-")
+    # --- MODEL NAME MAPPING ---
+    # Maps friendly version strings to official Kling API model_name identifiers.
+    MODEL_NAME_MAP = {
+        # Kling 3.0 Series (latest)
+        "3.0":        "kling-v3-0",
+        "3.0-omni":   "kling-v3-0-omni",      # multimodal (audio + video)
+        "3.0-motion": "kling-v3-0-motion",    # motion control 3.0
+        # Kling 2.0 Series
+        "2.0":        "kling-v2-0",
+        "2.0-master": "kling-v2-0-master",    # Master Edition alias
+        # Kling 2.6 Series (stable default)
+        "2.6":        "kling-v2-6",
+        # Kling 1.x (legacy, still supported)
+        "1.6":        "kling-v1-6",
+        "1.5":        "kling-v1-5",
+    }
+    target_model_name = MODEL_NAME_MAP.get(model_version.strip(), f"kling-v{model_version.replace('.', '-')}")
+
+    # --- DURATION SAFETY ---
+    # Kling 3.0 supports 5s, 10s, 15s. Older models only support 5s / 10s.
+    duration_int = int(str(duration).replace("s", ""))
+    if duration_int == 15 and "v3" not in target_model_name:
+        duration_int = 10  # Clamp to 10s for non-3.0 models
 
     # --- MODE SELECTION ---
     if ref_video_path:
@@ -103,7 +118,7 @@ def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", qu
             "model_name": target_model_name, 
             "image": encoded_string,
             "prompt": prompt,
-            "duration": duration,
+            "duration": duration_int,
             "mode": quality_mode, # "std" or "pro"
             "cfg_scale": 0.5
         }

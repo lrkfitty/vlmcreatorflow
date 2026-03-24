@@ -3054,8 +3054,8 @@ if selection == "Art Director":
 # ==========================================
 if selection == "Video Studio":
     with st.container():
-        st.markdown("### AI Video Generator (Kling 2.6 / Veo 2.0)")
-        st.info("Transform your generated images into high-motion video clips using the latest 2026 models.")
+        st.markdown("### AI Video Generator (Kling 3.0 / 2.6)")
+        st.info("Transform your generated images into cinematic video clips. Powered by Kling 3.0 (latest), 2.6, and 2.0.")
     
     # Sub-tabs for Creation vs Gallery
     v_tab_create, v_tab_gallery = st.tabs(["Generate Video", "Video Gallery (Recover)"])
@@ -3099,7 +3099,7 @@ if selection == "Video Studio":
         with st.form(key="video_form"):
             # Model Selection
             st.markdown("**Select Video Engine**")
-            video_model = st.selectbox("Engine", ["Kling AI 2.6 (Professional)", "HuMo AI (Human Motion Premium)"], key="vid_model_select")
+            video_model = st.selectbox("Engine", ["Kling AI 3.0 (Latest)", "Kling AI 2.6 (Stable)", "Kling AI 2.0 (Master)", "HuMo AI (Human Motion Premium)"], key="vid_model_select")
             
             col_v_in, col_v_set = st.columns([1, 1])
         
@@ -3135,18 +3135,33 @@ if selection == "Video Studio":
             # Settings Column (Dynamic)
             with col_v_set:
                 if "Kling" in video_model:
-                    st.info("⚡ Engine: **Kling AI 2.6** (Professional)")
+                    # Map UI selection → model version string
+                    _model_ver_map = {
+                        "Kling AI 3.0 (Latest)":  "3.0",
+                        "Kling AI 2.6 (Stable)":  "2.6",
+                        "Kling AI 2.0 (Master)":  "2.0",
+                    }
+                    model_version_input = _model_ver_map.get(video_model, "2.6")
+                    st.info(f"⚡ Engine: **{video_model}**")
                     
                     col_dur, col_qual = st.columns(2)
                     with col_dur:
-                        duration = st.selectbox("Duration", ["5s", "10s"])
+                        _dur_opts = ["5s", "10s", "15s"] if "3.0" in video_model else ["5s", "10s"]
+                        duration = st.selectbox("Duration", _dur_opts, help="15s is only available on Kling 3.0")
                     with col_qual:
                         quality = st.selectbox("Quality Mode", ["Professional (High Quality, Slower)", "Standard (Fast, Efficient)"])
                         
-                    # Advanced Model Override
+                    # Advanced: Omni / Motion Control variants
                     with st.expander("Advanced Model Settings (Override)", expanded=False):
-                         model_version_input = st.text_input("Kling Model Version", value="2.6", help="Code auto-converts '2.6' to 'kling-v2-6'.")
-                         st.caption("Available: `2.6` (Latest), `1.6` (Stable), `1.5`.")
+                        _variant_opts = {
+                            "Standard": model_version_input,
+                            "Omni (Native Audio + Video, 3.0 only)": "3.0-omni",
+                            "Motion Control 3.0": "3.0-motion",
+                            "Kling 1.6 (Legacy Stable)": "1.6",
+                        }
+                        _variant_label = st.selectbox("Model Variant", list(_variant_opts.keys()), key="vid_variant")
+                        model_version_input = _variant_opts[_variant_label]
+                        st.caption(f"Resolved model: `kling-v{model_version_input.replace('.', '-')}`")
                          
                          st.divider()
                          st.markdown("**Cinematic Overrides (Prompt Injection)**")
@@ -3326,7 +3341,7 @@ if selection == "Video Studio":
                              st.error("Missing KLING_ACCESS_KEY/SECRET.")
                              status.update(label="Failed", state="error")
                         else:
-                             st.write(f"Sending to Kling AI 2.6 API ({mode_val.upper()} Mode)...")
+                             st.write(f"Sending to Kling API (Model: kling-v{model_version_input.replace('.', '-')}, Mode: {mode_val.upper()})...")
                              st.write("Processing... (Standard: ~2-5m, Pro: ~5-10m)")
                              
                              result = generate_video_kling(
