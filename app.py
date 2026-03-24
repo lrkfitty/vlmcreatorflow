@@ -3058,9 +3058,197 @@ if selection == "Video Studio":
         st.info("Transform your generated images into cinematic video clips. Powered by Kling 3.0 (latest), 2.6, and 2.0.")
     
     # Sub-tabs for Creation vs Gallery
-    v_tab_create, v_tab_gallery = st.tabs(["Generate Video", "Video Gallery (Recover)"])
+    v_tab_create, v_tab_multishot, v_tab_gallery = st.tabs(["Generate Video", "🎬 Multi-Shot Video", "Video Gallery (Recover)"])
     
+    with v_tab_multishot:
+        st.markdown("#### 🎬 Multi-Shot Video Generator")
+        st.info("Select a character from your asset library and generate the same scene from multiple cinematic angles — all consistent via Kling reference locking.")
+
+        # ── Character & Outfit Pickers ──────────────────────────────────────
+        _ms_assets = st.session_state.get("global_assets", {})
+        _ms_chars  = _ms_assets.get("characters", {}).copy()
+        _ms_chars.update(_ms_assets.get("relations", {}))
+        _ms_outfits = _ms_assets.get("outfits", {})
+
+        _char_list   = ["None (upload below)"] + sorted(_ms_chars.keys())
+        _outfit_list = ["None"] + sorted(_ms_outfits.keys())
+
+        ms_col1, ms_col2 = st.columns(2)
+        with ms_col1:
+            ms_char_sel = st.selectbox("Character Reference", _char_list, key="msv_char")
+        with ms_col2:
+            ms_outfit_sel = st.selectbox("Outfit Reference", _outfit_list, key="msv_outfit")
+
+        # Resolve paths
+        _ms_char_path   = _ms_chars.get(ms_char_sel) if ms_char_sel != "None (upload below)" else None
+        _ms_outfit_path = _ms_outfits.get(ms_outfit_sel) if ms_outfit_sel != "None" else None
+
+        if isinstance(_ms_char_path, dict):   _ms_char_path   = _ms_char_path.get("default_img")
+        if isinstance(_ms_outfit_path, dict): _ms_outfit_path = _ms_outfit_path.get("default_img")
+
+        # Show thumbnails
+        if _ms_char_path or _ms_outfit_path:
+            th1, th2 = st.columns(2)
+            with th1:
+                if _ms_char_path: st.image(_ms_char_path, caption=ms_char_sel, width=120)
+            with th2:
+                if _ms_outfit_path: st.image(_ms_outfit_path, caption=ms_outfit_sel, width=120)
+
+        # Fallback: upload image if no character selected
+        ms_uploaded = None
+        if not _ms_char_path:
+            ms_uploaded = st.file_uploader("Or upload a reference image", type=["png","jpg","jpeg"], key="msv_upload")
+
+        st.divider()
+
+        # ── Settings ─────────────────────────────────────────────────────────
+        ms_set1, ms_set2, ms_set3 = st.columns(3)
+        with ms_set1:
+            ms_model = st.selectbox("Kling Model", ["3.0", "2.6", "2.0"], key="msv_model",
+                                    help="3.0 = latest, supports 15s")
+        with ms_set2:
+            _ms_dur_opts = ["5s", "10s", "15s"] if ms_model == "3.0" else ["5s", "10s"]
+            ms_duration  = st.selectbox("Duration Per Shot", _ms_dur_opts, key="msv_dur")
+        with ms_set3:
+            ms_quality = st.selectbox("Quality", ["Professional", "Standard"], key="msv_qual")
+
+        ms_motion_prompt = st.text_area(
+            "Motion / Scene Prompt",
+            placeholder="Describe what's happening — will be appended with the camera angle for each shot.\n\nExample: 'Walking confidently through a neon-lit street, cinematic, film grain'",
+            height=90,
+            key="msv_prompt"
+        )
+
+        # ── Angle Selector ────────────────────────────────────────────────────
+        st.markdown("**Select Camera Angles to Generate**")
+        _ms_angle_options = [
+            "Wide Shot",
+            "Medium Shot",
+            "Close-Up",
+            "Over-the-Shoulder",
+            "Low Angle",
+            "High Angle",
+            "Dutch Angle",
+            "POV Shot",
+            "Full Body",
+            "Profile (Side View)",
+            "Three-Quarter Angle",
+            "Bird's Eye View",
+        ]
+        ms_angles = st.multiselect(
+            "Angles (each = 1 credit + 5 Kling credits)",
+            _ms_angle_options,
+            default=["Wide Shot", "Medium Shot", "Close-Up"],
+            key="msv_angles"
+        )
+
+        st.caption(f"💳 Cost: **{len(ms_angles) * 5} credits** for {len(ms_angles)} shot(s)")
+
+        ms_generate_btn = st.button("🎬 Generate Multi-Shot Videos", type="primary", key="msv_gen_btn",
+                                     disabled=not ms_angles)
+
+        if ms_generate_btn:
+            _user = st.session_state.current_user.get("username") if st.session_state.get("current_user") else "guest"
+            _total_credits = len(ms_angles) * 5
+            if not auth_mgr.deduct_credits(_user, _total_credits):
+                st.error(f"❌ Need {_total_credits} credits for {len(ms_angles)} shots.")
+            elif not (_ms_char_path or ms_uploaded):
+                st.error("Please select a character or upload a reference image.")
+            elif not ms_motion_prompt.strip():
+                st.error("Please enter a motion / scene prompt.")
+            else:
+                # Resolve source image path
+                _ref_img_path = _ms_char_path
+                if not _ref_img_path and ms_uploaded:
+                    _tmp_vid_ref = os.path.join("output", "temp_msv_ref.png")
+                    with open(_tmp_vid_ref, "wb") as _f: _f.write(ms_uploaded.getbuffer())
+                    _ref_img_path = _tmp_vid_ref
+
+                # Build character identity prefix for the prompt
+                _char_prefix = ""
+                if ms_char_sel != "None (upload below)":
+                    _char_name = ms_char_sel.replace("(My) ","").split("/")[-1]
+                    _char_name = os.path.splitext(_char_name)[0] if "." in _char_name else _char_name
+                    _char_prefix = (
+                        f"IDENTITY LOCK: The character in the reference image is {_char_name}. "
+                        f"Maintain EXACT facial identity, body, and appearance from the reference. "
+                    )
+                if _ms_outfit_path and ms_outfit_sel != "None":
+                    _char_prefix += f"Character wears: {os.path.splitext(ms_outfit_sel.split('/')[-1])[0]}. "
+
+                _ms_mode = "pro" if ms_quality == "Professional" else "std"
+                _ms_dur_int = int(ms_duration.replace("s", ""))
+
+                st.session_state["msv_results"] = []
+
+                for _angle in ms_angles:
+                    with st.spinner(f"🎬 Generating: {_angle}..."):
+                        _angle_instruction = {
+                            "Wide Shot":            "Wide establishing shot. Full scene visible. Deep depth of field.",
+                            "Medium Shot":          "Medium shot, waist-up framing. Natural depth of field.",
+                            "Close-Up":             "Close-up on face. Head and shoulders. Shallow depth of field, bokeh background.",
+                            "Over-the-Shoulder":    "Over-the-shoulder perspective. Subject in foreground softly blurred, focus ahead.",
+                            "Low Angle":            "Low angle looking up. Powerful, dominant framing.",
+                            "High Angle":           "High angle looking down. Vulnerable, omniscient viewpoint.",
+                            "Dutch Angle":          "Dutch angle / tilted frame. Tension and unease.",
+                            "POV Shot":             "First-person POV shot. Camera IS the character's eyes.",
+                            "Full Body":            "Full body shot, head to toe. Shows posture, movement, and outfit completely.",
+                            "Profile (Side View)":  "Pure side profile. 90-degree lateral view. Strong silhouette and jawline.",
+                            "Three-Quarter Angle":  "Three-quarter angle, 45 degrees to subject. Classic cinematic portrait depth.",
+                            "Bird's Eye View":      "Bird's eye view directly overhead. Spatial layout and movement patterns revealed.",
+                        }.get(_angle, f"{_angle} camera angle.")
+
+                        _full_prompt = f"{_char_prefix}{ms_motion_prompt.strip()}, CAMERA: {_angle_instruction} Photorealistic, cinematic, film grain, professional cinematography."
+
+                        _vid_result = generate_video_kling(
+                            _ref_img_path,
+                            _full_prompt,
+                            duration=_ms_dur_int,
+                            model_version=ms_model,
+                            quality_mode=_ms_mode,
+                            output_folder=get_user_out_dir("Videos")
+                        )
+
+                        if _vid_result["status"] == "success":
+                            st.session_state["msv_results"].append({
+                                "angle": _angle,
+                                "video_path": _vid_result.get("video_path"),
+                                "video_url":  _vid_result.get("video_url"),
+                            })
+                            st.toast(f"✅ {_angle} complete!")
+                        else:
+                            auth_mgr.add_credits(_user, 5)  # Refund this shot
+                            st.error(f"{_angle} failed: {_vid_result.get('error', 'Unknown error')}")
+
+                st.success(f"🎬 Multi-Shot complete! {len(st.session_state.get('msv_results', []))} shots generated.")
+                st.rerun()
+
+        # ── Results Grid ──────────────────────────────────────────────────────
+        if st.session_state.get("msv_results"):
+            st.divider()
+            st.markdown("#### 🎬 Generated Shots")
+            _res_list = st.session_state["msv_results"]
+            _res_cols = st.columns(min(2, len(_res_list)))
+            for _ri, _rv in enumerate(_res_list):
+                with _res_cols[_ri % 2]:
+                    st.markdown(f"**{_rv['angle']}**")
+                    _vp = _rv.get("video_path")
+                    _vu = _rv.get("video_url")
+                    if _vp and os.path.exists(_vp):
+                        st.video(_vp)
+                        with open(_vp, "rb") as _vf:
+                            st.download_button(
+                                f"⬇️ Download — {_rv['angle']}",
+                                _vf,
+                                file_name=os.path.basename(_vp),
+                                mime="video/mp4",
+                                key=f"dl_msv_{_ri}"
+                            )
+                    elif _vu:
+                        st.video(_vu)
+
     with v_tab_gallery:
+
         # Use User Isolated Directory
         vid_dir = get_user_out_dir("Videos")
         
