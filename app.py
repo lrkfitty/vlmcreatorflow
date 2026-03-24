@@ -3342,14 +3342,18 @@ if selection == "Video Studio":
                     # Advanced: Omni / Motion Control variants
                     with st.expander("Advanced Model Settings (Override)", expanded=False):
                         _variant_opts = {
-                            "Standard": model_version_input,
-                            "Omni (Native Audio + Video, 3.0 only)": "3.0-omni",
-                            "Motion Control 3.0": "3.0-motion",
-                            "Kling 1.6 (Legacy Stable)": "1.6",
+                            "Standard (matches engine above)": model_version_input,
+                            "Kling 2.6 (Stable)": "2.6",
+                            "Kling 2.5": "2.5",
+                            "Kling 2.5 Turbo": "2.5-turbo",
+                            "Kling 2.1": "2.1",
+                            "Kling 2.1 Master (Pro only)": "2.1-master",
+                            "Kling 2.0 Master": "2.0-master",
+                            "Kling 1.6 (Legacy)": "1.6",
                         }
                         _variant_label = st.selectbox("Model Variant", list(_variant_opts.keys()), key="vid_variant")
                         model_version_input = _variant_opts[_variant_label]
-                        st.caption(f"Resolved model: `kling-v{model_version_input.replace('.', '-')}`")
+                        st.caption(f"Resolved API name: `{model_version_input}`")
                         st.divider()
                         st.markdown("**Cinematic Overrides (Prompt Injection)**")
                         v_stock = st.selectbox("Film Stock", ["None"] + knowledge_base.get("film_stocks", []), key="vid_stock")

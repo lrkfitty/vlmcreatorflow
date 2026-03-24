@@ -70,20 +70,22 @@ def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", qu
         return {"status": "failed", "error": f"Image path not found: {image_path}"}
 
     # --- MODEL NAME MAPPING ---
-    # Maps friendly version strings to official Kling API model_name identifiers.
+    # Official Kling API model_name identifiers (verified from klingai.com docs).
     MODEL_NAME_MAP = {
-        # Kling 3.0 Series (latest)
-        "3.0":        "kling-v3-0",
-        "3.0-omni":   "kling-v3-0-omni",      # multimodal (audio + video)
-        "3.0-motion": "kling-v3-0-motion",    # motion control 3.0
-        # Kling 2.0 Series
-        "2.0":        "kling-v2-0",
-        "2.0-master": "kling-v2-0-master",    # Master Edition alias
-        # Kling 2.6 Series (stable default)
-        "2.6":        "kling-v2-6",
+        # Kling 3.0 Series (latest) — 3–15s, multi-shot
+        "3.0":        "kling-v3",
+        # Kling 2.x Series
+        "2.6":        "kling-v2-6",           # stable workhorse
+        "2.5":        "kling-v2-5",
+        "2.5-turbo":  "kling-v2-5-turbo",
+        "2.1":        "kling-v2-1",
+        "2.1-master": "kling-v2-1-master",    # pro only
+        "2.0":        "kling-v2",             # "Master Edition" launch name
+        "2.0-master": "kling-v2-master",
         # Kling 1.x (legacy, still supported)
         "1.6":        "kling-v1-6",
         "1.5":        "kling-v1-5",
+        "1.0":        "kling-v1",
     }
     target_model_name = MODEL_NAME_MAP.get(model_version.strip(), f"kling-v{model_version.replace('.', '-')}")
 
@@ -277,6 +279,49 @@ def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", qu
 
     except Exception as e:
         return {"status": "failed", "error": str(e)}
+
+if __name__ == "__main__":
+    import argparse
+    import json as _json
+    from pathlib import Path
+    from dotenv import load_dotenv
+    load_dotenv()
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--image", required=True)
+    parser.add_argument("--prompt", required=True)
+    parser.add_argument("--carousel_id", required=True)
+    parser.add_argument("--queue_file", required=True)
+    parser.add_argument("--model_version", default="3.0")
+    parser.add_argument("--output_folder", default="output")
+    args = parser.parse_args()
+
+    queue_path = Path(args.queue_file)
+
+    def _update_queue(updates):
+        try:
+            q = _json.loads(queue_path.read_text()) if queue_path.exists() else {}
+            if args.carousel_id in q:
+                q[args.carousel_id].update(updates)
+                queue_path.write_text(_json.dumps(q, indent=2))
+        except Exception as ex:
+            print(f"Queue update error: {ex}")
+
+    result = generate_video_kling(
+        image_path=args.image,
+        prompt=args.prompt,
+        model_version=args.model_version,
+        quality_mode="pro",
+        output_folder=args.output_folder,
+    )
+
+    if result.get("status") == "success" and result.get("video_path"):
+        _update_queue({"status": "done", "video_path": result["video_path"]})
+        print(f"Done: {result['video_path']}")
+    else:
+        _update_queue({"status": "failed"})
+        print(f"Failed: {result.get('error', result.get('logs', ''))}")
+
 
 def generate_video_humo(image_path, prompt, audio_path=None, num_frames=49, num_inference_steps=50, guidance_scale=5.0, audio_guidance_scale=5.5, output_folder="output"):
     """
