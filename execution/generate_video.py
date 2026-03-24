@@ -21,7 +21,161 @@ def get_kling_token(access_key, secret_key):
     token = jwt.encode(payload, secret_key, algorithm="HS256", headers=headers)
     return token
 
-def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", quality_mode="pro", camera_control=None, ref_video_path=None, ref_orientation="image", output_folder="output"):
+def generate_video_kling(
+    image_path,
+    prompt,
+    duration=5,
+    model_version="2.6",
+    quality_mode="pro",
+    camera_control=None,
+    ref_video_path=None,
+    ref_orientation="image",
+    output_folder="output",
+    # ── Kling 3.0 New Features ─────────────────────────────────────
+    image_references=None,      # List of local paths or URLs — character/element refs (up to 7)
+                                # Reference them in prompt as @image_1, @image_2 etc.
+    image_tail=None,            # Path/URL to use as the END FRAME of the video
+    native_audio=False,         # True = Kling generates lip-sync audio natively
+    audio_url=None,             # URL to custom audio file (.mp3/.wav, max 5MB, 2-60s)
+    negative_prompt=None,       # Text describing what NOT to include
+):
+    """
+    Generates video using Kling AI API.
+    Supports full Kling 3.0 feature set: native audio, character references,
+    end-frame control, custom audio, and negative prompts.
+    """
+
+    ak = os.getenv("KLING_ACCESS_KEY")
+    sk = os.getenv("KLING_SECRET_KEY")
+
+    if not ak or not sk:
+        return {"status": "failed", "error": "Missing KLING_ACCESS_KEY or KLING_SECRET_KEY"}
+
+    try:
+        token = get_kling_token(ak, sk)
+    except Exception as e:
+        return {"status": "failed", "error": f"Token Generation Failed: {e}"}
+
+    url = "https://api.klingai.com/v1/videos/image2video"
+
+    import base64
+
+    def encode_image(path_or_url):
+        """Returns base64 string for local file, or URL string for remote."""
+        if not path_or_url:
+            return None
+        if isinstance(path_or_url, str) and path_or_url.startswith(('http://', 'https://')):
+            return path_or_url  # Pass URL directly for image_tail / references
+        elif os.path.exists(str(path_or_url)):
+            with open(path_or_url, "rb") as f:
+                return base64.b64encode(f.read()).decode('utf-8')
+        return None
+
+    # Encode primary source image (always base64)
+    encoded_string = ""
+    if image_path.startswith(('http://', 'https://')):
+        try:
+            resp = requests.get(image_path)
+            resp.raise_for_status()
+            encoded_string = base64.b64encode(resp.content).decode('utf-8')
+        except Exception as e:
+            return {"status": "failed", "error": f"Failed to download source image: {e}"}
+    elif os.path.exists(image_path):
+        with open(image_path, "rb") as image_file:
+            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+    else:
+        return {"status": "failed", "error": f"Image path not found: {image_path}"}
+
+    # --- MODEL NAME MAPPING ---
+    MODEL_NAME_MAP = {
+        "3.0":        "kling-v3",
+        "2.6":        "kling-v2-6",
+        "2.5":        "kling-v2-5",
+        "2.5-turbo":  "kling-v2-5-turbo",
+        "2.1":        "kling-v2-1",
+        "2.1-master": "kling-v2-1-master",
+        "2.0":        "kling-v2",
+        "2.0-master": "kling-v2-master",
+        "1.6":        "kling-v1-6",
+        "1.5":        "kling-v1-5",
+        "1.0":        "kling-v1",
+    }
+    target_model_name = MODEL_NAME_MAP.get(model_version.strip(), f"kling-v{model_version.replace('.', '-')}")
+
+    # --- DURATION SAFETY ---
+    duration_int = int(str(duration).replace("s", ""))
+    if duration_int == 15 and "v3" not in target_model_name:
+        duration_int = 10
+
+    # --- MODE SELECTION ---
+    if ref_video_path:
+        # MOTION CONTROL MODE
+        if not ref_video_path.startswith(('http', 'https')):
+            return {"status": "failed", "error": "Motion Control requires a public URL for the reference video."}
+
+        url = "https://api.klingai.com/v1/videos/motion-control"
+        payload = {
+            "image_url": encoded_string,
+            "video_url": ref_video_path,
+            "character_orientation": ref_orientation,
+            "mode": quality_mode,
+            "prompt": prompt,
+            "model_name": target_model_name
+        }
+
+    else:
+        # STANDARD IMAGE-TO-VIDEO
+        payload = {
+            "model_name": target_model_name,
+            "image": encoded_string,
+            "prompt": prompt,
+            "duration": duration_int,
+            "mode": quality_mode,
+            "cfg_scale": 0.5
+        }
+
+        # ── Kling 3.0: Negative Prompt ───────────────────────────────
+        if negative_prompt:
+            payload["negative_prompt"] = negative_prompt
+
+        # ── Kling 3.0: Native Audio ──────────────────────────────────
+        # motion_has_audio=True — Kling generates lip-sync / ambient audio automatically
+        if native_audio:
+            payload["motion_has_audio"] = True
+
+        # ── Kling 3.0: Custom Audio URL ──────────────────────────────
+        # Overrides native_audio if provided
+        if audio_url:
+            payload["audio_url"] = audio_url
+            payload["motion_has_audio"] = False  # Mutually exclusive
+
+        # ── Kling 3.0: End Frame (image_tail) ────────────────────────
+        # Sets the LAST frame of the video — drives the motion path
+        if image_tail:
+            tail_encoded = encode_image(image_tail)
+            if tail_encoded:
+                if image_tail.startswith(('http', 'https')):
+                    payload["image_tail"] = tail_encoded  # URL passthrough
+                else:
+                    payload["image_tail"] = tail_encoded  # base64
+
+        # ── Kling 3.0: Character / Element Reference Images ──────────
+        # Up to 7 images. Reference in prompt as @image_1, @image_2 etc.
+        if image_references:
+            refs_payload = []
+            for i, ref_path in enumerate(image_references[:7], start=1):
+                ref_enc = encode_image(ref_path)
+                if ref_enc:
+                    refs_payload.append({
+                        "image": ref_enc,
+                        "label": f"@image_{i}"
+                    })
+            if refs_payload:
+                payload["image_references"] = refs_payload
+
+        if camera_control:
+            payload["camera_control"] = camera_control
+
     """
     Generates video using Kling AI API.
     camera_control: Optional dict for 'type' and 'config'.

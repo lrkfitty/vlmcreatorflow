@@ -3306,19 +3306,71 @@ if selection == "Video Studio":
                 with col_phy:
                     vid_physics = st.selectbox("Physics Focus", ["Standard", "High Physics", "Jiggle Physics", "Water/Liquids"], help="Enforce specific physics simulations.")
                     
-                motion_prompt = st.text_area("Motion Prompt", height=100, placeholder="Describe the movement...", key="vid_prompt_text")
-                
-                # NOTE: Auto-Generate Vision AI button inside Form acts as Submit. 
-                # This is tricky. We'll disable it or move it out if problematic.
-                # Actually, submit buttons can distinguish themselves.
-                auto_vis = st.form_submit_button("Auto-Generate with Vision AI")
-                
+                motion_prompt = st.text_area("Motion Prompt", height=100, placeholder="Describe the movement. For character refs use @image_1, @image_2 in your prompt.\n\nExample: '@image_1 walks confidently down a neon-lit Tokyo street, cinematic slow motion'", key="vid_prompt_text")
+
+                # ── Kling 3.0: Character Reference ───────────────────────────
+                with st.expander("🎭 Character Reference (Kling 3.0)", expanded=False):
+                    st.caption("Add up to 3 reference images for character/element consistency. Reference them in your prompt as @image_1, @image_2, @image_3.")
+                    _vt_assets = st.session_state.get("global_assets", {})
+                    _vt_chars = _vt_assets.get("characters", {}).copy()
+                    _vt_chars.update(_vt_assets.get("relations", {}))
+                    _vt_outfits = _vt_assets.get("outfits", {})
+
+                    _vt_char_list = ["None"] + sorted(_vt_chars.keys())
+                    _vt_outfit_list = ["None"] + sorted(_vt_outfits.keys())
+
+                    vt_ref1_char = st.selectbox("@image_1 — Character", _vt_char_list, key="vt_ref1_char")
+                    vt_ref2_outfit = st.selectbox("@image_2 — Outfit", _vt_outfit_list, key="vt_ref2_outfit")
+                    vt_ref3_upload = st.file_uploader("@image_3 — Upload Extra Ref", type=["png","jpg","jpeg"], key="vt_ref3")
+
+                    # Resolve paths
+                    def _resolve_asset(val, data_dict):
+                        if val == "None": return None
+                        p = data_dict.get(val)
+                        if isinstance(p, dict): p = p.get("default_img")
+                        return p
+
+                    _vt_ref1_path = _resolve_asset(vt_ref1_char, _vt_chars)
+                    _vt_ref2_path = _resolve_asset(vt_ref2_outfit, _vt_outfits)
+
+                    # Show thumbnails
+                    _vt_thumb_items = [(vt_ref1_char, _vt_ref1_path), (vt_ref2_outfit, _vt_ref2_path)]
+                    _vt_visible = [(l, p) for l, p in _vt_thumb_items if p]
+                    if _vt_visible:
+                        _tc = st.columns(len(_vt_visible))
+                        for _ti, (_tl, _tp) in enumerate(_vt_visible):
+                            with _tc[_ti]: st.image(_tp, caption=_tl.split("/")[-1], width=100)
+
+                # ── Kling 3.0: End Frame Control ─────────────────────────────
+                with st.expander("🎬 End Frame Control (image_tail)", expanded=False):
+                    st.caption("Upload an image to use as the LAST frame — Kling will animate the path between start and end.")
+                    vt_tail_img = st.file_uploader("End Frame Image", type=["png","jpg","jpeg"], key="vt_tail")
+                    if vt_tail_img:
+                        st.image(vt_tail_img, caption="End Frame Preview", width=150)
+
+                # ── Kling 3.0: Audio Controls ────────────────────────────────
+                with st.expander("🔊 Audio (Kling 3.0)", expanded=False):
+                    vt_native_audio = st.checkbox(
+                        "Native Audio Generation",
+                        value=False,
+                        help="Kling auto-generates lip-sync voice + ambient audio. Only available on Kling 2.6+ Pro."
+                    )
+                    if not vt_native_audio:
+                        vt_custom_audio = st.file_uploader("Or upload custom audio (.mp3/.wav, max 5MB, 2–60s)", type=["mp3","wav","m4a"], key="vt_audio")
+                        vt_audio_url_input = st.text_input("Or paste audio URL", key="vt_audio_url", placeholder="https://...")
+                    else:
+                        vt_custom_audio = None
+                        vt_audio_url_input = ""
+
+                # ── Negative Prompt ──────────────────────────────────────────
+                with st.expander("🚫 Negative Prompt", expanded=False):
+                    vt_negative_prompt = st.text_area("What to EXCLUDE from the video", placeholder="blurry, watermark, text overlay, artifacts, distortion...", height=70, key="vt_neg")
+
+                auto_vis = st.form_submit_button("Auto-Generate Motion Prompt with Vision AI")
+
                 if auto_vis:
-                     # ... (Vision logic)
-                     # Since this is a submit, it will rerun. We need to handle logic conditionally.
-                     # However, generating video is also a submit.
-                     # We can't have both run.
-                     pass # We will handle logic below outside form? No, inside form but check bools.
+                     pass
+
 
             # Settings Column (Dynamic)
             with col_v_set:
@@ -3531,19 +3583,78 @@ if selection == "Video Studio":
                              st.error("Missing KLING_ACCESS_KEY/SECRET.")
                              status.update(label="Failed", state="error")
                         else:
-                             st.write(f"Sending to Kling API (Model: kling-v{model_version_input.replace('.', '-')}, Mode: {mode_val.upper()})...")
+                             st.write(f"Sending to Kling API (Model: {model_version_input}, Mode: {mode_val.upper()})...")
                              st.write("Processing... (Standard: ~2-5m, Pro: ~5-10m)")
-                             
+
+                             # ── Resolve Kling 3.0 extras ──────────────────
+                             # Character / element reference images
+                             _image_refs = []
+                             _vt_r1 = st.session_state.get("vt_ref1_char", "None")
+                             _vt_r2 = st.session_state.get("vt_ref2_outfit", "None")
+
+                             _vt_assets_resolve = st.session_state.get("global_assets", {})
+                             _vt_chars_r = _vt_assets_resolve.get("characters", {}).copy()
+                             _vt_chars_r.update(_vt_assets_resolve.get("relations", {}))
+                             _vt_outfits_r = _vt_assets_resolve.get("outfits", {})
+
+                             def _get_path(val, dct):
+                                 if val == "None": return None
+                                 p = dct.get(val)
+                                 return p.get("default_img") if isinstance(p, dict) else p
+
+                             r1p = _get_path(_vt_r1, _vt_chars_r)
+                             r2p = _get_path(_vt_r2, _vt_outfits_r)
+                             if r1p: _image_refs.append(r1p)
+                             if r2p: _image_refs.append(r2p)
+
+                             # @image_3 upload
+                             _vt_r3_file = st.session_state.get("vt_ref3")
+                             if _vt_r3_file:
+                                 _tmp_r3 = os.path.join("output", "temp_ref3.png")
+                                 with open(_tmp_r3, "wb") as _f3: _f3.write(_vt_r3_file.getbuffer())
+                                 _image_refs.append(_tmp_r3)
+
+                             # End frame
+                             _tail_path = None
+                             _vt_tail_file = st.session_state.get("vt_tail")
+                             if _vt_tail_file:
+                                 _tail_path = os.path.join("output", "temp_tail.png")
+                                 with open(_tail_path, "wb") as _ftail: _ftail.write(_vt_tail_file.getbuffer())
+
+                             # Audio
+                             _audio_url_final = None
+                             _native_audio_val = st.session_state.get("vt_native_audio_state", False)
+                             _vt_audio_file = st.session_state.get("vt_audio")
+                             _vt_audio_url_str = st.session_state.get("vt_audio_url", "")
+                             if _vt_audio_url_str:
+                                 _audio_url_final = _vt_audio_url_str
+                             elif _vt_audio_file:
+                                 _tmp_audio = os.path.join("output", f"temp_audio.{_vt_audio_file.name.split('.')[-1]}")
+                                 with open(_tmp_audio, "wb") as _fa: _fa.write(_vt_audio_file.getbuffer())
+                                 # For Kling API, audio must be a URL — upload to S3
+                                 try:
+                                     _audio_url_final = upload_file_obj(_vt_audio_file, f"user_uploads/audio/{_vt_audio_file.name}")
+                                 except:
+                                     st.warning("Audio upload failed — generating without audio.")
+
+                             # Negative prompt
+                             _neg_prompt = st.session_state.get("vt_neg", "").strip() or None
+
                              result = generate_video_kling(
-                                 temp_path, 
-                                 final_motion_prompt, 
-                                 duration=5, 
-                                 model_version=model_version_input, 
-                                 quality_mode=mode_val, 
+                                 temp_path,
+                                 final_motion_prompt,
+                                 duration=int(duration.replace("s","")),
+                                 model_version=model_version_input,
+                                 quality_mode=mode_val,
                                  camera_control=camera_data,
                                  ref_video_path=ref_video_url,
                                  ref_orientation=ref_orientation,
-                                 output_folder=get_user_out_dir("Videos")
+                                 output_folder=get_user_out_dir("Videos"),
+                                 image_references=_image_refs or None,
+                                 image_tail=_tail_path,
+                                 native_audio=_native_audio_val,
+                                 audio_url=_audio_url_final,
+                                 negative_prompt=_neg_prompt,
                              )
                     
                     elif "HuMo" in video_model:
