@@ -66,7 +66,7 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
             p = a.get("path")
             
             # Collect ALL characters (Main + Friends)
-            if "Main Character" in l or "Reference Character" in l or "Cast:" in l:
+            if "Main Character" in l or "Reference Character" in l or "Cast:" in l or "Main Subject" in l or "IdentityLock" in l:
                 all_cast_members.append({"path": p, "label": l})
             
             # Collect ALL outfits

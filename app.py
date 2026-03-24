@@ -1761,17 +1761,22 @@ if selection == "World Builder":
                                  f_name = cast_pool[k]['name'] if isinstance(cast_pool[k], dict) else k.split('/')[-1]
                                  f_fit_opts = assets.get('outfits', {})
                                  if not f_fit_opts: f_fit_opts = {"Casual": "", "Chic": ""}
-                                 f_outfit_key = st.selectbox(f"Outfit for {f_name.split()[0]}", list(f_fit_opts.keys()), key=f"fit_{idx}")
+                                 f_outfit_options = ["Default (No Outfit Override)"] + list(f_fit_opts.keys())
+                                 f_outfit_key = st.selectbox(f"Outfit for {f_name.split()[0]}", f_outfit_options, key=f"fit_{idx}")
                                  f_outfit_path = None
-                                 if isinstance(f_fit_opts[f_outfit_key], dict):
+                                 if f_outfit_key == "Default (No Outfit Override)":
+                                     f_outfit_name = None  # Skip — no outfit override for this friend
+                                 elif isinstance(f_fit_opts.get(f_outfit_key), dict):
                                      f_outfit_name = f_fit_opts[f_outfit_key]['name']
                                      f_outfit_path = f_fit_opts[f_outfit_key].get('default_img')
                                  else:
                                      f_outfit_name = os.path.splitext(f_outfit_key.split('/')[-1])[0]
-                                     f_outfit_path = f_fit_opts[f_outfit_key]
-                                 temp_assets.append({"path": f_outfit_path, "label": f"Outfit for {f_name}: {f_outfit_name}"}) 
-                                 friend_outfit_details.append(f"{f_name} in {f_outfit_name}") 
-                                 if f_outfit_path: st.image(f_outfit_path, width=150, caption=f_outfit_name)
+                                     f_outfit_path = f_fit_opts.get(f_outfit_key)
+                                 if f_outfit_name:
+                                     temp_assets.append({"path": f_outfit_path, "label": f"Outfit for {f_name}: {f_outfit_name}"})
+                                     friend_outfit_details.append(f"{f_name} in {f_outfit_name}")
+                                     if f_outfit_path: st.image(f_outfit_path, width=150, caption=f_outfit_name)
+
                         if friend_outfit_details:
                             temp_selections["FRIEND_OUTFITS"] = ", ".join(friend_outfit_details)
                     else:
