@@ -139,15 +139,15 @@ def generate_video_kling(
             payload["negative_prompt"] = negative_prompt
 
         # ── Kling 3.0: Native Audio ──────────────────────────────────
-        # motion_has_audio=True — Kling generates lip-sync / ambient audio automatically
+        # enable_audio=True — Kling generates lip-sync / ambient audio (verified param name)
+        # Requires Pro mode on Kling 2.6+
         if native_audio:
-            payload["motion_has_audio"] = True
+            payload["enable_audio"] = True
 
         # ── Kling 3.0: Custom Audio URL ──────────────────────────────
-        # Overrides native_audio if provided
+        # Provide a public audio URL — mutually exclusive with enable_audio
         if audio_url:
             payload["audio_url"] = audio_url
-            payload["motion_has_audio"] = False  # Mutually exclusive
 
         # ── Kling 3.0: End Frame (image_tail) ────────────────────────
         # Sets the LAST frame of the video — drives the motion path

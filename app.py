@@ -3353,6 +3353,7 @@ if selection == "Video Studio":
                     vt_native_audio = st.checkbox(
                         "Native Audio Generation",
                         value=False,
+                        key="vt_native_audio",
                         help="Kling auto-generates lip-sync voice + ambient audio. Only available on Kling 2.6+ Pro."
                     )
                     if not vt_native_audio:
@@ -3623,7 +3624,7 @@ if selection == "Video Studio":
 
                              # Audio
                              _audio_url_final = None
-                             _native_audio_val = st.session_state.get("vt_native_audio_state", False)
+                             _native_audio_val = st.session_state.get("vt_native_audio", False)
                              _vt_audio_file = st.session_state.get("vt_audio")
                              _vt_audio_url_str = st.session_state.get("vt_audio_url", "")
                              if _vt_audio_url_str:
