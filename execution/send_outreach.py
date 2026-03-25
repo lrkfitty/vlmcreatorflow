@@ -18,6 +18,7 @@ From:         hello@vlmcreateflow.com
 """
 
 import os, sys, json, smtplib, argparse
+from pathlib import Path
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -270,6 +271,24 @@ def main():
     if not args.dry_run and sent_count > 0:
         with open(LEADS_FILE, "w") as f:
             json.dump(leads, f, indent=2)
+
+        # Sync outreach fields → vlm-crm/leads_local.json (keeps CRM dashboard live)
+        crm_path = Path(__file__).parent.parent / "vlm-crm" / "leads_local.json"
+        if crm_path.exists():
+            with open(crm_path) as f:
+                crm_leads = json.load(f)
+            outreach_map = {l["id"]: l for l in leads}
+            for cl in crm_leads:
+                src = outreach_map.get(cl["id"], {})
+                cl["emails_sent"]  = src.get("emails_sent", 0)
+                cl["drip_day"]     = src.get("drip_day", 0)
+                cl["last_sent_at"] = src.get("last_sent_at", "")
+                cl["replied"]      = src.get("replied", False)
+                cl["booked"]       = src.get("booked", False)
+                cl["vertical"]     = src.get("vertical", cl.get("niche", ""))
+            with open(crm_path, "w") as f:
+                json.dump(crm_leads, f, indent=2)
+            print(f"CRM synced → {crm_path}")
 
     print(f"\nDone. Sent: {sent_count} | Skipped: {skip_count} | Errors: {error_count}")
 
