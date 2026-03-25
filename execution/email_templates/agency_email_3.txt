@@ -1,17 +1,15 @@
-subject: Last note — 15 min to show you what this looks like for {{company}}
-preview: Happy to walk you through it live
+subject: What the setup actually looks like for {{company}}
+preview: One call, then it runs itself
 
-Hi {{first_name}},
+{{first_name}},
 
-I'll keep this short — last note from me.
+Last note from me — and I'll make it useful.
 
-If production costs, shoot logistics, or slow creative turnaround are a real problem at {{company}}, I'd love to spend 15 minutes showing you exactly how we'd solve it.
+If you want to see exactly how this works for {{company}}, I do a 30-minute setup call. We walk through the system live, scope your first use case, and map the onboarding.
 
-No pitch deck. Just a live demo of the AI content engine and a frank conversation about whether it fits your operation.
+There's a one-time setup fee to build your brand into the engine. Monthly from there runs $1,500–$3,000 depending on output volume. Most agencies recover the setup cost inside the first campaign they don't have to shoot.
 
-Managed plans start at $1,500/mo. Enterprise capacity scales to $3,000/mo with full white-label.
-
-If now's not the right time, no hard feelings. But if you want to see it: grab a slot here — b2b.vlmcreateflow.com
+Book your setup call here: b2b.vlmcreateflow.com
 
 — Ty
 Viral Lense Media

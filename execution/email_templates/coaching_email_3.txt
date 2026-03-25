@@ -1,19 +1,15 @@
-subject: Last one — 15 min to see if this fits {{company}}
-preview: I'll show you the system live, no pitch
+subject: What the setup looks like for {{company}}
+preview: One call, then it runs itself
 
-Hi {{first_name}},
+{{first_name}},
 
-Last email from me.
+Last note — and I'll make it useful.
 
-If staying visible online is a real constraint — not enough time, inconsistent output, or content that doesn't match your positioning — I'd like to show you what we've built in 15 minutes.
+If you want to see exactly how this works for {{company}}, I do a 30-minute setup call. We talk about your brand, your audience, your positioning — and map out what an always-on content engine looks like for you specifically.
 
-Live demo. I'll pull up the system, show you example output, and we'll talk honestly about whether it makes sense for where you're taking {{company}}.
+There's a one-time setup fee to build your voice and identity into the system. Monthly from there runs $1,500–$3,000. Most clients have it running inside a week.
 
-Plans start at $1,500/mo. Month-to-month to start.
-
-Book directly here: b2b.vlmcreateflow.com
-
-If the timing isn't right, no problem. But if it is — you could have a full content operation running inside a week.
+Book your setup call: b2b.vlmcreateflow.com
 
 — Ty
 Viral Lense Media

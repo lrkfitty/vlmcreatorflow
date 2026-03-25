@@ -1,24 +1,15 @@
-subject: Your next shoot just cost you a client
-preview: What if you could deliver 100 ad creatives before lunch?
+subject: {{company}}'s next shoot
+preview: The math doesn't work and you already know it
 
 Hi {{first_name}},
 
-Quick question — what's your current production timeline when a client needs 20 fresh ad creatives?
+Right now, somewhere in your pipeline, there's a client brief that needs visuals. You're pricing in a photographer, a location, maybe talent — and the margin you're left with barely justifies the headache.
 
-If the answer involves a shoot, a photographer, and 2-3 weeks, your margins are getting crushed.
+What if {{company}} could close that same brief on Tuesday and deliver 100 creative variations by Friday — no shoot, no scheduling, no overhead?
 
-We built an AI content engine that replaces that entire pipeline. No shoots. No retainers. No delays.
+That's the system we built. Agencies using it now are quoting faster, delivering more, and keeping margin their competitors can't match.
 
-Here's what it actually does:
-- Generates photorealistic brand visuals, lifestyle shots, and ad creatives on demand
-- Delivers 50-100 assets in hours, not weeks
-- Runs on autopilot — your team briefs it, it executes
-
-We already have AI influencer accounts posting twice a day with zero human involvement. The same system works for client campaigns.
-
-If you're running an agency and production costs are eating your margins, I'd like to show you what this looks like for {{company}}.
-
-Worth 20 minutes? Here's where to learn more: b2b.vlmcreateflow.com
+Worth 15 minutes: b2b.vlmcreateflow.com
 
 — Ty
 Viral Lense Media

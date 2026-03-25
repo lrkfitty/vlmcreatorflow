@@ -1,24 +1,19 @@
-subject: Re: Your content still looks like a stock photo
-preview: What bespoke AI content actually looks like
+subject: Re: {{company}}'s content problem
+preview: What bespoke actually looks like
 
-Hi {{first_name}},
+{{first_name}},
 
 Quick follow-up.
 
-The problem with stock photos isn't just aesthetics — it signals to a sophisticated prospect that your firm doesn't sweat the details. If you don't control your own image, why would they trust you with theirs?
+The issue with stock photos isn't just aesthetics — it signals to a high-net-worth prospect that your firm doesn't sweat the details. That's the last thing you want them thinking before they hand you their life savings.
 
-We've built a content engine specifically for service professionals: advisors, attorneys, consultants. It generates photorealistic scenarios that match your brand — custom settings, professional environments, your identity.
+We generate photorealistic content built around your brand — your advisors, your settings, your identity. LinkedIn posts that get engagement from the people you're actually trying to reach. Email campaigns that look like you have a creative department.
 
-A few things it enables:
-- LinkedIn content that actually gets engagement from the people you're trying to reach
-- Bespoke visuals for client newsletters and email campaigns
-- A social presence that looks like you have a full creative team — without one
+No photographer on retainer. No annual shoot budget. Just content that performs.
 
-No shoots. No scheduling. No $15K annual photography budget.
+Plans run $1,500–$3,000/mo.
 
-Managed plans run $1,500-$3,000/mo depending on output volume. Most advisors recover that in a single new client.
-
-Full details at b2b.vlmcreateflow.com
+b2b.vlmcreateflow.com
 
 — Ty
 Viral Lense Media

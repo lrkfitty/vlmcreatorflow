@@ -39,32 +39,39 @@ SMTP_USER = "hello@vlmcreateflow.com"
 SMTP_PASS = "Vlmcreateflow1!"
 FROM_ADDR = "hello@vlmcreateflow.com"
 FROM_NAME = "Ty | Viral Lense Media"
+REPLY_TO  = "virallensemediavlm@gmail.com"   # Gmail MCP monitors this for replies
 
 # ── Sequence schedule ─────────────────────────────────────────────────────────
 # Maps (vertical, emails_sent) -> (template_file, day_offset_from_last_send)
 SEQUENCE = {
-    # emails_sent=0 means nothing sent yet — send email 1 immediately (day 0)
-    # emails_sent=1 means email 1 sent — send email 2 after 3 days
-    # emails_sent=2 means email 2 sent — send email 3 after 7 days from email 1
+    # Escape-to-Arrival framework — 4 emails per lead
+    # emails_sent=0 → email 1 (day 0):  Escape frame — their pain
+    # emails_sent=1 → email 2 (day 3):  Arrival frame — the result
+    # emails_sent=2 → email 3 (day 7):  Setup call CTA + setup fee framing
+    # emails_sent=3 → email 4 (day 14): Breakup email
     "ad_agency": [
         "agency_email_1.txt",
         "agency_email_2.txt",
         "agency_email_3.txt",
+        "agency_email_4.txt",
     ],
     "financial_advisor": [
         "financial_email_1.txt",
         "financial_email_2.txt",
         "financial_email_3.txt",
+        "financial_email_4.txt",
     ],
     "coach_consultant": [
         "coaching_email_1.txt",
         "coaching_email_2.txt",
         "coaching_email_3.txt",
+        "coaching_email_4.txt",
     ],
 }
 
-# Days between emails: email 2 sends 3 days after email 1, email 3 sends 4 days after email 2 (7 total)
-SEND_GAPS = [0, 3, 4]   # gap from previous send (day 0, then +3, then +4 = day 7)
+# Gap (days) from previous send before sending this email index
+# Index 0=day 0, 1=+3 days, 2=+4 days (day 7 total), 3=+7 days (day 14 total)
+SEND_GAPS = [0, 3, 4, 7]
 
 
 # ── Template loader ───────────────────────────────────────────────────────────
@@ -117,7 +124,7 @@ def send_email(to_addr: str, subject: str, body: str, dry_run: bool = False) -> 
     msg["Subject"] = subject
     msg["From"]    = f"{FROM_NAME} <{FROM_ADDR}>"
     msg["To"]      = to_addr
-    msg["Reply-To"] = FROM_ADDR
+    msg["Reply-To"] = REPLY_TO
 
     msg.attach(MIMEText(body, "plain", "utf-8"))
 

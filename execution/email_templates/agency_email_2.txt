@@ -1,24 +1,17 @@
-subject: Re: Your next shoot just cost you a client
-preview: Proof it works — live accounts, real results
+subject: Re: {{company}}'s next shoot
+preview: What it looks like when it's running
 
-Hi {{first_name}},
+{{first_name}},
 
-Following up on my note from a few days ago.
+Following up — wanted to show you something real.
 
-I want to give you something concrete. We run three live AI influencer accounts — Neo, Shay, and Ty — each posting original content twice a day, fully automated. No human picks up a camera. No shoots. The AI generates the brief, the visuals, and the captions.
+We run three live AI content accounts. Each posts original content twice a day, fully automated. No shoots. No photographers. No retainers. The system generates the brief, the visuals, and the captions — and it never calls in sick.
 
-Neo posts stoic/creative content. Shay does luxury travel and fashion. Both have been growing steadily since launch.
+We white-label this engine for agencies. Your clients get always-on content production. You get a service line your current model can't compete with on margin.
 
-This is the same engine we're now white-labeling for agencies.
+Managed plans start at $1,500/mo.
 
-For a boutique shop like {{company}}, it means:
-- Offer clients an always-on content machine at margins you can actually defend
-- Cut production timelines from weeks to hours
-- Stop competing on price with larger shops who can afford bigger crews
-
-Managed B2B plans start at $1,500/mo — that's less than one half-day shoot.
-
-Still curious? Everything's at b2b.vlmcreateflow.com
+b2b.vlmcreateflow.com
 
 — Ty
 Viral Lense Media

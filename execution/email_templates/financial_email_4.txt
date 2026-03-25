@@ -1,0 +1,14 @@
+subject: Closing your file
+preview: Last one from me
+
+{{first_name}},
+
+Last email, I promise.
+
+If the day ever comes where {{company}}'s content isn't attracting the clients you want — or you're spending too much to produce too little — what we built will still be here.
+
+b2b.vlmcreateflow.com
+
+— Ty
+Viral Lense Media
+hello@vlmcreateflow.com

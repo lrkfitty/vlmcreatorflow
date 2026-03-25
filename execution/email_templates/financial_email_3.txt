@@ -1,19 +1,15 @@
-subject: Last note — quick demo for {{company}}?
-preview: 15 minutes, no obligation
+subject: What onboarding looks like for {{company}}
+preview: 30-minute call, then it runs
 
-Hi {{first_name}},
+{{first_name}},
 
-Last note, I promise.
+Last note — making it concrete.
 
-If your current content strategy isn't attracting the clients you want, or you're spending too much on photography and getting inconsistent results, I'd like to show you what we've built.
+If you want to see exactly what this looks like for {{company}}, I do a 30-minute setup call. We scope your brand, your ideal client, and your first use case — then the system builds from there.
 
-15-minute demo. I'll show you the system live — you tell me if it fits.
+There's a one-time setup fee to get your brand built into the engine. Monthly retainer runs $1,500–$3,000 depending on output. Most advisors recover that in a single new client the content helped close.
 
-Managed plans start at $1,500/mo. No contracts longer than 3 months to start.
-
-Book a time directly: b2b.vlmcreateflow.com
-
-If it's not a fit right now, no problem. But if it is — this could change what your brand looks like in 30 days.
+Book your setup call: b2b.vlmcreateflow.com
 
 — Ty
 Viral Lense Media

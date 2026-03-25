@@ -1,24 +1,15 @@
-subject: Your face is your brand — but you're not everywhere
-preview: What if your content ran itself while you're on calls?
+subject: {{company}}'s content problem
+preview: You're the brand — but you're not everywhere
 
 Hi {{first_name}},
 
-You charge premium rates because clients are buying you — your thinking, your energy, your brand.
+Right now, your content output is bottlenecked by your time. When you're coaching, you're not posting. When you're building, you're not visible. And the prospects who find you two weeks from now might never have seen your name before.
 
-But if you're not posting consistently, running out of time to create content, or still relying on old headshots from two years ago, the gap between what you charge and what your presence signals is working against you.
+Imagine {{company}} showing up in people's feeds every single day — original, on-brand content that sounds and looks like you — while you're on calls, traveling, or offline. Your audience grows. Your name stays top of mind. You don't lift a finger.
 
-We built a system that keeps your brand active without requiring your time. It generates photorealistic content featuring your AI avatar — your look, your style, your voice — and can autopost on a full schedule across your channels. You stay top of mind with prospects while you're coaching clients.
+That's what we built.
 
-This isn't generic content. It's built around you.
-
-What it does for coaches and consultants:
-- Creates original, on-brand visuals and copy on autopilot
-- Posts consistently so your audience doesn't forget about you
-- Frees you to do the work that actually pays
-
-Plans start at $1,500/mo. No team, no shoots, no overhead.
-
-See what it looks like: b2b.vlmcreateflow.com
+Worth 15 minutes: b2b.vlmcreateflow.com
 
 — Ty
 Viral Lense Media
