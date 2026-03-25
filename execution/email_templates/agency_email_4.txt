@@ -7,7 +7,7 @@ I'll stop reaching out after this one.
 
 If production costs, slow turnaround, or shrinking margins ever become the thing that's blocking {{company}} from growing — the system we built solves all three. It'll still be there.
 
-When the timing is right: b2b.vlmcreateflow.com
+When the timing is right: https://vlmforbusiness.streamlit.app
 
 — Ty
 Viral Lense Media

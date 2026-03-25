@@ -13,7 +13,7 @@ No photographer on retainer. No annual shoot budget. Just content that performs.
 
 Plans run $1,500–$3,000/mo.
 
-b2b.vlmcreateflow.com
+https://vlmforbusiness.streamlit.app
 
 — Ty
 Viral Lense Media

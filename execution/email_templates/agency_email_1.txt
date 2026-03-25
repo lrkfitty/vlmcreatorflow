@@ -9,7 +9,7 @@ What if {{company}} could close that same brief on Tuesday and deliver 100 creat
 
 That's the system we built. Agencies using it now are quoting faster, delivering more, and keeping margin their competitors can't match.
 
-Worth 15 minutes: b2b.vlmcreateflow.com
+Worth 15 minutes: https://vlmforbusiness.streamlit.app
 
 — Ty
 Viral Lense Media

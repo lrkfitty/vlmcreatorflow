@@ -9,7 +9,7 @@ Imagine {{company}} showing up with bespoke, photorealistic content that looks l
 
 That's the gap we close.
 
-Worth a look: b2b.vlmcreateflow.com
+Worth a look: https://vlmforbusiness.streamlit.app
 
 — Ty
 Viral Lense Media

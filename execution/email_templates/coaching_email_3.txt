@@ -9,7 +9,7 @@ If you want to see exactly how this works for {{company}}, I do a 30-minute setu
 
 There's a one-time setup fee to build your voice and identity into the system. Monthly from there runs $1,500–$3,000. Most clients have it running inside a week.
 
-Book your setup call: b2b.vlmcreateflow.com?book=1
+Book your setup call: https://vlmforbusiness.streamlit.app/?book=1
 
 — Ty
 Viral Lense Media

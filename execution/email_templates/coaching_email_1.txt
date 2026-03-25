@@ -9,7 +9,7 @@ Imagine {{company}} showing up in people's feeds every single day — original, 
 
 That's what we built.
 
-Worth 15 minutes: b2b.vlmcreateflow.com
+Worth 15 minutes: https://vlmforbusiness.streamlit.app
 
 — Ty
 Viral Lense Media

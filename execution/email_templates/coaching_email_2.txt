@@ -13,7 +13,7 @@ You stop having to choose between doing the work and being known for it.
 
 Plans start at $1,500/mo.
 
-b2b.vlmcreateflow.com
+https://vlmforbusiness.streamlit.app
 
 — Ty
 Viral Lense Media

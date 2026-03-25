@@ -9,7 +9,7 @@ If you want to see exactly how this works for {{company}}, I do a 30-minute setu
 
 There's a one-time setup fee to build your brand into the engine. Monthly from there runs $1,500–$3,000 depending on output volume. Most agencies recover the setup cost inside the first campaign they don't have to shoot.
 
-Book your setup call here: b2b.vlmcreateflow.com?book=1
+Book your setup call here: https://vlmforbusiness.streamlit.app/?book=1
 
 — Ty
 Viral Lense Media

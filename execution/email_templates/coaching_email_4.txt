@@ -7,7 +7,7 @@ Last email from me.
 
 If staying visible ever stops being a problem you can ignore — if the gap between how good {{company}} is and how known it is becomes the thing that's holding you back — what we built will still be here.
 
-b2b.vlmcreateflow.com
+https://vlmforbusiness.streamlit.app
 
 — Ty
 Viral Lense Media

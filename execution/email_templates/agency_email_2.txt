@@ -11,7 +11,7 @@ We white-label this engine for agencies. Your clients get always-on content prod
 
 Managed plans start at $1,500/mo.
 
-b2b.vlmcreateflow.com
+https://vlmforbusiness.streamlit.app
 
 — Ty
 Viral Lense Media

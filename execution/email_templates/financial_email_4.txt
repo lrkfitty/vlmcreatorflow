@@ -7,7 +7,7 @@ Last email, I promise.
 
 If the day ever comes where {{company}}'s content isn't attracting the clients you want — or you're spending too much to produce too little — what we built will still be here.
 
-b2b.vlmcreateflow.com
+https://vlmforbusiness.streamlit.app
 
 — Ty
 Viral Lense Media
