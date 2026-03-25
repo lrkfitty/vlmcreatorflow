@@ -1,0 +1,25 @@
+subject: Your content still looks like a stock photo
+preview: There's a reason high-net-worth clients aren't calling back
+
+Hi {{first_name}},
+
+I'll be direct: most independent RIAs look exactly the same online. Same headshots, same stock images of graphs, same generic "trust us with your money" messaging.
+
+High-net-worth prospects can tell in 3 seconds.
+
+We built a system that creates bespoke, photorealistic content — your brand, your style, your advisors in the environments your ideal clients actually respect. Not stock photos. Not staged library shots.
+
+Think: an AI-generated image of you in a corner-office setting, advising a client across a mahogany table. Unlimited variations. $0 per shoot.
+
+For a firm like {{company}}, that means:
+- Content that matches the quality of the clients you're trying to attract
+- A consistent visual brand across LinkedIn, your website, and email — without a photographer on retainer
+- Move fast when markets move — new creative same day, not in 3 weeks
+
+Plans start at $1,500/mo.
+
+Worth a look: b2b.vlmcreateflow.com
+
+— Ty
+Viral Lense Media
+hello@vlmcreateflow.com
