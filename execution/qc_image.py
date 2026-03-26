@@ -24,9 +24,9 @@ logger = logging.getLogger(__name__)
 
 # ── Thresholds ────────────────────────────────────────────────────────────────
 THRESHOLDS = {
-    "laplacian_min":      80,     # below = too blurry
+    "laplacian_min":      18,     # below = too blurry (AI portraits with bokeh score 20-40; hard fails are <10)
     "aesthetic_min":     5.0,     # below = auto-reject
-    "aesthetic_review":  5.5,     # below aesthetic_min+review band = flag for review
+    "aesthetic_review":  5.5,     # below = flag for review
     "face_conf_min":     0.85,    # face detector confidence
     "brisque_max":       50,      # above = poor technical quality
     "min_resolution":    1080,    # minimum pixels on short side
