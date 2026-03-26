@@ -172,8 +172,9 @@ class CampaignManager:
                     reel_id=reel_id,
                     vo_path=vo_result["audio_path"],
                     transcript_path=vo_result["transcript_path"],
-                    image_paths=image_paths,
+                    image_paths=image_paths or None,  # None = auto-pick from account folder
                     output_dir=reel_output_dir,
+                    account=account,
                     music_mood=music_mood,
                 )
 

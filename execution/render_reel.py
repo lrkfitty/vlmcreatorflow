@@ -43,6 +43,38 @@ _MUSIC_FOLDERS = {
 _SUPPORTED_AUDIO = (".mp3", ".wav", ".m4a", ".aac")
 _SUPPORTED_IMG   = (".jpg", ".jpeg", ".png", ".webp")
 
+# Auto-image pool: account → output folder (excludes thumbnails)
+_OUTPUT_ROOT = _HERE.parent / "output" / "users"
+_ACCOUNT_FOLDERS = {
+    "ty":   _OUTPUT_ROOT / "Tyrie",
+    "shay": _OUTPUT_ROOT / "Shay",
+    "neo":  _OUTPUT_ROOT / "Neo",
+}
+
+
+def _auto_pick_images(account: str = "ty", count: int = 4) -> list:
+    """
+    Auto-select `count` random images from the account's output folder.
+    Excludes thumbnails (_thumb.*) and picks only full-size images.
+    """
+    folder = _ACCOUNT_FOLDERS.get(account, _ACCOUNT_FOLDERS["ty"])
+    if not folder.exists():
+        raise FileNotFoundError(f"No output folder found for account '{account}': {folder}")
+
+    all_imgs = [
+        f for f in folder.rglob("*")
+        if f.suffix.lower() in _SUPPORTED_IMG
+        and "_thumb" not in f.name
+        and f.stat().st_size > 50_000  # skip tiny files
+    ]
+
+    if not all_imgs:
+        raise FileNotFoundError(f"No images found in {folder}")
+
+    picks = random.sample(all_imgs, min(count, len(all_imgs)))
+    print(f"🖼️  Auto-picked {len(picks)} images from {folder.name}/")
+    return [str(p) for p in picks]
+
 
 def _pick_music(mood: str = "chill") -> tuple[str, float]:
     """
@@ -128,8 +160,9 @@ def render_reel(
     reel_id: str,
     vo_path: str,
     transcript_path: str,
-    image_paths: list,
+    image_paths: list = None,
     output_dir: str = None,
+    account: str = "ty",
     music_mood: str = "chill",
     music_path: str = None,
     crf: int = 18,
@@ -153,6 +186,10 @@ def render_reel(
     output_dir = output_dir or str(_HERE.parent / "output" / "reels")
     Path(output_dir).mkdir(parents=True, exist_ok=True)
     output_path = os.path.join(output_dir, f"{reel_id}.mp4")
+
+    # Auto-pick images if none provided
+    if not image_paths:
+        image_paths = _auto_pick_images(account=account, count=4)
 
     # 1. Load transcript
     with open(transcript_path, "r") as f:
@@ -187,17 +224,14 @@ def render_reel(
     }
     props_json = json.dumps(props)
 
-    # 5. Total frames = VO duration + 1.5s tail
-    total_frames = int((duration + 1.5) * 30) + 1
-
-    # 6. Call Remotion CLI
+    # 5. Call Remotion CLI (calculateMetadata in index.tsx sets durationInFrames from props.duration)
+    remotion_bin = str(_REMOTION_ROOT / "node_modules" / ".bin" / "remotion")
     cmd = [
-        "npx", "remotion", "render",
+        remotion_bin, "render",
         "src/index.tsx",
         "TyReel",
         output_path,
         f"--props={props_json}",
-        f"--frames=0-{total_frames}",
         f"--codec=h264",
         f"--crf={crf}",
         "--width=1080",
@@ -239,6 +273,6 @@ if __name__ == "__main__":
         reel_id=reel_id_arg,
         vo_path=vo_arg,
         transcript_path=transcript_arg,
-        image_paths=images_arg,
+        image_paths=images_arg or None,  # None triggers auto-pick
     )
     print(f"\n🎬 Output: {mp4}")
