@@ -205,6 +205,14 @@ def synthesize_vo(script: str, account: str = "ty", output_path: str = None) -> 
             current_word += char
             word_end = end
 
+    # Fix zero-duration words: each word's end = next word's start (or start + 0.1s floor)
+    for i, w in enumerate(words):
+        if w["end"] <= w["start"]:
+            if i + 1 < len(words):
+                w["end"] = words[i + 1]["start"]
+            else:
+                w["end"] = round(w["start"] + 0.1, 3)
+
     return {"audio_path": output_path, "words": words, "duration": char_ends[-1] if char_ends else 0}
 
 
