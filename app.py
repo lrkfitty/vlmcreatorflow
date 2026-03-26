@@ -2718,13 +2718,15 @@ if selection == "Campaign Queue":
         for i, job in enumerate(st.session_state.campaign_queue):
             status = job['status']
             status_icon = "✅" if status == "completed" else "❌" if status == "failed" else "⏳"
+            job_type = job.get('type', 'image')
+            type_icon = "🎬" if job_type == "reel" else "🎥" if "video" in job_type else "🖼️"
             companions = job.get("data", {}).get("extra_images", [])
-            companion_note = f" · {len(companions)} companion(s)" if companions else ""
+            companion_note = f" · {len(companions)} cast" if companions else ""
 
             col_info, col_up, col_down, col_regen, col_del = st.columns([6, 0.4, 0.4, 0.8, 0.6])
 
             with col_info:
-                with st.expander(f"{status_icon} {job.get('name', job.get('id','?'))} ({status}){companion_note}"):
+                with st.expander(f"{status_icon} {type_icon} {job.get('name', job.get('id','?'))} ({status}){companion_note}"):
                     prompt_text = job.get('data', {}).get('prompt_data', {}).get('positive_prompt', 'No Prompt')
                     st.caption(f"**Prompt:** {prompt_text[:300]}{'...' if len(prompt_text) > 300 else ''}")
                     st.caption(f"**Created:** {job.get('created_at', '?')}")
@@ -2732,9 +2734,32 @@ if selection == "Campaign Queue":
                         st.caption(f"**Companions:** {', '.join(os.path.basename(c['path']) for c in companions)}")
                     if status == 'completed':
                         for r in job.get('results', []):
+                            # ── Reel result ──
+                            reel_path = r.get('reel_path')
+                            if reel_path and os.path.exists(reel_path):
+                                st.video(reel_path)
+                                st.caption(f"🎬 Script: _{r.get('script', '')}_ ({r.get('duration', 0):.1f}s)")
+
+                            # ── Image result ──
                             img_path = r.get('image_path')
                             if img_path and os.path.exists(img_path):
                                 st.image(img_path, use_container_width=True)
+                                # QC badge
+                                qc = r.get('qc')
+                                if qc:
+                                    scores = qc.get('scores', {})
+                                    lap = scores.get('laplacian')
+                                    aes = scores.get('aesthetic_score')
+                                    if qc['pass']:
+                                        badge = "✅ QC Pass"
+                                        if qc.get('needs_review'):
+                                            badge = "🟡 QC Review"
+                                    else:
+                                        badge = f"❌ QC Fail: {qc.get('reason', '')}"
+                                    parts = [badge]
+                                    if lap is not None: parts.append(f"blur={lap:.0f}")
+                                    if aes is not None: parts.append(f"aes={aes:.2f}")
+                                    st.caption("  ·  ".join(parts))
 
             with col_up:
                 if i > 0 and st.button("↑", key=f"up_{i}", help="Move up"):
