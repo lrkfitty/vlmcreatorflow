@@ -35,9 +35,10 @@ class CampaignManager:
         with open(self.campaign_file, 'w') as f:
             json.dump(self.queue, f, indent=4)
 
-    def add_job(self, name, description, prompt_data, settings, output_folder, 
-                char_path=None, outfit_path=None, vibe_path=None, job_type="image"):
-        
+    def add_job(self, name, description, prompt_data, settings, output_folder,
+                char_path=None, outfit_path=None, vibe_path=None, job_type="image",
+                extra_images=None):
+
         job = {
             "id": f"job_{int(time.time())}_{len(self.queue)}",
             "name": name,
@@ -53,13 +54,21 @@ class CampaignManager:
                     "char_path": char_path,
                     "outfit_path": outfit_path,
                     "vibe_path": vibe_path
-                }
+                },
+                "extra_images": extra_images or []
             },
             "results": []
         }
         self.queue.append(job)
         self.save_queue()
         return job
+
+    def move_job(self, index, direction):
+        """Move a job up (-1) or down (+1) in the queue."""
+        new_index = index + direction
+        if 0 <= new_index < len(self.queue):
+            self.queue[index], self.queue[new_index] = self.queue[new_index], self.queue[index]
+            self.save_queue()
 
     def clear_queue(self):
         self.queue = []
@@ -161,12 +170,21 @@ class CampaignManager:
                         })
                         print(f"   🔗 Cascading context: attached prior shot from same scene")
                 
+                # Inject extra_images (companions) into prompt_data assets
+                extra_images = job["data"].get("extra_images", [])
+                if extra_images:
+                    if "assets" not in p_data:
+                        p_data["assets"] = []
+                    for ei in extra_images:
+                        # Avoid duplicates
+                        if not any(a.get("path") == ei.get("path") for a in p_data["assets"]):
+                            p_data["assets"].append(ei)
+
                 for r in range(repeats):
                     print(f"   ... Batch {r+1}/{repeats}")
-                    
-                    # Call the generator
+
                     result = generate_image_from_prompt(
-                        p_data, 
+                        p_data,
                         output_folder=paths["output_folder"],
                         reference_image_path=paths["char_path"],
                         outfit_path=paths["outfit_path"],

@@ -102,24 +102,35 @@ def generate_prompt_content(vibe, outfit, character,
     system_prompt = textwrap.dedent(f"""
         {instructions}
         
-        ROLE: You are an ACADEMY AWARD-WINNING CINEMATOGRAPHER and HOLLYWOOD DIRECTOR. You are famous for your visual storytelling, intense detail, and atmospheric lighting.
-        
-        GOAL: Your job is to take visual references and turn them into a **VISUAL MASTERPIECE PROMPT**.
-        
+        ROLE: You are an ACADEMY AWARD-WINNING CINEMATOGRAPHER and DOCUMENTARY PHOTOGRAPHER. You are famous for capturing AUTHENTIC, LIVED-IN moments — not polished ad campaigns.
+
+        GOAL: Your job is to take visual references and turn them into a **REAL, CANDID, PHOTOREALISTIC PROMPT** that looks like it was shot in the moment, not staged.
+
         🚨 ABSOLUTE RULE #1: VISUAL REFERENCES = TRUTH 🚨
         The images provided are ABSOLUTE REALITY. Your job is to DESCRIBE WHAT YOU SEE, not what the text says.
         - If IMAGE 1 shows a blonde woman → You MUST write "blonde woman"
         - If IMAGE 2 shows a brown fur top → You MUST write "brown fur top"
         - If the text says "red dress" but IMAGE 2 shows black pants → DESCRIBE THE BLACK PANTS
-        
+
         IMAGES OVERRIDE TEXT. ALWAYS. NO EXCEPTIONS.
-        
+
+        🚨 ABSOLUTE RULE #2: NO AI LOOK — LIVED-IN ONLY 🚨
+        The single biggest failure mode is images that look generated. Eliminate ALL of these:
+        - FORBIDDEN: Perfect smooth skin (looks plastic) → ADD: subtle pores, slight texture, natural imperfection
+        - FORBIDDEN: Perfectly symmetrical lighting (looks studio) → ADD: mixed light sources, one side slightly darker
+        - FORBIDDEN: Generic backgrounds (empty walls, perfect bokeh) → ADD: real environment details — cups on tables, people in background, signs, clutter, texture
+        - FORBIDDEN: Posed stiff body language → ADD: mid-laugh, caught mid-sentence, hand adjusting hair, looking away
+        - FORBIDDEN: Overly sharp/rendered look → ADD: slight motion blur on hands, shallow depth of field, film grain
+        - FORBIDDEN: Perfect makeup/hair → ADD: a strand of hair out of place, slight lip gloss smear, natural brows
+
+        THE AESTHETIC YOU'RE GOING FOR: Think Instagram candid by a talented friend with a Sony A7IV. Not a billboard. Not a fashion editorial. REAL LIFE captured beautifully.
+
         CRITICAL OUTPUT RULES:
         1.  **DESCRIBE EXACTLY WHAT YOU SEE IN THE IMAGES.** Do not invent features or clothing.
-        2.  **RICH, DENSE, EVOCATIVE LANGUAGE:** 150+ words. Use cinematic terms like "Volumetric Lighting", "Subsurface Scattering", "Bokeh", "Film Grain", "Chiaroscuro".
+        2.  **RICH, DENSE, EVOCATIVE LANGUAGE:** 150+ words. Use cinematic terms like "Volumetric Lighting", "Subsurface Scattering", "Shallow Depth of Field", "Film Grain", "Natural Bounce Light".
         3.  **NEVER BE GENERIC:**
             -   BAD: "She is wearing a top."
-            -   GOOD: "She is draped in a plush brown fur cropped top that catches the golden hour light with each movement, revealing hints of skin at her midriff."
+            -   GOOD: "She is draped in a plush brown fur cropped top, one shoulder slightly slipped, catching the golden hour light with each movement — she's mid-laugh, eyes squinted, totally unaware of the camera."
         
         INSTRUCTION MANUAL:
         
@@ -160,7 +171,7 @@ def generate_prompt_content(vibe, outfit, character,
         OUTPUT JSON FORMAT:
         {{
             "positive_prompt": "(MASTERPIECE): [What you SEE in the images] + [Technical specs] + [Action/Emotion expansion] + [Cinematic atmosphere]. High aesthetic, 8k, photorealistic.",
-            "negative_prompt": "cartoon, illustration, anime, 3d render, painting, drawing, text, watermark, low quality, glitch, deformed, mutated, ugly, disfigured, smooth skin, plastic look, wrong hair color, wrong outfit, hallucinated features...",
+            "negative_prompt": "cartoon, illustration, anime, 3d render, painting, drawing, text, watermark, low quality, glitch, deformed, mutated, ugly, disfigured, smooth plastic skin, airbrushed skin, overly perfect skin, symmetrical lighting, studio lighting, posed stiff posture, generic background, empty background, perfect hair, overly sharp rendering, AI generated look, digital art, CGI, wrong hair color, wrong outfit, hallucinated features, oversaturated colors, fake bokeh",
             "aspect_ratio": "{aspect_ratio}"
         }}
     """)

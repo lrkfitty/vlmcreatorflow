@@ -2713,22 +2713,59 @@ if selection == "Campaign Queue":
                 status_box.success("All Jobs Completed.")
                 st.session_state.campaign_running = False
     
-        # 3. Queue Visualization (With Delete)
+        # 3. Queue Visualization
         st.markdown("#### Job List")
         for i, job in enumerate(st.session_state.campaign_queue):
-            col_q_info, col_q_del = st.columns([6, 1])
-            
-            with col_q_info:
-                with st.expander(f"{'DONE' if job['status']=='completed' else 'WAITING'} {job.get('id', 'Unknown')} ({job['status']})"):
+            status = job['status']
+            status_icon = "✅" if status == "completed" else "❌" if status == "failed" else "⏳"
+            companions = job.get("data", {}).get("extra_images", [])
+            companion_note = f" · {len(companions)} companion(s)" if companions else ""
+
+            col_info, col_up, col_down, col_regen, col_del = st.columns([6, 0.4, 0.4, 0.8, 0.6])
+
+            with col_info:
+                with st.expander(f"{status_icon} {job.get('name', job.get('id','?'))} ({status}){companion_note}"):
                     prompt_text = job.get('data', {}).get('prompt_data', {}).get('positive_prompt', 'No Prompt')
-                    st.write(f"**Prompt:** {prompt_text}")
-                    st.write(f"**Created:** {job.get('created_at', 'Unknown')}")
-                    if job['status'] == 'completed':
-                         st.write("**Results:**")
-            
-            with col_q_del:
-                # Only allow deleting pending or completed tasks, not running ones (to match index)
-                if st.button("DEL", key=f"del_job_{i}", help="Delete this task"):
+                    st.caption(f"**Prompt:** {prompt_text[:300]}{'...' if len(prompt_text) > 300 else ''}")
+                    st.caption(f"**Created:** {job.get('created_at', '?')}")
+                    if companions:
+                        st.caption(f"**Companions:** {', '.join(os.path.basename(c['path']) for c in companions)}")
+                    if status == 'completed':
+                        for r in job.get('results', []):
+                            img_path = r.get('image_path')
+                            if img_path and os.path.exists(img_path):
+                                st.image(img_path, use_container_width=True)
+
+            with col_up:
+                if i > 0 and st.button("↑", key=f"up_{i}", help="Move up"):
+                    campaign_mgr.move_job(i, -1)
+                    st.rerun()
+
+            with col_down:
+                if i < len(st.session_state.campaign_queue) - 1 and st.button("↓", key=f"dn_{i}", help="Move down"):
+                    campaign_mgr.move_job(i, 1)
+                    st.rerun()
+
+            with col_regen:
+                if status in ("completed", "failed") and st.button("↺ Redo", key=f"regen_{i}", help="Re-queue with new seed"):
+                    import copy
+                    new_job_data = copy.deepcopy(job["data"])
+                    campaign_mgr.add_job(
+                        name=job["name"] + "_v2",
+                        description=job.get("description", ""),
+                        prompt_data=new_job_data["prompt_data"],
+                        settings=new_job_data["settings"],
+                        output_folder=new_job_data["paths"]["output_folder"],
+                        char_path=new_job_data["paths"].get("char_path"),
+                        outfit_path=new_job_data["paths"].get("outfit_path"),
+                        vibe_path=new_job_data["paths"].get("vibe_path"),
+                        extra_images=new_job_data.get("extra_images", []),
+                    )
+                    st.toast(f"Re-queued: {job['name']}_v2")
+                    st.rerun()
+
+            with col_del:
+                if status != "running" and st.button("✕", key=f"del_{i}", help="Remove from queue"):
                     campaign_mgr.remove_job(i)
                     st.rerun()
 
