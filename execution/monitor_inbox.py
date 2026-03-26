@@ -22,7 +22,7 @@ Cron (runs 5 min after outreach sender):
     5 3 * * * /opt/homebrew/bin/python3.11 "/.../execution/monitor_inbox.py"
 """
 
-import os, sys, json, imaplib, email, argparse, logging
+import os, sys, json, imaplib, email, email.message, argparse, logging
 from email.header import decode_header
 from datetime import datetime
 from pathlib import Path
