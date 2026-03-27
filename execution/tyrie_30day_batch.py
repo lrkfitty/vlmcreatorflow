@@ -1123,7 +1123,7 @@ def build_assets(carousel_idx: int, env: str | None) -> list:
     # Rotate through ALL Tyrie outfits
     if TYRIE_ALL_OUTFITS:
         ty_outfit = TYRIE_ALL_OUTFITS[carousel_idx % len(TYRIE_ALL_OUTFITS)]
-        assets.append({"path": str(ty_outfit), "label": "Outfit for Tyrie"})
+        assets.append({"path": str(ty_outfit), "label": "Outfit for Main Character"})
 
     # Rotate through ALL Angeil outfits (offset by half so they don't sync)
     if ANGEIL_ALL_OUTFITS:

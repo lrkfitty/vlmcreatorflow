@@ -859,7 +859,7 @@ def build_assets(carousel: dict, carousel_idx: int) -> list:
     # Rotate through ALL Shay outfits by carousel index
     if SHAY_ALL_OUTFITS:
         outfit = SHAY_ALL_OUTFITS[carousel_idx % len(SHAY_ALL_OUTFITS)]
-        assets.append({"path": str(outfit), "label": "Outfit for Shay (main)"})
+        assets.append({"path": str(outfit), "label": "Outfit for Main Character"})
 
     env_path = resolve(carousel.get("env", "")) if carousel.get("env") else ""
     if env_path and os.path.exists(env_path):
