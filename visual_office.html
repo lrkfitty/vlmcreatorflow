@@ -1,0 +1,885 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>VLM HQ — Agent Office</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:#0a0c18; overflow:hidden; font-family:'Courier New',monospace; cursor:default; }
+canvas { display:block; }
+#panel {
+  position:fixed; top:50%; left:50%; transform:translate(-50%,-50%);
+  background:#fff; border-radius:12px; padding:24px 28px; width:300px;
+  display:none; z-index:100; font-family:'Courier New',monospace;
+  box-shadow:0 20px 60px rgba(0,0,0,0.4);
+}
+#panel h2  { font-size:14px; letter-spacing:3px; margin-bottom:3px; }
+#panel .rl { font-size:10px; color:#888; margin-bottom:14px; }
+.ps { display:flex; justify-content:space-between; padding:6px 0; font-size:11px; border-bottom:1px solid #eee; }
+.ps span:last-child { color:#0055cc; font-weight:bold; }
+#pcls { margin-top:12px; font-size:10px; color:#aaa; cursor:pointer; text-align:center; letter-spacing:2px; }
+#pcls:hover { color:#333; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="panel">
+  <h2 id="pn">AGENT</h2>
+  <div class="rl" id="pr">Role</div>
+  <div id="ps2"></div>
+  <div id="pcls" onclick="closePanel()">[ CLOSE ]</div>
+</div>
+<script>
+const cv = document.getElementById('c');
+const cx = cv.getContext('2d');
+cv.width = window.innerWidth; cv.height = window.innerHeight;
+const W = cv.width, H = cv.height;
+
+// ── LIVE DATA ─────────────────────────────────────────────────────────────────
+let live = { leads_total:51, emails_sent:50, queued_posts:58, activity:[] };
+(async function poll(){ try{ live = await (await fetch('http://localhost:5001/api/status')).json(); }catch(e){}; setTimeout(poll,15000); })();
+
+// ── LAYOUT ────────────────────────────────────────────────────────────────────
+const TH = 54;          // title bar height
+const BH = 86;          // bottom bar height
+const OH = H - TH - BH; // office height
+const OY = TH;          // office top y
+const OB = H - BH;      // office bottom y
+const CEH = 44;         // ceiling band height
+const FLH = 58;         // floor band height
+const FLY = OB - FLH;  // floor starts here
+const WLY = OY + CEH;  // wall starts here (below ceiling)
+
+// Characters sit at this y (feet on floor line)
+const GY = FLY + 4;
+
+// Zone widths (proportional to W)
+const ZW = [
+  ['exec',     '#ffd700', 0.185],
+  ['creative', '#cc00ff', 0.290],
+  ['sales',    '#00ff88', 0.180],
+  ['ops',      '#3399ff', 0.225],
+  ['recep',    '#ff3333', 0.120],
+];
+let ZX = {};
+{ let acc=0; ZW.forEach(([id,,pct])=>{ ZX[id]=W*acc; acc+=pct; }); }
+const zw = id => W * ZW.find(z=>z[0]===id)[2];
+
+// ── AGENT DATA ────────────────────────────────────────────────────────────────
+const AGENTS = {
+  claude:     { label:'CLAUDE CODE',   role:'Orchestrator — Executive', col:'#ffd700', zone:'exec',
+                skin:'#d4a870', hair:'#110500', shirt:'#1a1a3e', pants:'#0d0d1a',
+                status:'ACTIVE', stats:[['STATUS','ACTIVE — Automode ON'],['TASKS','8 completed'],['STACK','Python · Node · ffmpeg'],['QUEUE','0 pending']] },
+  gemini:     { label:'GEMINI',        role:'Image Generation — Creative', col:'#00eeff', zone:'creative',
+                skin:'#c48050', hair:'#111111', shirt:'#2d1a5e', pants:'#1a1030',
+                status:'IDLE',   stats:[['STATUS','IDLE'],['GENERATED','9 × 4K images'],['MODEL','Flash 3.1 Image'],['SAFETY','1 filtered']] },
+  kling:      { label:'KLING AI',      role:'Cinematographer — Creative', col:'#cc00ff', zone:'creative',
+                skin:'#b87048', hair:'#1a0800', shirt:'#1a0a2a', pants:'#0a0616',
+                status:'IDLE',   stats:[['STATUS','IDLE'],['CLIPS','6 × 5s rendered'],['MODEL','kling-v2-6 pro'],['MODE','image2video']] },
+  outreach:   { label:'OUTREACH BOT',  role:'Sales Rep — Sales Floor', col:'#00ff88', zone:'sales',
+                skin:'#c07838', hair:'#0a0500', shirt:'#003322', pants:'#001a10',
+                status:'ACTIVE', stats:[['STATUS','ACTIVE'],['LEADS','51 contacted'],['EMAIL 2','Fires Mar 29'],['VERTICALS','Financial · Coach · Agency']] },
+  autoposter: { label:'AUTO-POSTER',   role:'Social Media Manager — Ops', col:'#ff00cc', zone:'ops',
+                skin:'#d4a870', hair:'#1a1a1a', shirt:'#3a0033', pants:'#1a0018',
+                status:'ACTIVE', stats:[['STATUS','ACTIVE'],['ACCOUNTS','Neo / Shay / Ty'],['QUEUE','58 posts'],['SCHEDULE','10:00 + 22:00 BKK']] },
+  crm:        { label:'CRM SYNC',      role:'Analyst — Ops Center', col:'#3399ff', zone:'ops',
+                skin:'#b07840', hair:'#0a0a0a', shirt:'#0a1a33', pants:'#050e1a',
+                status:'SYNCING',stats:[['STATUS','SYNCING'],['LEADS','51 tracked'],['SYNC','Every hour'],['PLATFORM','flowleads']] },
+  gmail:      { label:'GMAIL MONITOR', role:'Receptionist — Front Desk', col:'#ff3333', zone:'recep',
+                skin:'#c8a06a', hair:'#1a1400', shirt:'#1a0808', pants:'#0e0408',
+                status:'WATCHING',stats:[['STATUS','WATCHING'],['INBOX','hello@vlmcreateflow.com'],['TRIGGER','Booking keywords'],['REPLIES','0 detected']] },
+};
+
+// ── DRAW HELPERS ──────────────────────────────────────────────────────────────
+function rr(x,y,w,h,r,fill,stroke,sw=1.5) {
+  cx.beginPath(); cx.roundRect(x,y,w,h,r);
+  if(fill){cx.fillStyle=fill;cx.fill();}
+  if(stroke){cx.strokeStyle=stroke;cx.lineWidth=sw;cx.stroke();}
+}
+function ln(x1,y1,x2,y2,col,w=1.5) {
+  cx.strokeStyle=col; cx.lineWidth=w;
+  cx.beginPath(); cx.moveTo(x1,y1); cx.lineTo(x2,y2); cx.stroke();
+}
+function txt(s,x,y,size,col,align='left') {
+  cx.fillStyle=col; cx.font=`${size}px 'Courier New'`; cx.textAlign=align; cx.fillText(s,x,y);
+}
+function boldTxt(s,x,y,size,col,align='left') {
+  cx.fillStyle=col; cx.font=`bold ${size}px 'Courier New'`; cx.textAlign=align; cx.fillText(s,x,y);
+}
+
+// Floor tiles
+function tiles(x,y,w,h,c1='#d4d0c4',c2='#c8c4b8',sz=18) {
+  for(let tx=0;tx<w;tx+=sz) for(let ty=0;ty<h;ty+=sz) {
+    cx.fillStyle=((tx/sz|0)+(ty/sz|0))%2?c2:c1;
+    cx.fillRect(x+tx,y+ty,Math.min(sz,w-tx),Math.min(sz,h-ty));
+  }
+}
+
+// Monitor with screen content
+function monitor(mx,my,mw,mh,col,lines,t,accent=null) {
+  const ac=accent||col;
+  // glow
+  cx.save(); cx.globalAlpha=0.08+Math.sin(t*1.6)*0.03;
+  const g=cx.createRadialGradient(mx,my,0,mx,my,mw*0.9);
+  g.addColorStop(0,ac); g.addColorStop(1,'transparent');
+  cx.fillStyle=g; cx.fillRect(mx-mw,my-mh,mw*2,mh*2); cx.restore();
+  // bezel
+  rr(mx-mw/2-3,my-mh/2-3,mw+6,mh+8,3,'#131313');
+  // screen
+  cx.fillStyle='#040810'; cx.fillRect(mx-mw/2,my-mh/2,mw,mh);
+  // tint
+  cx.save(); cx.globalAlpha=0.10+Math.sin(t*2)*0.04; cx.fillStyle=ac;
+  cx.fillRect(mx-mw/2,my-mh/2,mw,mh); cx.restore();
+  // header
+  cx.fillStyle=ac+'44'; cx.fillRect(mx-mw/2,my-mh/2,mw,13);
+  // content
+  cx.save(); cx.beginPath(); cx.rect(mx-mw/2+1,my-mh/2+1,mw-2,mh-2); cx.clip();
+  lines.forEach((l,i)=>{
+    cx.fillStyle=i===0?ac:'rgba(255,255,255,0.8)';
+    cx.font=`${i===0?'bold ':''}${i===0?8:7}px 'Courier New'`;
+    cx.textAlign='left'; cx.fillText(l,mx-mw/2+4,my-mh/2+(i===0?10:20+i*10));
+  });
+  cx.restore();
+  // stand
+  cx.fillStyle='#1e1e1e'; cx.fillRect(mx-2,my+mh/2+1,4,8); cx.fillRect(mx-9,my+mh/2+9,18,3);
+}
+
+// Desk surface (top-view with depth)
+function desk(dx,dy,dw,dh,col='#c8912a',dark='#a07018') {
+  rr(dx,dy,dw,dh,2,col,dark,1);
+  cx.fillStyle=dark; cx.fillRect(dx,dy+dh,dw,5); // front face
+  // legs
+  cx.fillStyle=dark;
+  cx.fillRect(dx+5,dy+dh+5,6,FLY-dy-dh-5);
+  cx.fillRect(dx+dw-11,dy+dh+5,6,FLY-dy-dh-5);
+}
+
+// ── CHARACTERS ────────────────────────────────────────────────────────────────
+function seatedChar(px,py,ag,t,typing=true) {
+  // py = desk surface y. Character sits in front/behind
+  const bob = typing ? Math.sin(t*6)*1.5 : 0;
+  const by = py+14; // seat level (below desk front)
+  // shadow
+  cx.save(); cx.globalAlpha=0.12; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(px,GY+2,18,4,0,0,Math.PI*2); cx.fill(); cx.restore();
+  // lower body (hidden behind desk but draw for completeness)
+  cx.fillStyle=ag.pants||'#1a1a2a';
+  cx.fillRect(px-10,by,20,30);
+  // torso
+  rr(px-13,by-30,26,32,2,ag.shirt);
+  // collar/tie for exec
+  if(ag.zone==='exec'){
+    cx.fillStyle='#ffd700'; cx.fillRect(px-3,by-28,6,18);
+    cx.fillStyle='#0d0d20'; cx.fillRect(px-1,by-14,2,8);
+  }
+  // left arm
+  cx.save(); cx.fillStyle=ag.shirt;
+  cx.translate(px-13,by-20); cx.rotate(0.42);
+  cx.fillRect(-5,0,9,(16+bob)); cx.restore();
+  // right arm
+  cx.save(); cx.fillStyle=ag.shirt;
+  cx.translate(px+13,by-20); cx.rotate(-0.42);
+  cx.fillRect(-4,0,9,(16+bob)); cx.restore();
+  // hands on keyboard
+  cx.fillStyle=ag.skin;
+  cx.fillRect(px-20,by-8+bob,8,5); cx.fillRect(px+12,by-8+bob,8,5);
+  // neck
+  cx.fillStyle=ag.skin; cx.fillRect(px-4,by-38,8,10);
+  // head
+  cx.beginPath(); cx.arc(px,by-50,17,0,Math.PI*2); cx.fillStyle=ag.skin; cx.fill();
+  // hair
+  cx.fillStyle=ag.hair; cx.beginPath(); cx.arc(px,by-52,17,Math.PI,0); cx.fill();
+  cx.fillRect(px-17,by-61,34,8);
+  // eyes
+  cx.fillStyle='#2a2a2a';
+  cx.fillRect(px-7,by-53,3,3); cx.fillRect(px+4,by-53,3,3);
+  return by-50; // head center y
+}
+
+function standingChar(px,ag,t,pose='neutral') {
+  const bob = Math.sin(t*2)*0.8;
+  // shadow
+  cx.save(); cx.globalAlpha=0.12; cx.fillStyle='#000';
+  cx.beginPath(); cx.ellipse(px,GY+2,16,4,0,0,Math.PI*2); cx.fill(); cx.restore();
+  // legs
+  cx.fillStyle=ag.pants||'#1a1a2a';
+  cx.fillRect(px-10,GY-44,9,44); cx.fillRect(px+1,GY-44,9,44);
+  // shoes
+  cx.fillStyle='#111'; cx.fillRect(px-13,GY-5,13,7); cx.fillRect(px+1,GY-5,13,7);
+  // torso
+  rr(px-15,GY-90,30,48,2,ag.shirt);
+  // arms
+  if(pose==='point'||pose==='headset') {
+    // Right arm raised pointing at whiteboard
+    cx.fillStyle=ag.shirt;
+    cx.save(); cx.translate(px+15,GY-82); cx.rotate(-1.1);
+    cx.fillRect(-4,0,8,24); cx.restore();
+    // hand
+    cx.fillStyle=ag.skin; cx.beginPath(); cx.arc(px+32,GY-98,5,0,Math.PI*2); cx.fill();
+    // left arm down
+    cx.save(); cx.fillStyle=ag.shirt; cx.translate(px-15,GY-82); cx.rotate(0.2);
+    cx.fillRect(-4,0,8,26); cx.restore();
+  } else if(pose==='camera') {
+    // both arms forward/up to camera height
+    cx.fillStyle=ag.shirt;
+    cx.save(); cx.translate(px-15,GY-82); cx.rotate(-0.7);
+    cx.fillRect(-4,0,8,26); cx.restore();
+    cx.save(); cx.translate(px+15,GY-82); cx.rotate(0.7);
+    cx.fillRect(-4,0,8,26); cx.restore();
+    cx.fillStyle=ag.skin;
+    cx.fillRect(px-28,GY-62,8,5); cx.fillRect(px+20,GY-62,8,5);
+  } else {
+    cx.fillStyle=ag.shirt;
+    cx.save(); cx.translate(px-15,GY-82); cx.rotate(0.15);
+    cx.fillRect(-4,0,8,28); cx.restore();
+    cx.save(); cx.translate(px+15,GY-82); cx.rotate(-0.15);
+    cx.fillRect(-4,0,8,28); cx.restore();
+  }
+  // neck
+  cx.fillStyle=ag.skin; cx.fillRect(px-4,GY-98,8,10);
+  // head
+  cx.beginPath(); cx.arc(px,GY-110,17,0,Math.PI*2); cx.fillStyle=ag.skin; cx.fill();
+  // hair
+  cx.fillStyle=ag.hair; cx.beginPath(); cx.arc(px,GY-112,17,Math.PI,0); cx.fill();
+  cx.fillRect(px-17,GY-121,34,8);
+  // eyes
+  cx.fillStyle='#2a2a2a'; cx.fillRect(px-7,GY-113,3,3); cx.fillRect(px+4,GY-113,3,3);
+  return GY-110; // head center y
+}
+
+// Headset drawn over head
+function headset(px,hy) {
+  cx.strokeStyle='#1a1a1a'; cx.lineWidth=3;
+  cx.beginPath(); cx.arc(px,hy,22,Math.PI*1.15,Math.PI*1.85); cx.stroke();
+  rr(px-25,hy-4,8,10,2,'#222'); // earpiece
+  // mic boom
+  cx.beginPath(); cx.moveTo(px-17,hy+6); cx.lineTo(px-24,hy+18); cx.stroke();
+  rr(px-28,hy+16,8,5,2,'#ff6600'); // mic capsule
+}
+
+// ── PIXEL-ART DESK ACCESSORIES (desk-accessory skill) ─────────────────────────
+// Items drawn in 16-bit retro pixel-art style, tintable, NW-facing perspective.
+// White/gray base = tint via col param. No anti-aliasing (crisp pixel edges).
+
+function deskMug(mx, my, col) {
+  // Liquid top
+  cx.fillStyle = '#2a1206';
+  cx.beginPath(); cx.ellipse(mx, my-14, 6, 2.5, 0, 0, Math.PI*2); cx.fill();
+  // Body
+  cx.fillStyle = col;
+  cx.fillRect(mx-6, my-14, 13, 14);
+  // Right shading
+  cx.fillStyle = 'rgba(0,0,0,0.22)'; cx.fillRect(mx+4, my-14, 3, 14);
+  // Handle
+  cx.strokeStyle = col; cx.lineWidth = 2.5;
+  cx.beginPath(); cx.arc(mx+10, my-7, 4, -1.0, 1.0); cx.stroke();
+  // Highlight stripe
+  cx.fillStyle = 'rgba(255,255,255,0.30)'; cx.fillRect(mx-5, my-13, 3, 9);
+  // Rim top ring
+  cx.strokeStyle = 'rgba(0,0,0,0.18)'; cx.lineWidth = 1;
+  cx.beginPath(); cx.ellipse(mx+0.5, my-14, 6, 2.5, 0, 0, Math.PI*2); cx.stroke();
+}
+
+function deskPlant(px, py, col) {
+  // Pot body (trapezoid)
+  cx.fillStyle = '#7a5a12';
+  cx.beginPath(); cx.moveTo(px-7,py); cx.lineTo(px+7,py);
+  cx.lineTo(px+5,py-11); cx.lineTo(px-5,py-11); cx.closePath(); cx.fill();
+  // Pot rim
+  rr(px-8,py-14,16,4,1,'#9a7018');
+  // Soil
+  cx.fillStyle = '#2a1808';
+  cx.beginPath(); cx.ellipse(px, py-12, 7, 2.5, 0, 0, Math.PI*2); cx.fill();
+  // Leaves
+  const c = col || '#228833';
+  cx.fillStyle = c;
+  [[-6,-24,4,9,-0.3],[0,-28,4,10,0],[6,-24,4,9,0.3]].forEach(([ox,oy,rx,ry,ang])=>{
+    cx.beginPath(); cx.ellipse(px+ox, py+oy, rx, ry, ang, 0, Math.PI*2); cx.fill();
+  });
+  // Stem
+  cx.strokeStyle = '#1a6620'; cx.lineWidth = 1.5;
+  cx.beginPath(); cx.moveTo(px, py-11); cx.lineTo(px, py-22); cx.stroke();
+}
+
+function deskLamp(lx, ly, col) {
+  // Base plate
+  rr(lx-7, ly-3, 14, 5, 1, '#252525');
+  // Vertical arm
+  cx.strokeStyle = '#4a4a4a'; cx.lineWidth = 2;
+  cx.beginPath(); cx.moveTo(lx, ly-3); cx.lineTo(lx-5, ly-22); cx.stroke();
+  // Horizontal arm
+  cx.beginPath(); cx.moveTo(lx-5, ly-22); cx.lineTo(lx-2, ly-30); cx.stroke();
+  // Lampshade
+  cx.fillStyle = col;
+  cx.beginPath(); cx.moveTo(lx-14, ly-21); cx.lineTo(lx+2, ly-21);
+  cx.lineTo(lx-2, ly-30); cx.closePath(); cx.fill();
+  // Shade highlight
+  cx.fillStyle = 'rgba(255,255,255,0.22)';
+  cx.beginPath(); cx.moveTo(lx-13, ly-22); cx.lineTo(lx-7, ly-22);
+  cx.lineTo(lx-5, ly-29); cx.closePath(); cx.fill();
+  // Glow cone on desk
+  cx.save(); cx.globalAlpha = 0.10;
+  const g = cx.createRadialGradient(lx-5, ly-15, 0, lx-5, ly-15, 32);
+  g.addColorStop(0, col); g.addColorStop(1, 'transparent');
+  cx.fillStyle = g; cx.fillRect(lx-37,ly-47,74,37); cx.restore();
+}
+
+function deskStapler(sx, sy, col) {
+  // Base rail
+  rr(sx-13, sy-3, 26, 5, 1, '#282828');
+  // Body (NW angle offset)
+  rr(sx-11, sy-11, 22, 9, 2, col || '#5a5a5a');
+  // Highlight
+  cx.fillStyle = 'rgba(255,255,255,0.14)'; cx.fillRect(sx-10, sy-10, 8, 3);
+  // Mechanism seam
+  cx.fillStyle = 'rgba(0,0,0,0.28)'; cx.fillRect(sx-11, sy-4, 22, 2);
+}
+
+// ── ZONE BACKGROUNDS ─────────────────────────────────────────────────────────
+function zoneBG(id, col) {
+  const x=ZX[id], w=zw(id);
+  // wall (warm white)
+  const wg = cx.createLinearGradient(x,WLY,x+w,WLY);
+  wg.addColorStop(0,'#f2eee2'); wg.addColorStop(0.5,'#f0ece0'); wg.addColorStop(1,'#eae6da');
+  cx.fillStyle=wg; cx.fillRect(x,WLY,w,FLY-WLY);
+  // floor
+  tiles(x,FLY,w,FLH,'#d4d0c4','#c8c4b8');
+  // ceiling strip (zone color accent)
+  rr(x,OY,w,CEH,0,'#e0dcd0');
+  cx.fillStyle=col+'33'; cx.fillRect(x,OY,w,CEH);
+  // ceiling light
+  rr(x+w/2-20,OY+4,40,10,2,'#ddd8c8');
+  cx.fillStyle='#fffaee'; cx.fillRect(x+w/2-16,OY+6,32,6);
+  // ceiling glow cone
+  cx.save(); cx.globalAlpha=0.14;
+  const g=cx.createRadialGradient(x+w/2,OY+10,0,x+w/2,OY+10,Math.min(w,200));
+  g.addColorStop(0,'#fff8e0'); g.addColorStop(1,'transparent');
+  cx.fillStyle=g; cx.fillRect(x,OY,w,OH*0.7); cx.restore();
+  // zone label on ceiling
+  boldTxt(ZW.find(z=>z[0]===id)?.[1]||id.toUpperCase(), x+w/2, OY+30, 9, col, 'center');
+  // zone divider (right edge)
+  ln(x+w,WLY,x+w,FLY,'rgba(0,0,0,0.12)',1.5);
+  // floor accent strip
+  cx.fillStyle=col; cx.fillRect(x,FLY,w,3);
+}
+
+// Window on back wall
+function window2d(wx,wy,ww,wh) {
+  const g=cx.createLinearGradient(wx,wy,wx,wy+wh);
+  g.addColorStop(0,'#aaddf0'); g.addColorStop(0.6,'#88c8e0'); g.addColorStop(1,'#6aaec8');
+  cx.fillStyle=g; cx.fillRect(wx,wy,ww,wh);
+  // clouds
+  cx.fillStyle='#eef5fa';
+  [[0.2,0.25],[0.65,0.18]].forEach(([fx,fy])=>{
+    const ccx=wx+ww*fx, ccy=wy+wh*fy;
+    [0,10,-9].forEach((ox,i)=>{
+      cx.beginPath(); cx.arc(ccx+ox,ccy+i*2,(6-i*1.5),0,Math.PI*2); cx.fill();
+    });
+  });
+  // frame
+  cx.strokeStyle='#e0dcd0'; cx.lineWidth=3; cx.strokeRect(wx,wy,ww,wh);
+  cx.strokeStyle='#d4d0c4'; cx.lineWidth=1.5;
+  cx.beginPath(); cx.moveTo(wx+ww/2,wy); cx.lineTo(wx+ww/2,wy+wh); cx.stroke();
+  cx.beginPath(); cx.moveTo(wx,wy+wh*0.5); cx.lineTo(wx+ww,wy+wh*0.5); cx.stroke();
+  // sill
+  cx.fillStyle='#d8d4c8'; cx.fillRect(wx-2,wy+wh,ww+4,5);
+}
+
+// ── ZONE CONTENTS ────────────────────────────────────────────────────────────
+
+function drawExec(t) {
+  const x=ZX.exec, w=zw('exec'), ag=AGENTS.claude;
+  const midX = x + w/2;
+
+  // Window
+  const winW=w*0.65, winH=(FLY-WLY)*0.30;
+  window2d(x+w/2-winW/2, WLY+18, winW, winH);
+
+  // Glass office walls (exec area bounded by glass)
+  cx.save(); cx.globalAlpha=0.12;
+  cx.fillStyle='#88aacc';
+  cx.fillRect(x+w-4,WLY,4,FLY-WLY); cx.restore();
+  cx.strokeStyle='rgba(140,180,220,0.45)'; cx.lineWidth=2;
+  cx.setLineDash([0]);
+  cx.strokeRect(x+1,WLY+2,w-5,FLY-WLY-2);
+  // Glass mullions
+  ln(x+1,WLY+40,x+1,FLY,'rgba(140,180,220,0.5)',1);
+
+  // Bookshelf on left wall
+  rr(x+4,FLY-110,16,110,0,'#9a6a1a');
+  for(let sh=0;sh<5;sh++){
+    cx.fillStyle='#7a5010'; cx.fillRect(x+4,FLY-110+sh*22,16,2);
+    [[0x8B0000],[0x006400],[0x00008B],[0x8B4513]].forEach(([bc],bi)=>{
+      cx.fillStyle='#'+bc.toString(16).padStart(6,'0');
+      cx.fillRect(x+5+bi*3,FLY-108+sh*22,2,18);
+    });
+  }
+
+  // L-shaped executive desk
+  const deskW=w*0.72, deskH=14, deskY=FLY-92;
+  desk(midX-deskW/2, deskY, deskW, deskH, '#c09020','#906c10');
+  // L extension
+  desk(x+4+16+4, deskY-60, w*0.3, deskH, '#c09020','#906c10');
+
+  // 3 monitors
+  const mh=52, mw=70;
+  monitor(midX-55, deskY-mh/2-14, mw, mh, ag.col,
+    ['> AUTOMODE: ON','> directives: 12','> tasks: 8 done','> queue: 0'], t);
+  monitor(midX, deskY-mh/2-14, mw, mh, '#ffaa00',
+    ['TASK LOG','run outreach ✓','gen images ✓','render b2c ✓'], t);
+  monitor(midX+55, deskY-mh/2-14, mw, mh, '#ff8800',
+    ['SYSTEM OK','Python 3.11 ✓','Node/Remotion ✓','crons: 4 active'], t);
+
+  // Trophy / plant
+  cx.fillStyle='#ffd700'; cx.fillRect(x+w-16,deskY-28,10,12);
+  cx.fillStyle='#c09020'; cx.fillRect(x+w-17,deskY-16,12,4);
+
+  // Character (seated, thoughtful lean)
+  const hy = seatedChar(midX, deskY, ag, t, true);
+
+  // Active glow on desk
+  if(true) {
+    cx.save(); cx.globalAlpha=0.08+Math.sin(t*2)*0.04;
+    cx.fillStyle=ag.col; cx.fillRect(midX-deskW/2,deskY,deskW,deskH); cx.restore();
+  }
+
+  // Keyboard on desk
+  rr(midX-22,deskY+2,44,8,1,'#2a2838','#3a3848',1);
+
+  // Desk accessories (desk-accessory skill)
+  deskLamp(midX-deskW/2+12, deskY, ag.col);
+  deskMug(midX+deskW/2-14, deskY, ag.col);
+  deskPlant(x+24+zw('exec')*0.22, deskY-60, '#2a8833');
+
+  // Name label
+  agentLabel(midX, FLY+12, ag);
+  hitBoxes.push({ id:'claude', x, y:OY, w, h:OH });
+}
+
+function drawCreative(t) {
+  const x=ZX.creative, w=zw('creative');
+  const halfW = w/2;
+  const gemX = x + halfW*0.5;
+  const klngX = x + halfW + halfW*0.5;
+
+  // Partition between gemini and kling
+  ln(x+halfW, WLY+20, x+halfW, FLY-5,'rgba(0,0,0,0.08)',1);
+  cx.setLineDash([4,4]);
+  ln(x+halfW, WLY+20, x+halfW, FLY-5,'rgba(200,0,255,0.15)',1);
+  cx.setLineDash([]);
+
+  // Windows
+  const wh=(FLY-WLY)*0.28;
+  window2d(x+14, WLY+14, halfW*0.62, wh);
+  window2d(x+halfW+12, WLY+14, halfW*0.62, wh);
+
+  // ── GEMINI: Drawing table + tablet ───────────────────────────────────
+  const gDeskY = FLY - 88;
+  const gDeskW = halfW * 0.68;
+  // Angled drawing table
+  cx.fillStyle='#b87a1a';
+  cx.beginPath(); cx.moveTo(gemX-gDeskW/2,gDeskY+10);
+  cx.lineTo(gemX+gDeskW/2,gDeskY); cx.lineTo(gemX+gDeskW/2,gDeskY+14);
+  cx.lineTo(gemX-gDeskW/2,gDeskY+20); cx.closePath(); cx.fill();
+  // Table legs
+  cx.fillStyle='#906010';
+  cx.fillRect(gemX-gDeskW/2+4,gDeskY+16,6,FLY-gDeskY-16);
+  cx.fillRect(gemX+gDeskW/2-10,gDeskY+10,6,FLY-gDeskY-10);
+
+  // Drawing tablet on table (glowing screen)
+  const tabW=gDeskW*0.7, tabH=tabW*0.62, tabY=gDeskY-tabH+4;
+  rr(gemX-tabW/2-3,tabY-3,tabW+6,tabH+6,3,'#1a1a2a');
+  cx.fillStyle='#050a18'; cx.fillRect(gemX-tabW/2,tabY,tabW,tabH);
+  // Generated image on tablet (colorful blocks)
+  const colors=['#ff6b6b','#ffd700','#00eeff','#cc00ff','#00ff88'];
+  for(let gx2=0;gx2<5;gx2++) for(let gy2=0;gy2<4;gy2++) {
+    cx.fillStyle=colors[(gx2+gy2)%5]+'aa';
+    cx.fillRect(gemX-tabW/2+3+gx2*(tabW-6)/5, tabY+3+gy2*(tabH-6)/4,
+                (tabW-6)/5-1,(tabH-6)/4-1);
+  }
+  cx.save(); cx.globalAlpha=0.15+Math.sin(t*2)*0.05; cx.fillStyle='#00eeff';
+  cx.fillRect(gemX-tabW/2,tabY,tabW,tabH); cx.restore();
+  // tablet glow
+  monitor(gemX, tabY+tabH/2, 0, 0, '#00eeff', [], t); // just for glow
+
+  // Stylus pen in hand
+  cx.strokeStyle='#aaa'; cx.lineWidth=2;
+  cx.beginPath(); cx.moveTo(gemX-22,gDeskY-4); cx.lineTo(gemX-6,gDeskY+8); cx.stroke();
+
+  // Desk accessories
+  deskMug(gemX+gDeskW/2-10, gDeskY, AGENTS.gemini.col);
+
+  // Art prints on wall (behind gemini)
+  [[x+4,'#ff6b6b'],[x+26,'#00eeff'],[x+48,'#cc00ff']].forEach(([ax,ac])=>{
+    rr(ax,WLY+wh+28,18,24,1,'#fff8f0',ac,1.5);
+    cx.fillStyle=ac+'66'; cx.fillRect(ax+2,WLY+wh+30,14,20);
+  });
+
+  // Character (Gemini - leaning forward to tablet)
+  seatedChar(gemX, gDeskY, AGENTS.gemini, t, false);
+  agentLabel(gemX, FLY+12, AGENTS.gemini);
+  hitBoxes.push({ id:'gemini', x, y:OY, w:halfW, h:OH });
+
+  // ── KLING: Camera + tripod (STANDING) ────────────────────────────────
+  const kx = klngX - 8;
+
+  // Camera tripod
+  const tripodTop = GY - 90;
+  cx.strokeStyle='#555'; cx.lineWidth=2.5;
+  ln(kx, tripodTop, kx-28, GY, '#444', 2.5);
+  ln(kx, tripodTop, kx+28, GY, '#444', 2.5);
+  ln(kx, tripodTop, kx+4, GY, '#444', 2);
+  ln(kx, tripodTop, kx, tripodTop-40, '#555', 3); // column up
+  // Camera body
+  rr(kx-22, tripodTop-60, 44, 28, 3, '#1a1a1a', '#333', 1);
+  // Lens
+  cx.fillStyle='#0a0a0a'; cx.beginPath(); cx.arc(kx-18,tripodTop-46,9,0,Math.PI*2); cx.fill();
+  cx.strokeStyle='#555'; cx.lineWidth=1.5; cx.beginPath(); cx.arc(kx-18,tripodTop-46,10,0,Math.PI*2); cx.stroke();
+  cx.fillStyle='#003344'; cx.beginPath(); cx.arc(kx-18,tripodTop-46,6,0,Math.PI*2); cx.fill();
+  // Viewfinder
+  rr(kx+14,tripodTop-58,8,8,1,'#222');
+
+  // Clapperboard leaning on wall
+  rr(x+halfW*1.82,FLY-62,26,34,1,'#fff');
+  cx.fillStyle='#111'; cx.fillRect(x+halfW*1.82,FLY-62,26,10);
+  txt('VLM',x+halfW*1.82+4,FLY-54,6,'#00ff88');
+
+  // Light stand
+  cx.strokeStyle='#777'; cx.lineWidth=2;
+  ln(x+halfW*1.88,GY,x+halfW*1.88,GY-70,'#666',2);
+  cx.fillStyle='#ffd700'; cx.beginPath();
+  cx.arc(x+halfW*1.88,GY-70,8,0,Math.PI*2); cx.fill();
+  cx.save(); cx.globalAlpha=0.12;
+  const lg=cx.createRadialGradient(x+halfW*1.88,GY-70,0,x+halfW*1.88,GY-70,60);
+  lg.addColorStop(0,'#ffd700'); lg.addColorStop(1,'transparent');
+  cx.fillStyle=lg; cx.fillRect(x+halfW*1.68,GY-130,80,80); cx.restore();
+
+  // Standing character - looking at camera
+  standingChar(klngX+14, AGENTS.kling, t, 'camera');
+  agentLabel(klngX, FLY+12, AGENTS.kling);
+  hitBoxes.push({ id:'kling', x:x+halfW, y:OY, w:halfW, h:OH });
+}
+
+function drawSales(t) {
+  const x=ZX.sales, w=zw('sales'), ag=AGENTS.outreach;
+  const midX = x + w/2;
+
+  // Window
+  const wh=(FLY-WLY)*0.26;
+  window2d(x+w*0.15, WLY+14, w*0.7, wh);
+
+  // BIG LEAD SCOREBOARD on left portion of wall
+  const sbX=x+4, sbY=WLY+wh+26, sbW=w*0.44, sbH=(FLY-WLY)*0.46;
+  rr(sbX,sbY,sbW,sbH,4,'#040c08','#00ff88',2);
+  cx.fillStyle='#00ff8822'; cx.fillRect(sbX+1,sbY+1,sbW-2,sbH*0.28);
+  boldTxt('PIPELINE', sbX+sbW/2, sbY+sbH*0.16, 9, '#00ff88','center');
+  // Big number
+  cx.fillStyle='#00ff88'; cx.font=`bold 38px 'Courier New'`; cx.textAlign='center';
+  cx.shadowColor='#00ff88'; cx.shadowBlur=18;
+  cx.fillText(live.leads_total??51, sbX+sbW/2, sbY+sbH*0.56); cx.shadowBlur=0;
+  boldTxt('LEADS', sbX+sbW/2, sbY+sbH*0.72, 8,'rgba(0,255,136,0.7)','center');
+  ['Financial: 20','Coaches: 20','Agency: 11'].forEach((l,i)=>{
+    txt(l, sbX+6, sbY+sbH*0.80+i*11, 7,'rgba(255,255,255,0.55)','left');
+  });
+
+  // Whiteboard (right wall)
+  const wbX=x+w-6-w*0.36, wbY=WLY+wh+22, wbW=w*0.36, wbH=(FLY-WLY)*0.5;
+  rr(wbX,wbY,wbW,wbH,2,'#f8f9ff','#ccc',1.5);
+  cx.fillStyle='#888'; cx.fillRect(wbX,wbY+wbH,wbW,5); // tray
+  cx.fillStyle='#1a6b3a'; cx.font=`bold 8px 'Courier New'`; cx.textAlign='left';
+  cx.fillText('EMAIL 2: MAR 29', wbX+4, wbY+16);
+  ['✓ 51 CONTACTED','→ 3 VERTICALS','→ REPLY: 0','FINANCIAL: 20','COACHES: 20','AGENCY: 11'].forEach((l,i)=>{
+    cx.fillStyle=l.startsWith('✓')?'#00aa44':l.startsWith('→')?'#cc7700':'#333';
+    cx.font=`7px 'Courier New'`; cx.fillText(l,wbX+4,wbY+30+i*13);
+  });
+
+  // Standing desk (taller)
+  const sdW=w*0.52, sdH=16, sdY=FLY-110;
+  desk(midX-sdW/2-20, sdY, sdW, sdH, '#c8912a','#a07018');
+  rr(midX-sdW/2-20, sdY+sdH, sdW, FLY-sdY-sdH, 0, '#a07018');
+
+  // Phone / laptop on desk
+  rr(midX-sdW/2-12,sdY-12,24,14,2,'#1a1a1a');
+  cx.fillStyle='#0a3a18'; cx.fillRect(midX-sdW/2-10,sdY-10,20,10);
+
+  // Desk accessories
+  deskMug(midX-sdW/2+8, sdY, ag.col);
+
+  // Monitor at desk
+  monitor(midX+sdW/2-40, sdY-52, 65, 42, ag.col,
+    ['OUTREACH BOT','51 LEADS HIT','EMAIL 2: MAR29','CRON: ACTIVE'], t);
+
+  // Standing character with headset, pointing at whiteboard
+  const hy = standingChar(midX-20, ag, t, 'point');
+  headset(midX-20, hy);
+  agentLabel(midX, FLY+12, ag);
+  hitBoxes.push({ id:'outreach', x:ZX.sales, y:OY, w, h:OH });
+}
+
+function drawOps(t) {
+  const x=ZX.ops, w=zw('ops');
+  const halfW = w/2;
+  const apX = x + halfW*0.5;
+  const crmX = x + halfW + halfW*0.5;
+
+  // Partition
+  cx.setLineDash([4,4]);
+  ln(x+halfW,WLY+20,x+halfW,FLY-5,'rgba(51,153,255,0.15)',1);
+  cx.setLineDash([]);
+
+  // Windows
+  const wh=(FLY-WLY)*0.27;
+  window2d(x+10,WLY+14,halfW*0.65,wh);
+  window2d(x+halfW+10,WLY+14,halfW*0.65,wh);
+
+  // ── AUTO-POSTER: 3 monitors ───────────────────────────────────────────
+  const apDeskY = FLY - 92, apDeskW = halfW * 0.82;
+  desk(apX-apDeskW/2, apDeskY, apDeskW, 14, '#c8912a','#a07018');
+  rr(apX-26,apDeskY+2,52,8,1,'#2a2838','#3a3848',1); // keyboard
+  // 3 monitors in arc
+  const mh=50,mw=60;
+  monitor(apX-54, apDeskY-mh/2-12, mw, mh, '#ff00cc',
+    ['@neoismyname1','3 posts today','Queue: 16','LIVE'], t);
+  monitor(apX, apDeskY-mh/2-18, mw, mh, '#ff55cc',
+    ['@shay.so.fine','Last: 05:01','Queue: 24','LIVE'], t, '#ff44cc');
+  monitor(apX+54, apDeskY-mh/2-12, mw, mh, '#cc0088',
+    ['@tytheguyyttg','Sched: 2x/day','Queue: 18','LIVE'], t, '#bb0077');
+  // Phone stand
+  rr(apX+apDeskW/2-14,apDeskY-20,8,18,2,'#1a1a1a');
+  // Desk accessories
+  deskMug(apX-apDeskW/2+12, apDeskY, AGENTS.autoposter.col);
+  seatedChar(apX, apDeskY, AGENTS.autoposter, t, true);
+  agentLabel(apX, FLY+12, AGENTS.autoposter);
+  hitBoxes.push({ id:'autoposter', x, y:OY, w:halfW, h:OH });
+
+  // ── CRM SYNC: Data analyst ────────────────────────────────────────────
+  const crmDeskY = FLY - 92, crmDeskW = halfW*0.78;
+  desk(crmX-crmDeskW/2, crmDeskY, crmDeskW, 14, '#c8912a','#a07018');
+  rr(crmX-24,crmDeskY+2,48,8,1,'#2a2838','#3a3848',1);
+  // Desk accessories
+  deskMug(crmX-crmDeskW/2+12, crmDeskY, AGENTS.crm.col);
+  deskStapler(crmX+crmDeskW/2-18, crmDeskY, '#4a6a8a');
+  // 2 monitors with data charts
+  monitor(crmX-38, crmDeskY-45, 68, mh, '#3399ff',
+    ['CRM SYNC','51 LEADS','Replies: 0','Sync: hourly'], t);
+  monitor(crmX+38, crmDeskY-45, 68, mh, '#2266cc',
+    ['PIPELINE','Email1: 51✓','Email2: pend','Email3: pend'], t,'#2266cc');
+  // Mini bar charts on wall
+  [[4,80],[8,60],[5,68],[9,50],[6,72]].forEach(([v,h2],i)=>{
+    cx.fillStyle='#3399ff'+['cc','aa','88','aa','cc'][i];
+    cx.fillRect(x+halfW+8+i*12,WLY+wh+32,8,h2-20);
+  });
+  seatedChar(crmX, crmDeskY, AGENTS.crm, t, true);
+  agentLabel(crmX, FLY+12, AGENTS.crm);
+  hitBoxes.push({ id:'crm', x:x+halfW, y:OY, w:halfW, h:OH });
+}
+
+function drawRecep(t) {
+  const x=ZX.recep, w=zw('recep'), ag=AGENTS.gmail;
+  const midX = x + w/2;
+
+  // Window
+  const wh=(FLY-WLY)*0.25;
+  window2d(x+w*0.12, WLY+14, w*0.76, wh);
+
+  // VLM HQ sign on back wall
+  const signY = WLY + wh + 20;
+  cx.fillStyle='#ffd700'; cx.font=`bold 14px 'Courier New'`; cx.textAlign='center';
+  cx.shadowColor='#ffd700'; cx.shadowBlur=10;
+  cx.fillText('VLM HQ', midX, signY+16); cx.shadowBlur=0;
+  cx.fillStyle='rgba(255,215,0,0.4)'; cx.font=`7px 'Courier New'`;
+  cx.fillText('VIRAL LENSE MEDIA', midX, signY+28);
+
+  // Reception plant
+  cx.fillStyle='#2a4a1a'; cx.beginPath();
+  cx.arc(x+w-16,FLY-52,12,0,Math.PI*2); cx.fill();
+  cx.fillStyle='#1a3a0e';
+  cx.fillRect(x+w-20,FLY-42,8,4);
+  [[0,-12],[-8,-8],[8,-8]].forEach(([ox,oy])=>{
+    cx.beginPath(); cx.ellipse(x+w-16+ox,FLY-52+oy,8,5,ox<0?-0.4:0.4,0,Math.PI*2); cx.fill();
+  });
+  cx.fillStyle='#8B6914'; cx.fillRect(x+w-18,FLY-38,10,38);
+
+  // Curved reception desk
+  const rdY=FLY-84, rdH=14;
+  rr(x+4,rdY,w-8,rdH,2,'#c8912a','#a07018',1);
+  // Front panel
+  rr(x+4,rdY+rdH,w-8,40,0,'#a07018');
+  cx.fillStyle='#c09020'; cx.fillRect(x+6,rdY+rdH+4,w-12,2);
+  // Monitor
+  monitor(midX, rdY-40, 60, 42, ag.col,
+    ['INBOX: OPEN','WATCHING...','keywords: ON','replies: 0'], t);
+  // Desk accessories
+  deskMug(midX+24, rdY, ag.col);
+  seatedChar(midX, rdY, ag, t, false);
+  agentLabel(midX, FLY+12, ag);
+  hitBoxes.push({ id:'gmail', x:ZX.recep, y:OY, w, h:OH });
+}
+
+// Agent name label below floor — with pixel-art mini sprite (character-sprite skill)
+function agentLabel(lx,ly,ag) {
+  const lw=100;
+  rr(lx-lw/2,ly,lw,22,4,'#0d1020',ag.col,1.5);
+  const isActive=['ACTIVE','SYNCING','WATCHING'].includes(ag.status);
+  // Status dot
+  cx.save(); cx.globalAlpha=isActive?0.9:0.4;
+  cx.beginPath(); cx.arc(lx-lw/2+9,ly+11,3.5,0,Math.PI*2);
+  cx.fillStyle=isActive?'#00ff88':'#555'; cx.fill(); cx.restore();
+  // Mini 8-bit character sprite (character-sprite skill indicator)
+  cx.save(); cx.imageSmoothingEnabled=false;
+  const ps=2, spx=lx-lw/2+16, spy=ly+4;
+  // Hair
+  cx.fillStyle=ag.hair||'#111';
+  cx.fillRect(spx+ps,spy,4*ps,ps);
+  // Head (skin)
+  cx.fillStyle=ag.skin||'#c8a070';
+  cx.fillRect(spx+ps,spy+ps,4*ps,3*ps);
+  // Eyes
+  cx.fillStyle='#222';
+  cx.fillRect(spx+ps,spy+2*ps,ps,ps); cx.fillRect(spx+4*ps,spy+2*ps,ps,ps);
+  // Shirt/body
+  cx.fillStyle=ag.shirt||'#2a2a4a';
+  cx.fillRect(spx,spy+4*ps,6*ps,3*ps);
+  // Zone color accent pixel
+  cx.fillStyle=ag.col; cx.globalAlpha=0.7;
+  cx.fillRect(spx+2*ps,spy+4*ps,2*ps,ps); cx.restore();
+  // Label text
+  cx.fillStyle=ag.col; cx.font=`bold 8px 'Courier New'`; cx.textAlign='center';
+  cx.fillText(ag.label, lx+8, ly+16);
+}
+
+// ── TITLE BAR ─────────────────────────────────────────────────────────────────
+function titleBar(t) {
+  cx.fillStyle='#0d1020'; cx.fillRect(0,0,W,TH);
+  cx.fillStyle='#ffd700'; cx.fillRect(0,TH-2,W,2);
+  // Logo
+  cx.fillStyle='#ffd700'; cx.font=`bold 20px 'Courier New'`; cx.textAlign='left';
+  cx.shadowColor='#ffd700'; cx.shadowBlur=14; cx.fillText('VLM HQ',18,34); cx.shadowBlur=0;
+  cx.fillStyle='rgba(255,215,0,0.35)'; cx.font=`9px 'Courier New'`;
+  cx.fillText('AGENT OPERATIONS — LIVE VIEW',18,46);
+  // Zones
+  const zones=[['EXECUTIVE','#ffd700'],['CREATIVE','#cc00ff'],['SALES','#00ff88'],['OPS','#3399ff'],['RECEPTION','#ff3333']];
+  let lx=W*0.28;
+  cx.font=`9px 'Courier New'`;
+  zones.forEach(([name,col])=>{
+    cx.beginPath(); cx.arc(lx+5,32,5,0,Math.PI*2); cx.fillStyle=col; cx.fill();
+    cx.fillStyle='rgba(255,255,255,0.65)'; cx.textAlign='left'; cx.fillText(name,lx+14,36);
+    lx+=name.length*6+28;
+  });
+  // Skills badge (char-sprite + desk-accessory loaded)
+  const bx=W-310;
+  rr(bx,19,130,14,3,'rgba(0,255,136,0.08)','rgba(0,255,136,0.25)',1);
+  cx.fillStyle='rgba(0,255,136,0.55)'; cx.font=`7px 'Courier New'`; cx.textAlign='left';
+  cx.fillText('SKILLS: CHAR-SPRITE · DESK-ACCESSORY', bx+5, 29);
+  // Live dot
+  const ba=0.5+Math.sin(t*2.5)*0.5;
+  cx.save(); cx.globalAlpha=ba;
+  cx.beginPath(); cx.arc(W-86,32,4,0,Math.PI*2); cx.fillStyle='#00ff88'; cx.fill(); cx.restore();
+  cx.fillStyle='rgba(255,255,255,0.4)'; cx.font=`9px 'Courier New'`; cx.textAlign='right';
+  cx.fillText('LIVE · '+new Date().toLocaleTimeString(), W-14,36);
+}
+
+// ── METRICS + TICKER ──────────────────────────────────────────────────────────
+let tickerX = W;
+function bottomBar(t) {
+  const by=H-BH;
+  cx.fillStyle='#0d1020'; cx.fillRect(0,by,W,BH);
+  cx.fillStyle='rgba(255,215,0,0.5)'; cx.fillRect(0,by,W,2);
+
+  const mets=[
+    {l:'LEADS',v:live.leads_total??51,col:'#00ff88'},
+    {l:'EMAILS',v:live.emails_sent??50,col:'#ffd700'},
+    {l:'POST QUEUE',v:live.queued_posts??58,col:'#ff00cc'},
+    {l:'IMAGES',v:9,col:'#00eeff'},
+    {l:'VIDEOS',v:2,col:'#ff4400'},
+    {l:'AGENTS LIVE',v:4,col:'#3399ff'},
+  ];
+  const mw=W/mets.length;
+  mets.forEach((m,i)=>{
+    const mx=i*mw+mw/2;
+    cx.fillStyle=m.col; cx.font=`bold 28px 'Courier New'`; cx.textAlign='center';
+    cx.shadowColor=m.col; cx.shadowBlur=10; cx.fillText(m.v,mx,by+42); cx.shadowBlur=0;
+    cx.fillStyle='rgba(255,255,255,0.3)'; cx.font=`8px 'Courier New'`; cx.fillText(m.l,mx,by+56);
+    if(i>0){cx.strokeStyle='rgba(255,255,255,0.07)';cx.lineWidth=1;
+      cx.beginPath();cx.moveTo(i*mw,by+10);cx.lineTo(i*mw,by+70);cx.stroke();}
+  });
+
+  // Activity ticker
+  const ty=by+68;
+  cx.fillStyle='#060c18'; cx.fillRect(0,ty,W,BH-68);
+  cx.fillStyle='#0d1a10'; cx.fillRect(0,ty,W,18);
+  cx.save(); cx.beginPath(); cx.rect(0,ty,W,18); cx.clip();
+  const acts=live.activity||[];
+  const tickStr = acts.length
+    ? acts.map(a=>`${a.agent||'SYS'} — ${(a.action||'').slice(0,40)}`).join('   •   ')
+    : 'SYSTEM IDLE — All agents on standby';
+  cx.fillStyle='#00ccff'; cx.font=`8px 'Courier New'`; cx.textAlign='left';
+  cx.fillText(tickStr, tickerX, ty+13);
+  const tw=cx.measureText(tickStr).width;
+  tickerX-=1.2; if(tickerX<-tw) tickerX=W;
+  cx.restore();
+
+  // Ticker label
+  cx.fillStyle='#00ccff44'; cx.fillRect(0,ty,60,18);
+  cx.fillStyle='#00ccff'; cx.font=`bold 7px 'Courier New'`; cx.textAlign='left';
+  cx.fillText('◄ ACTIVITY', 4, ty+13);
+}
+
+// ── CLICK HANDLING ────────────────────────────────────────────────────────────
+const hitBoxes = [];
+let selected = null;
+
+cv.addEventListener('click', e => {
+  const r=cv.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  for(const hb of hitBoxes) {
+    if(mx>=hb.x&&mx<=hb.x+hb.w&&my>=hb.y&&my<=hb.y+hb.h) {
+      showPanel(AGENTS[hb.id]); return;
+    }
+  }
+  closePanel();
+});
+
+function showPanel(ag) {
+  selected=ag;
+  const p=document.getElementById('panel');
+  p.style.display='block'; p.style.borderTopColor=ag.col;
+  document.getElementById('pn').style.color=ag.col;
+  document.getElementById('pn').textContent=ag.label;
+  document.getElementById('pr').textContent=ag.role;
+  document.getElementById('ps2').innerHTML=ag.stats.map(
+    ([k,v])=>`<div class="ps"><span>${k}</span><span>${v}</span></div>`).join('');
+}
+window.closePanel=()=>{ selected=null; document.getElementById('panel').style.display='none'; };
+
+// ── MAIN LOOP ─────────────────────────────────────────────────────────────────
+function frame(ts) {
+  const t=ts/1000;
+  hitBoxes.length=0;
+  cx.clearRect(0,0,W,H);
+
+  // Draw zone backgrounds
+  ZW.forEach(([id,col])=>zoneBG(id,col));
+
+  // Draw each zone's content
+  drawExec(t);
+  drawCreative(t);
+  drawSales(t);
+  drawOps(t);
+  drawRecep(t);
+
+  // Selection outline
+  if(selected) {
+    const id=Object.keys(AGENTS).find(k=>AGENTS[k]===selected);
+    const hb=hitBoxes.find(h=>h.id===id);
+    if(hb){ cx.strokeStyle=selected.col; cx.lineWidth=2.5; cx.strokeRect(hb.x+1.5,OY+1.5,hb.w-3,OH-3); }
+  }
+
+  titleBar(t);
+  bottomBar(t);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
