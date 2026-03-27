@@ -874,7 +874,7 @@ def main():
             prompt_data = {
                 "positive_prompt": prompt_text,
                 "aspect_ratio": "4:5",
-                "image_size": "1K",
+                "image_size": "4K",
                 "assets": assets,
             }
 
