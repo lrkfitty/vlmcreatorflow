@@ -41,6 +41,8 @@ CAMPAIGN_JSON = PROJECT_ROOT / "current_campaign.json"
 APPROVED_FILE = PROJECT_ROOT / ".tmp" / "approved_posts.json"
 TYRIE_SCHEDULE = PROJECT_ROOT / ".tmp" / "tyrie_schedule.json"
 TYRIE_LOG = PROJECT_ROOT / ".tmp" / "tyrie_post_log.json"
+SHAY_LOG  = PROJECT_ROOT / ".tmp" / "shay_post_log.json"
+NEO_LOG   = PROJECT_ROOT / ".tmp" / "neo_post_log.json"
 
 # ── page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -725,6 +727,9 @@ with tab_neo:
         unsafe_allow_html=True,
     )
 
+    neo_log = load_json(NEO_LOG, default=[])
+    neo_posted_stems = {e.get("stem", "") for e in neo_log if e.get("stem")}
+
     # Stats row
     stat_cols = st.columns(4)
     with stat_cols[0]:
@@ -755,10 +760,10 @@ with tab_neo:
         )
     with stat_cols[3]:
         st.markdown(
-            "<div class='stat-box'>"
-            "<span class='stat-value' style='color:#ffaa00;text-shadow:0 0 15px rgba(255,170,0,0.4);'>—</span>"
-            "<span class='stat-label'>Engagement %</span>"
-            "</div>",
+            f"<div class='stat-box'>"
+            f"<span class='stat-value' style='color:#ffaa00;text-shadow:0 0 15px rgba(255,170,0,0.4);'>{len(neo_log)}</span>"
+            f"<span class='stat-label'>Posted</span>"
+            f"</div>",
             unsafe_allow_html=True,
         )
 
@@ -774,15 +779,36 @@ with tab_neo:
             unsafe_allow_html=True,
         )
     else:
-        # View mode toggle
-        view_mode = st.radio("View", ["Grid (3-col)", "Large (1-col)"], horizontal=True, key="neo_view_mode", label_visibility="collapsed")
+        filter_col, view_col = st.columns([2, 2])
+        with filter_col:
+            neo_filter = st.radio(
+                "Filter",
+                ["Unposted", "All", "Approved", "Posted"],
+                horizontal=True,
+                key="neo_filter_status",
+                label_visibility="collapsed",
+            )
+        with view_col:
+            view_mode = st.radio("View", ["Grid (3-col)", "Large (1-col)"], horizontal=True, key="neo_view_mode", label_visibility="collapsed")
 
         if view_mode == "Large (1-col)":
-            # Full-size single column view
             for idx, (img_path, caption, stem) in enumerate(posts):
                 is_approved = approved.get(stem, False)
-                status_label = "APPROVED" if is_approved else "READY"
-                badge_class = "badge-approved" if is_approved else "badge-ready"
+                is_posted   = stem in neo_posted_stems
+
+                if neo_filter == "Unposted" and is_posted:
+                    continue
+                if neo_filter == "Approved" and not is_approved:
+                    continue
+                if neo_filter == "Posted" and not is_posted:
+                    continue
+
+                if is_posted:
+                    status_label, badge_class = "🔵 POSTED", "badge-approved"
+                elif is_approved:
+                    status_label, badge_class = "✓ APPROVED", "badge-approved"
+                else:
+                    status_label, badge_class = "READY", "badge-ready"
 
                 st.markdown(
                     f"<div style='margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;'>"
@@ -797,22 +823,41 @@ with tab_neo:
                         f"<div style='padding:8px 4px 4px;color:#8899aa;font-size:13px;line-height:1.5;'>{caption}</div>",
                         unsafe_allow_html=True,
                     )
-                btn_label = "✓ APPROVED" if is_approved else "APPROVE"
-                if st.button(btn_label, key=f"approve_large_{stem}"):
-                    approved[stem] = not is_approved
-                    save_approved(approved)
-                    st.rerun()
+                if not is_posted:
+                    btn_label = "✓ APPROVED" if is_approved else "APPROVE"
+                    if st.button(btn_label, key=f"approve_large_{stem}"):
+                        approved[stem] = not is_approved
+                        save_approved(approved)
+                        st.rerun()
                 st.markdown("<hr style='border-color:rgba(0,255,255,0.1);margin:20px 0;'>", unsafe_allow_html=True)
         else:
             # 3-col grid
+            filtered_posts = []
+            for item in posts:
+                img_path, caption, stem = item
+                is_posted = stem in neo_posted_stems
+                is_approved = approved.get(stem, False)
+                if neo_filter == "Unposted" and is_posted:
+                    continue
+                if neo_filter == "Approved" and not is_approved:
+                    continue
+                if neo_filter == "Posted" and not is_posted:
+                    continue
+                filtered_posts.append(item)
+
             grid_cols = st.columns(3)
-            for idx, (img_path, caption, stem) in enumerate(posts):
+            for idx, (img_path, caption, stem) in enumerate(filtered_posts):
                 col = grid_cols[idx % 3]
                 with col:
                     is_approved = approved.get(stem, False)
+                    is_posted   = stem in neo_posted_stems
                     b64 = img_to_b64(img_path)
-                    status_label = "APPROVED" if is_approved else "READY"
-                    badge_class  = "badge-approved" if is_approved else "badge-ready"
+                    if is_posted:
+                        status_label, badge_class = "🔵 POSTED", "badge-approved"
+                    elif is_approved:
+                        status_label, badge_class = "✓ APPROVED", "badge-approved"
+                    else:
+                        status_label, badge_class = "READY", "badge-ready"
                     caption_short = caption[:120] + "…" if len(caption) > 120 else caption
 
                     img_html = (
@@ -834,17 +879,17 @@ with tab_neo:
                         unsafe_allow_html=True,
                     )
 
-                    # Expander to see full image
-                    with st.expander(f"🔍 View full"):
+                    with st.expander("🔍 View full"):
                         st.image(str(img_path), use_container_width=True)
                         if caption:
                             st.caption(caption)
 
-                    btn_label = "✓ APPROVED" if is_approved else "APPROVE"
-                    if st.button(btn_label, key=f"approve_{stem}"):
-                        approved[stem] = not is_approved
-                        save_approved(approved)
-                        st.rerun()
+                    if not is_posted:
+                        btn_label = "✓ APPROVED" if is_approved else "APPROVE"
+                        if st.button(btn_label, key=f"approve_{stem}"):
+                            approved[stem] = not is_approved
+                            save_approved(approved)
+                            st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -871,11 +916,13 @@ with tab_shay:
         "<div class='section-header'>💎 SHAY · INSTAGRAM COMMAND</div>",
         unsafe_allow_html=True,
     )
-    
-    # Load Shay schedule
+
+    # Load Shay schedule + post log
     shay_schedule_path = PROJECT_ROOT / ".tmp" / "shay_schedule.json"
     shay_schedule = load_json(shay_schedule_path, default=[])
-    
+    shay_log = load_json(SHAY_LOG, default=[])
+    shay_posted_ids = {e.get("carousel_id", "") for e in shay_log if e.get("carousel_id")}
+
     # Count approvals
     approved_data = load_approved()
     shay_approvals = approved_data.get("shay", {})
@@ -888,9 +935,9 @@ with tab_shay:
     with stat_cols[1]:
         st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#ff00ff;'>{approved_count}/{len(shay_schedule)}</span><span class='stat-label'>Approved</span></div>", unsafe_allow_html=True)
     with stat_cols[2]:
-        st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#ff00ff;'>17.2%</span><span class='stat-label'>Engagement</span></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#00ff88;'>{len(shay_log)}</span><span class='stat-label'>Posted</span></div>", unsafe_allow_html=True)
     with stat_cols[3]:
-        st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#ff00ff;'>30</span><span class='stat-label'>Scheduled</span></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#ff00ff;'>{len(shay_schedule)}</span><span class='stat-label'>Scheduled</span></div>", unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -906,12 +953,12 @@ with tab_shay:
         # Filter by status
         filter_status = st.radio(
             "Filter",
-            ["All", "Pending", "Approved"],
+            ["Unposted", "All", "Approved", "Posted"],
             horizontal=True,
             key="shay_filter_status",
             label_visibility="collapsed"
         )
-        
+
         for post in shay_schedule:
             carousel_id = post.get("carousel_id")
             day = post.get("day")
@@ -919,16 +966,26 @@ with tab_shay:
             caption = post.get("caption", "")
             images = post.get("images", [])
             is_approved = carousel_id in shay_approvals
-            
+            is_posted   = carousel_id in shay_posted_ids
+
             # Filter logic
-            if filter_status == "Pending" and is_approved:
+            if filter_status == "Unposted" and is_posted:
                 continue
             if filter_status == "Approved" and not is_approved:
                 continue
-            
-            badge_class = "badge-approved" if is_approved else "badge-pending"
-            status_label = "✓ APPROVED" if is_approved else "⊙ PENDING"
-            
+            if filter_status == "Posted" and not is_posted:
+                continue
+
+            if is_posted:
+                badge_class  = "badge-approved"
+                status_label = "🔵 POSTED"
+            elif is_approved:
+                badge_class  = "badge-approved"
+                status_label = "✓ APPROVED"
+            else:
+                badge_class  = "badge-pending"
+                status_label = "⊙ PENDING"
+
             # Carousel card
             st.markdown(
                 f"<div style='background:rgba(255,0,255,0.05);border:1px solid rgba(255,0,255,0.2);border-radius:4px;padding:12px;margin-bottom:12px;'>"
@@ -941,7 +998,7 @@ with tab_shay:
                 f"</div>",
                 unsafe_allow_html=True,
             )
-            
+
             # Show carousel images
             if images:
                 img_cols = st.columns(min(len(images), 4))
@@ -949,27 +1006,28 @@ with tab_shay:
                     with img_cols[idx]:
                         if Path(img_path).exists():
                             st.image(str(img_path), use_container_width=True)
-            
-            # Approval button
-            col1, col2, col3 = st.columns([3, 1, 1])
-            with col2:
-                if not is_approved:
-                    if st.button(f"✓ Approve", key=f"approve_{carousel_id}"):
-                        shay_approvals[carousel_id] = {"approved_at": datetime.now().isoformat()}
-                        approved_data["shay"] = shay_approvals
-                        save_approved(approved_data)
-                        st.success("Approved!")
-                        st.rerun()
-            with col3:
-                if is_approved:
-                    if st.button(f"✗ Reject", key=f"reject_{carousel_id}"):
-                        if carousel_id in shay_approvals:
-                            del shay_approvals[carousel_id]
-                        approved_data["shay"] = shay_approvals
-                        save_approved(approved_data)
-                        st.info("Approval removed")
-                        st.rerun()
-            
+
+            # Approval buttons (skip if already posted)
+            if not is_posted:
+                col1, col2, col3 = st.columns([3, 1, 1])
+                with col2:
+                    if not is_approved:
+                        if st.button("✓ Approve", key=f"approve_{carousel_id}"):
+                            shay_approvals[carousel_id] = {"approved_at": datetime.now().isoformat()}
+                            approved_data["shay"] = shay_approvals
+                            save_approved(approved_data)
+                            st.success("Approved!")
+                            st.rerun()
+                with col3:
+                    if is_approved:
+                        if st.button("✗ Reject", key=f"reject_{carousel_id}"):
+                            if carousel_id in shay_approvals:
+                                del shay_approvals[carousel_id]
+                            approved_data["shay"] = shay_approvals
+                            save_approved(approved_data)
+                            st.info("Approval removed")
+                            st.rerun()
+
             st.markdown("<br>", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1007,6 +1065,9 @@ with tab_tyrie:
     tyrie_carousels = get_tyrie_carousels()
     tyrie_approved  = load_json(PROJECT_ROOT / ".tmp" / "tyrie_approved.json", default={})
     tyrie_log       = load_json(TYRIE_LOG, default=[])
+
+    # Build set of already-posted stems
+    posted_stems = {e.get("stem", "") for e in tyrie_log if e.get("stem")}
 
     approved_ty_count = sum(1 for cid, _, _ in tyrie_carousels if tyrie_approved.get(cid))
 
@@ -1047,6 +1108,63 @@ with tab_tyrie:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # ── REELS SECTION ─────────────────────────────────────────────────────────
+    st.markdown(
+        "<div class='section-header' style='font-size:12px;'>🎬 REELS</div>",
+        unsafe_allow_html=True,
+    )
+
+    reels_dir = PROJECT_ROOT / "output" / "reels"
+    ty_reels  = sorted(reels_dir.glob("*.mp4"), reverse=True) if reels_dir.exists() else []
+
+    if ty_reels:
+        reel_cols = st.columns(min(len(ty_reels), 3))
+        for ri, reel_path in enumerate(ty_reels[:6]):
+            with reel_cols[ri % 3]:
+                st.video(str(reel_path))
+                # Try to load matching transcript for script preview
+                transcript_path = reels_dir / reel_path.name.replace(".mp4", "_transcript.json")
+                if not transcript_path.exists():
+                    transcript_path = reels_dir / (reel_path.stem + "_transcript.json")
+                if transcript_path.exists():
+                    try:
+                        t = json.loads(transcript_path.read_text())
+                        st.caption(f"_{t.get('script','')[:120]}_")
+                    except Exception:
+                        pass
+                st.caption(reel_path.stem)
+    else:
+        st.markdown(
+            "<div class='coming-soon'>No reels yet — generate one below or from the Pipeline tab</div>",
+            unsafe_allow_html=True,
+        )
+
+    # Quick generate reel button
+    with st.expander("🎙️ Generate New Reel"):
+        reel_context = st.text_input("Scene context", placeholder="Ty working late on rooftop Bangkok, 3am, AI running on autopilot", key="ty_reel_ctx")
+        reel_style   = st.selectbox("Style", ["hook", "builder", "lifestyle", "day_in_life"], key="ty_reel_style")
+        if st.button("Generate Reel", type="primary", key="ty_gen_reel"):
+            if reel_context:
+                import subprocess, time as _time
+                reel_id = f"ty_{int(_time.time())}"
+                with st.spinner(f"Generating VO + rendering reel ({reel_id})..."):
+                    try:
+                        from execution.generate_vo import generate_vo
+                        from execution.render_reel import render_reel
+                        vo = generate_vo(context=reel_context, account="ty",
+                                         output_dir=str(reels_dir), reel_id=reel_id, style=reel_style)
+                        mp4 = render_reel(reel_id=reel_id, vo_path=vo["audio_path"],
+                                          transcript_path=vo["transcript_path"], account="ty")
+                        st.success(f"✅ Reel ready: {mp4}")
+                        st.video(mp4)
+                    except Exception as e:
+                        st.error(f"Render failed: {e}")
+            else:
+                st.warning("Enter a scene context first.")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── CAROUSEL APPROVAL ─────────────────────────────────────────────────────
     st.markdown(
         "<div class='section-header' style='font-size:12px;margin-top:20px;'>◭ 30-DAY CAROUSEL APPROVAL</div>",
         unsafe_allow_html=True,
@@ -1067,7 +1185,7 @@ with tab_tyrie:
     else:
         filter_ty = st.radio(
             "Filter",
-            ["All", "Pending", "Approved"],
+            ["Unposted", "All", "Approved", "Posted"],
             horizontal=True,
             key="tyrie_filter",
             label_visibility="collapsed",
@@ -1075,14 +1193,24 @@ with tab_tyrie:
 
         for idx, (carousel_id, shot_paths, caption) in enumerate(tyrie_carousels):
             is_approved = bool(tyrie_approved.get(carousel_id))
+            is_posted   = carousel_id in posted_stems
 
-            if filter_ty == "Pending" and is_approved:
+            if filter_ty == "Unposted" and is_posted:
                 continue
             if filter_ty == "Approved" and not is_approved:
                 continue
+            if filter_ty == "Posted" and not is_posted:
+                continue
 
-            badge_class  = "badge-approved" if is_approved else "badge-pending"
-            status_label = "✓ APPROVED" if is_approved else "⊙ PENDING"
+            if is_posted:
+                badge_class  = "badge-posted"
+                status_label = "🔵 POSTED"
+            elif is_approved:
+                badge_class  = "badge-approved"
+                status_label = "✓ APPROVED"
+            else:
+                badge_class  = "badge-pending"
+                status_label = "⊙ PENDING"
             vid_entry    = video_queue.get(carousel_id, {})
 
             # Carousel card header
@@ -1410,7 +1538,7 @@ with tab_pipeline:
     all_imgs = get_all_user_images()
     if all_imgs:
         img_cols = st.columns(6)
-        for i, (img_path, user) in enumerate(all_imgs[:12]):
+        for i, (img_path, user) in enumerate(all_imgs[:6]):
             with img_cols[i % 6]:
                 b64 = img_to_b64(img_path)
                 if b64:
