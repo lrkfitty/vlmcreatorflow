@@ -1149,10 +1149,16 @@ def run_batch():
         print(f"[{i+1}/{total}] {cid}")
         print(f"{'='*60}")
 
-        # Write caption
+        # Write caption with extended CTA
         caption_path = OUTPUT_DIR / f"{cid}_caption.txt"
+        ty_cta = (
+            "\n\nReal ones move different. Every city, every shot, every move — built with purpose and documented for the record. "
+            "This is not content for content's sake. This is legacy.\n\n"
+            "Powered by AI. Directed by us. → vlmcreateflow.com 🤖\n"
+            "DM for collabs. Link in bio."
+        )
         with open(caption_path, "w") as f:
-            f.write(carousel["caption"])
+            f.write(carousel["caption"] + ty_cta)
 
         assets = build_assets(i, carousel.get("env"))
 

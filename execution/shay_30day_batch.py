@@ -64,6 +64,10 @@ SHAY_ALL_OUTFITS = (
     _collect_outfits(OUTFITS_INF)
 )
 
+# Angeil has her own outfit folder — pass her an outfit when she's in the scene
+ANGEIL_CLOTH_DIR  = BASE / "assets/AI Content Creators/Friends/Angeil Master /Angeil Clothing"
+ANGEIL_ALL_OUTFITS = _collect_outfits(ANGEIL_CLOTH_DIR)
+
 # ── Character descriptions ────────────────────────────────────────────────────
 SHAY_DESC = (
     "Beautiful Black woman with a signature shoulder-length blonde bob, melanin-rich brown skin with a natural luminous glow, "
@@ -861,6 +865,12 @@ def build_assets(carousel: dict, carousel_idx: int) -> list:
         outfit = SHAY_ALL_OUTFITS[carousel_idx % len(SHAY_ALL_OUTFITS)]
         assets.append({"path": str(outfit), "label": "Outfit for Main Character"})
 
+    # Pass Angeil an outfit when she's in the scene
+    if "Angeil" in carousel.get("friends", {}) and ANGEIL_ALL_OUTFITS:
+        offset = len(ANGEIL_ALL_OUTFITS) // 2
+        angeil_outfit = ANGEIL_ALL_OUTFITS[(carousel_idx + offset) % len(ANGEIL_ALL_OUTFITS)]
+        assets.append({"path": str(angeil_outfit), "label": "Outfit for Angeil"})
+
     env_path = resolve(carousel.get("env", "")) if carousel.get("env") else ""
     if env_path and os.path.exists(env_path):
         assets.append({"path": env_path, "label": "Scene Location/Vibe"})
@@ -882,7 +892,14 @@ def main():
         print(f"{'='*60}")
 
         caption_path = OUTPUT / f"{cid}_caption.txt"
-        caption_path.write_text(carousel["caption"])
+        shay_cta = (
+            "\n\nThe soft girl era is not a trend. It is the standard, and she set it herself. "
+            "Every look curated, every moment captured, every destination earned. "
+            "This is what it looks like when the algorithm works for you — not the other way around.\n\n"
+            "The AI content engine behind the aesthetic → vlmcreateflow.com ✨\n"
+            "Link in bio. DM for brand partnerships."
+        )
+        caption_path.write_text(carousel["caption"] + shay_cta)
 
         assets = build_assets(carousel, i)
 

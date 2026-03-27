@@ -24,7 +24,30 @@ def _collect_outfits(directory: Path) -> list:
     exts = {".jpg", ".jpeg", ".png"}
     return sorted([f for f in directory.rglob("*") if f.suffix.lower() in exts and not f.name.startswith("._")])
 
-NEO_ALL_OUTFITS = _collect_outfits(NEO_OUTFITS)
+NEO_ALL_OUTFITS   = _collect_outfits(NEO_OUTFITS)
+
+# ── Outfit pools for cast members ─────────────────────────────────────────────
+SHAY_OUTFITS_DIR  = BASE / "assets/AI Content Creators/2026 Jan CLothing "
+SHAY_INF_DIR      = BASE / "assets/AI Content Creators/Influencer CLothing "
+ANGEIL_CLOTH_DIR  = BASE / "assets/AI Content Creators/Friends/Angeil Master /Angeil Clothing"
+
+def _collect_shay_outfits():
+    exts = {".jpg", ".jpeg", ".png"}
+    results = []
+    for d in [SHAY_OUTFITS_DIR, SHAY_INF_DIR]:
+        results += [f for f in d.rglob("*") if f.suffix.lower() in exts
+                    and not f.name.startswith("._")
+                    and "Jan 2026 Enviroments" not in str(f)]
+    return sorted(results)
+
+SHAY_ALL_OUTFITS  = _collect_shay_outfits()
+ANGEIL_ALL_OUTFITS = _collect_outfits(ANGEIL_CLOTH_DIR)
+
+# Outfit pool map by partner name
+PARTNER_OUTFIT_POOL = {
+    "Shay":   SHAY_ALL_OUTFITS,
+    "Angeil": ANGEIL_ALL_OUTFITS,
+}
 
 # ── Shay refs (Neo's girl) ────────────────────────────────────────────────────
 SHAY_BACK    = BASE / "assets/AI Content Creators/Shay.So.Fine/SHAY STOCK Photo/Shay blonde bob back.png"
@@ -843,6 +866,13 @@ def build_assets(carousel: dict, carousel_idx: int) -> list:
         neo_outfit = NEO_ALL_OUTFITS[carousel_idx % len(NEO_ALL_OUTFITS)]
         assets.append({"path": str(neo_outfit), "label": "Outfit for Main Character"})
 
+    # Also pass an outfit for the partner (Shay or Angeil) if we have one
+    pool = PARTNER_OUTFIT_POOL.get(partner, [])
+    if pool:
+        offset = len(pool) // 3
+        partner_outfit = pool[(carousel_idx + offset) % len(pool)]
+        assets.append({"path": str(partner_outfit), "label": f"Outfit for {partner}"})
+
     env_path = resolve(carousel.get("env", "")) if carousel.get("env") else ""
     if env_path and os.path.exists(env_path):
         assets.append({"path": env_path, "label": "Scene Location/Vibe"})
@@ -864,7 +894,13 @@ def main():
         print(f"{'='*60}")
 
         caption_path = OUTPUT / f"{cid}_caption.txt"
-        caption_path.write_text(carousel["caption"])
+        neo_cta = (
+            "\n\nAI-powered. Human-directed. This is what the new creative economy looks like — "
+            "built with intention, documented in real time, scaled with technology.\n\n"
+            "We build AI content brands at vlmcreateflow.com 🤖\n"
+            "DM us or visit the link in bio to get started."
+        )
+        caption_path.write_text(carousel["caption"] + neo_cta)
 
         assets = build_assets(carousel, i)
 
