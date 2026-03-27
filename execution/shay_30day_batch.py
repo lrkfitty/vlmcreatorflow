@@ -64,9 +64,8 @@ SHAY_ALL_OUTFITS = (
     _collect_outfits(OUTFITS_INF)
 )
 
-# Angeil has her own outfit folder — pass her an outfit when she's in the scene
-ANGEIL_CLOTH_DIR  = BASE / "assets/AI Content Creators/Friends/Angeil Master /Angeil Clothing"
-ANGEIL_ALL_OUTFITS = _collect_outfits(ANGEIL_CLOTH_DIR)
+# Angeil uses Shay's massive 148-file library (not her own small 13-file folder)
+ANGEIL_ALL_OUTFITS = SHAY_ALL_OUTFITS
 
 # ── Character descriptions ────────────────────────────────────────────────────
 SHAY_DESC = (

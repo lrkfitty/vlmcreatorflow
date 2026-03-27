@@ -22,7 +22,6 @@ BASE = Path(__file__).parent.parent
 TYRIE_HERO    = BASE / "assets/AI Content Creators/Friends/Tyrie Master/Tyrie Hero/Tyrie.png"
 CLOTHING_DIR  = BASE / "assets/AI Content Creators/Friends/Tyrie Master/Tyrie Clothing"
 ANGEIL_HERO   = BASE / "assets/AI Content Creators/Friends/Angeil Master /Angeil Hero image/Angeil.png"
-ANGEIL_CLOTH  = BASE / "assets/AI Content Creators/Friends/Angeil Master /Angeil Clothing"
 ANGEIL_EXTRAS = BASE / "assets/AI Content Creators/Friends/Black Influencer Models"
 ENVS_DIR      = BASE / "assets/AI Content Creators/Environments"
 OUTPUT_DIR    = BASE / "output/users/Tyrie/Instagram"
@@ -33,7 +32,19 @@ def _collect_outfits(directory: Path) -> list:
     return sorted([f for f in directory.rglob("*") if f.suffix.lower() in exts and not f.name.startswith("._")])
 
 TYRIE_ALL_OUTFITS  = _collect_outfits(CLOTHING_DIR)
-ANGEIL_ALL_OUTFITS = _collect_outfits(ANGEIL_CLOTH)
+
+# Angeil uses Shay's massive 148-file library (not her own small 13-file folder)
+_SHAY_LIB_2026 = BASE / "assets/AI Content Creators/2026 Jan CLothing "
+_SHAY_LIB_INF  = BASE / "assets/AI Content Creators/Influencer CLothing "
+def _collect_shay_outfits():
+    exts = {".jpg", ".jpeg", ".png"}
+    results = []
+    for d in [_SHAY_LIB_2026, _SHAY_LIB_INF]:
+        results += [f for f in d.rglob("*") if f.suffix.lower() in exts
+                    and not f.name.startswith("._")
+                    and "Jan 2026 Enviroments" not in str(f)]
+    return sorted(results)
+ANGEIL_ALL_OUTFITS = _collect_shay_outfits()
 
 # ── Character descriptions ───────────────────────────────────────────────────
 TY = (
@@ -1109,7 +1120,7 @@ CAROUSELS = [
 ]
 
 
-def build_assets(carousel_idx: int, env: str | None) -> list:
+def build_assets(carousel_idx: int, env=None) -> list:
     """Build the assets list, rotating through ALL outfit files by carousel index."""
     assets = [
         {"path": str(TYRIE_HERO), "label": "Main Character: Tyrie"},
