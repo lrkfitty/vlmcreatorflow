@@ -19,6 +19,13 @@ NEO_HERO     = BASE / "assets/AI Content Creators/Friends/Mens Friends/Neo.png"
 NEO_OUTFITS  = BASE / "assets/AI Content Creators/Friends/Mens Friends/Neo Outfits/Mens clothing"
 NEO_ENVS     = BASE / "assets/AI Content Creators/Friends/Mens Friends/Neo Environments"
 
+# ── Dynamic outfit pool — ALL Neo outfit files ────────────────────────────────
+def _collect_outfits(directory: Path) -> list:
+    exts = {".jpg", ".jpeg", ".png"}
+    return sorted([f for f in directory.rglob("*") if f.suffix.lower() in exts and not f.name.startswith("._")])
+
+NEO_ALL_OUTFITS = _collect_outfits(NEO_OUTFITS)
+
 # ── Shay refs (Neo's girl) ────────────────────────────────────────────────────
 SHAY_BACK    = BASE / "assets/AI Content Creators/Shay.So.Fine/SHAY STOCK Photo/Shay blonde bob back.png"
 SHAY_FRONT   = BASE / "assets/AI Content Creators/Shay.So.Fine/SHAY STOCK Photo/Shay blonde bob front .png"
@@ -822,19 +829,19 @@ def resolve(path_str: str) -> str:
     return s
 
 
-def build_assets(carousel: dict) -> list:
+def build_assets(carousel: dict, carousel_idx: int) -> list:
     partner = carousel["partner"]
     assets = [
         {"path": str(NEO_HERO), "label": "Main Character: Neo"},
     ]
     for ref_path in FRIEND_REFS.get(partner, []):
         if os.path.exists(ref_path):
-            label = f"Cast: {partner}"
-            assets.append({"path": ref_path, "label": label})
+            assets.append({"path": ref_path, "label": f"Cast: {partner}"})
 
-    outfit_path = resolve(carousel.get("outfit", ""))
-    if outfit_path and os.path.exists(outfit_path):
-        assets.append({"path": outfit_path, "label": "Outfit for Neo (main)"})
+    # Rotate through ALL Neo outfits by carousel index
+    if NEO_ALL_OUTFITS:
+        neo_outfit = NEO_ALL_OUTFITS[carousel_idx % len(NEO_ALL_OUTFITS)]
+        assets.append({"path": str(neo_outfit), "label": "Outfit for Neo (main)"})
 
     env_path = resolve(carousel.get("env", "")) if carousel.get("env") else ""
     if env_path and os.path.exists(env_path):
@@ -859,7 +866,7 @@ def main():
         caption_path = OUTPUT / f"{cid}_caption.txt"
         caption_path.write_text(carousel["caption"])
 
-        assets = build_assets(carousel)
+        assets = build_assets(carousel, i)
 
         for j, prompt_text in enumerate(carousel["shots"]):
             shot_num = j + 1

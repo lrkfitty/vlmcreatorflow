@@ -46,6 +46,24 @@ ENVS         = BASE / "assets/AI Content Creators/Environments"
 ENVS_2026    = OUTFITS_2026 / "Jan 2026 Enviroments"
 OUTPUT       = BASE / "output/users/Shay/Instagram"
 
+# ── Dynamic outfit pool — ALL Shay outfits, env subfolder excluded ────────────
+def _collect_outfits(directory: Path, exclude_dirs: set = None) -> list:
+    exts = {".jpg", ".jpeg", ".png"}
+    exclude_dirs = exclude_dirs or set()
+    results = []
+    for f in directory.rglob("*"):
+        if f.suffix.lower() not in exts or f.name.startswith("._"):
+            continue
+        if any(ex in f.parts for ex in exclude_dirs):
+            continue
+        results.append(f)
+    return sorted(results)
+
+SHAY_ALL_OUTFITS = (
+    _collect_outfits(OUTFITS_2026, exclude_dirs={"Jan 2026 Enviroments"}) +
+    _collect_outfits(OUTFITS_INF)
+)
+
 # ── Character descriptions ────────────────────────────────────────────────────
 SHAY_DESC = (
     "Beautiful Black woman with a signature shoulder-length blonde bob, melanin-rich brown skin with a natural luminous glow, "
@@ -827,7 +845,7 @@ def resolve(path_str: str) -> str:
     return s
 
 
-def build_assets(carousel: dict) -> list:
+def build_assets(carousel: dict, carousel_idx: int) -> list:
     assets = [
         {"path": str(SHAY_BACK),  "label": "Main Character: Shay (back)"},
         {"path": str(SHAY_FRONT), "label": "Main Character: Shay (front)"},
@@ -838,9 +856,10 @@ def build_assets(carousel: dict) -> list:
                 label = f"Cast: {name}" if i == 0 else f"Cast: {name} (ref {i+1})"
                 assets.append({"path": ref_path, "label": label})
 
-    outfit_path = resolve(carousel.get("outfit", ""))
-    if outfit_path and os.path.exists(outfit_path):
-        assets.append({"path": outfit_path, "label": "Outfit for Shay (main)"})
+    # Rotate through ALL Shay outfits by carousel index
+    if SHAY_ALL_OUTFITS:
+        outfit = SHAY_ALL_OUTFITS[carousel_idx % len(SHAY_ALL_OUTFITS)]
+        assets.append({"path": str(outfit), "label": "Outfit for Shay (main)"})
 
     env_path = resolve(carousel.get("env", "")) if carousel.get("env") else ""
     if env_path and os.path.exists(env_path):
@@ -865,7 +884,7 @@ def main():
         caption_path = OUTPUT / f"{cid}_caption.txt"
         caption_path.write_text(carousel["caption"])
 
-        assets = build_assets(carousel)
+        assets = build_assets(carousel, i)
 
         for j, prompt_text in enumerate(carousel["shots"]):
             shot_num = j + 1

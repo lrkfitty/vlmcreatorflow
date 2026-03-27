@@ -27,6 +27,14 @@ ANGEIL_EXTRAS = BASE / "assets/AI Content Creators/Friends/Black Influencer Mode
 ENVS_DIR      = BASE / "assets/AI Content Creators/Environments"
 OUTPUT_DIR    = BASE / "output/users/Tyrie/Instagram"
 
+# ── Dynamic outfit pools (all files, rotated by carousel index) ──────────────
+def _collect_outfits(directory: Path) -> list:
+    exts = {".jpg", ".jpeg", ".png"}
+    return sorted([f for f in directory.rglob("*") if f.suffix.lower() in exts and not f.name.startswith("._")])
+
+TYRIE_ALL_OUTFITS  = _collect_outfits(CLOTHING_DIR)
+ANGEIL_ALL_OUTFITS = _collect_outfits(ANGEIL_CLOTH)
+
 # ── Character descriptions ───────────────────────────────────────────────────
 TY = (
     "Tall, heavily muscular Black man with full-body tattoos covering both arms, chest, back, and neck. "
@@ -1101,8 +1109,8 @@ CAROUSELS = [
 ]
 
 
-def build_assets(outfit_ty: str, outfit_angeil: str, env: str | None) -> list:
-    """Build the assets list for the API call."""
+def build_assets(carousel_idx: int, env: str | None) -> list:
+    """Build the assets list, rotating through ALL outfit files by carousel index."""
     assets = [
         {"path": str(TYRIE_HERO), "label": "Main Character: Tyrie"},
         {"path": str(ANGEIL_HERO), "label": "Cast: Angeil"},
@@ -1112,15 +1120,16 @@ def build_assets(outfit_ty: str, outfit_angeil: str, env: str | None) -> list:
     if angeil_eyes.exists():
         assets.append({"path": str(angeil_eyes), "label": "Cast: Angeil (ref 2)"})
 
-    if outfit_ty:
-        p = CLOTHING_DIR / outfit_ty
-        if p.exists():
-            assets.append({"path": str(p), "label": "Outfit for Tyrie"})
+    # Rotate through ALL Tyrie outfits
+    if TYRIE_ALL_OUTFITS:
+        ty_outfit = TYRIE_ALL_OUTFITS[carousel_idx % len(TYRIE_ALL_OUTFITS)]
+        assets.append({"path": str(ty_outfit), "label": "Outfit for Tyrie"})
 
-    if outfit_angeil:
-        p = ANGEIL_CLOTH / outfit_angeil
-        if p.exists():
-            assets.append({"path": str(p), "label": "Outfit for Angeil"})
+    # Rotate through ALL Angeil outfits (offset by half so they don't sync)
+    if ANGEIL_ALL_OUTFITS:
+        offset = len(ANGEIL_ALL_OUTFITS) // 2
+        angeil_outfit = ANGEIL_ALL_OUTFITS[(carousel_idx + offset) % len(ANGEIL_ALL_OUTFITS)]
+        assets.append({"path": str(angeil_outfit), "label": "Outfit for Angeil"})
 
     if env:
         p = ENVS_DIR / env
@@ -1145,11 +1154,7 @@ def run_batch():
         with open(caption_path, "w") as f:
             f.write(carousel["caption"])
 
-        assets = build_assets(
-            carousel.get("outfit_ty", ""),
-            carousel.get("outfit_angeil", ""),
-            carousel.get("env"),
-        )
+        assets = build_assets(i, carousel.get("env"))
 
         for j, prompt_text in enumerate(carousel["shots"]):
             shot_num = j + 1
