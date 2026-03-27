@@ -536,23 +536,35 @@ def save_approved(data: dict):
 
 
 def get_neo_ig_posts():
-    """Return list of (img_path, caption, base_name) tuples for Neo IG."""
-    posts = []
+    """Return list of (carousel_id, [shot_paths], caption) grouped by carousel.
+    Groups *_shot*.jpg files together; falls back to treating each jpg as its own entry."""
     if not NEO_IG.exists():
-        return posts
-    imgs = sorted(
-        [f for f in NEO_IG.glob("*.jpg") if "_thumb" not in f.name],
-        key=lambda p: p.stat().st_mtime,
-        reverse=True,
-    )
-    for img in imgs:
+        return []
+    carousels = []
+    seen = set()
+    # First pass: find carousels that have caption files
+    for caption_path in sorted(NEO_IG.glob("*_caption.txt")):
+        carousel_id = caption_path.stem.replace("_caption", "")
+        caption = caption_path.read_text(encoding="utf-8").strip()
+        shot_paths = sorted(NEO_IG.glob(f"{carousel_id}_shot*.jpg"))
+        if not shot_paths:
+            single = NEO_IG / f"{carousel_id}.jpg"
+            if single.exists():
+                shot_paths = [single]
+        if shot_paths:
+            carousels.append((carousel_id, shot_paths, caption))
+            for sp in shot_paths:
+                seen.add(sp.name)
+    # Second pass: lone jpgs not grouped
+    for img in sorted(NEO_IG.glob("*.jpg"), key=lambda p: p.stat().st_mtime, reverse=True):
+        if "_thumb" in img.name or img.name in seen:
+            continue
         stem = img.stem
-        caption_path = NEO_IG / f"{stem}_caption.txt"
-        caption = ""
-        if caption_path.exists():
-            caption = caption_path.read_text(encoding="utf-8").strip()
-        posts.append((img, caption, stem))
-    return posts
+        cap_path = NEO_IG / f"{stem}_caption.txt"
+        cap = cap_path.read_text(encoding="utf-8").strip() if cap_path.exists() else ""
+        carousels.append((stem, [img], cap))
+        seen.add(img.name)
+    return carousels
 
 
 def render_content_calendar(schedule_items: list, posted_ids: set, approved_ids: set) -> str:
@@ -834,11 +846,11 @@ with tab_neo:
             unsafe_allow_html=True,
         )
     with stat_cols[1]:
-        posts = get_neo_ig_posts()
+        _neo_posts_count = len(get_neo_ig_posts())
         st.markdown(
             f"<div class='stat-box'>"
-            f"<span class='stat-value' style='color:#ff00ff;text-shadow:0 0 15px rgba(255,0,255,0.4);'>{len(posts)}</span>"
-            f"<span class='stat-label'>Posts Ready</span>"
+            f"<span class='stat-value' style='color:#ff00ff;text-shadow:0 0 15px rgba(255,0,255,0.4);'>{_neo_posts_count}</span>"
+            f"<span class='stat-label'>Carousels Ready</span>"
             f"</div>",
             unsafe_allow_html=True,
         )
@@ -868,7 +880,7 @@ with tab_neo:
         unsafe_allow_html=True,
     )
     posts = get_neo_ig_posts()
-    neo_cal_items = [{"carousel_id": stem, "day": i+1, "date": ""} for i, (_, _, stem) in enumerate(posts)]
+    neo_cal_items = [{"carousel_id": cid, "day": i+1, "date": ""} for i, (cid, _, _) in enumerate(posts)]
     neo_approved_ids = {k for k, v in approved.items() if v}
     st.markdown(render_content_calendar(neo_cal_items, neo_posted_stems, neo_approved_ids), unsafe_allow_html=True)
 
@@ -897,9 +909,9 @@ with tab_neo:
             label_visibility="collapsed",
         )
 
-        for idx, (img_path, caption, stem) in enumerate(posts):
-            is_approved = approved.get(stem, False)
-            is_posted   = stem in neo_posted_stems
+        for idx, (carousel_id, shot_paths, caption) in enumerate(posts):
+            is_approved = approved.get(carousel_id, False)
+            is_posted   = carousel_id in neo_posted_stems
 
             if neo_filter == "Unposted" and is_posted:
                 continue
@@ -919,43 +931,48 @@ with tab_neo:
 
             st.markdown(
                 f"<div style='background:rgba(0,255,255,0.03);border:1px solid rgba(0,255,255,0.15);"
-                f"border-radius:4px;padding:12px;margin-bottom:4px;'>"
+                f"border-radius:4px;padding:12px;margin-bottom:12px;'>"
                 f"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>"
                 f"<span class='badge {badge_class}'>{status_label}</span>"
-                f"<span style='font-size:10px;color:#556677;font-family:Share Tech Mono;'>Post {idx+1} · {stem[-12:]}</span>"
+                f"<span style='font-size:10px;color:#556677;font-family:Share Tech Mono;'>Post {idx+1} · {carousel_id}</span>"
                 f"</div>"
                 f"<div style='color:#aabbcc;font-size:13px;line-height:1.4;'>{caption_short or '<em style=color:#334455>No caption</em>'}</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
 
-            # Image in expander
-            with st.expander("🖼️ View image + Kling"):
-                st.image(str(img_path), use_container_width=True)
-                if not is_posted:
-                    if st.button("🎬 Kling Clip", key=f"neo_kling_{stem}"):
-                        st.info("Queue Kling from this image — wire to kling_client when ready")
+            # All shots in expander
+            if shot_paths:
+                with st.expander(f"🖼️ View {len(shot_paths)} images"):
+                    img_cols = st.columns(min(len(shot_paths), 4))
+                    for si, sp in enumerate(shot_paths[:4]):
+                        with img_cols[si]:
+                            st.image(str(sp), use_container_width=True)
+                            if not is_posted:
+                                if st.button("🎬 Kling", key=f"neo_kling_{carousel_id}_{si}"):
+                                    st.info("Queue Kling — wire to kling_client when ready")
 
             # Action buttons
             if not is_posted:
-                nc1, nc2, nc3, nc4 = st.columns([2, 2, 2, 3])
+                nc1, nc2, nc3, _ = st.columns([2, 2, 2, 3])
                 with nc1:
-                    if st.button("✓ Approve" if not is_approved else "✓ Approved", key=f"approve_{stem}"):
-                        approved[stem] = not is_approved
+                    if st.button("✓ Approve" if not is_approved else "✓ Approved", key=f"approve_{carousel_id}"):
+                        approved[carousel_id] = not is_approved
                         save_approved(approved)
                         st.rerun()
                 with nc2:
-                    if st.button("🔵 Mark Posted", key=f"neo_posted_{stem}"):
-                        _mark_posted_neo(stem, NEO_LOG)
+                    if st.button("🔵 Mark Posted", key=f"neo_posted_{carousel_id}"):
+                        _mark_posted_neo(carousel_id, NEO_LOG)
                         st.success("Marked as posted")
                         st.rerun()
                 with nc3:
-                    if st.button("🗑️ Remove", key=f"neo_remove_{stem}"):
-                        for f in [img_path, NEO_IG / f"{stem}_caption.txt"]:
-                            try:
-                                Path(f).unlink()
-                            except Exception:
-                                pass
+                    if st.button("🗑️ Remove", key=f"neo_remove_{carousel_id}"):
+                        for sp in shot_paths:
+                            try: Path(sp).unlink()
+                            except Exception: pass
+                        cap_file = NEO_IG / f"{carousel_id}_caption.txt"
+                        try: cap_file.unlink()
+                        except Exception: pass
                         st.rerun()
 
             st.markdown("<br>", unsafe_allow_html=True)
@@ -1044,7 +1061,13 @@ with tab_shay:
             day = post.get("day")
             date_str = post.get("date")
             caption = post.get("caption", "")
-            images = post.get("images", [])
+            # Resolve images: prefer disk shots, fall back to schedule image list
+            disk_shots = sorted(SHAY_IG.glob(f"{carousel_id}_shot*.jpg"))
+            if disk_shots:
+                images = [str(p) for p in disk_shots]
+            else:
+                images = [p for p in post.get("images", []) if Path(p).exists()]
+
             is_approved = carousel_id in shay_approvals
             is_posted   = carousel_id in shay_posted_ids
 
@@ -1066,7 +1089,7 @@ with tab_shay:
             # Carousel card — no images in main view
             st.markdown(
                 f"<div style='background:rgba(255,0,255,0.05);border:1px solid rgba(255,0,255,0.2);"
-                f"border-radius:4px;padding:12px;margin-bottom:4px;'>"
+                f"border-radius:4px;padding:12px;margin-bottom:12px;'>"
                 f"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>"
                 f"<span style='color:#00ffff;font-family:Share Tech Mono;font-size:11px;'>Day {day} · {date_str}</span>"
                 f"<span class='{badge_class}' style='padding:2px 8px;border-radius:2px;font-size:10px;'>{status_label}</span>"
@@ -1078,12 +1101,11 @@ with tab_shay:
 
             # Images in expander only
             if images:
-                with st.expander(f"🖼️ View {len(images)} images + Kling"):
+                with st.expander(f"🖼️ View {len(images)} images"):
                     img_cols = st.columns(min(len(images), 4))
                     for im_idx, img_path in enumerate(images[:4]):
                         with img_cols[im_idx]:
-                            if Path(img_path).exists():
-                                st.image(str(img_path), use_container_width=True)
+                            st.image(str(img_path), use_container_width=True)
                             if not is_posted:
                                 if st.button("🎬 Kling", key=f"shay_kling_{carousel_id}_{im_idx}"):
                                     st.info("Queue Kling from this image — wire to kling_client when ready")
@@ -1267,7 +1289,7 @@ with tab_tyrie:
             # Carousel card header (no images shown by default)
             st.markdown(
                 f"<div style='background:rgba(255,136,0,0.05);border:1px solid rgba(255,136,0,0.2);"
-                f"border-radius:4px;padding:12px;margin-bottom:4px;'>"
+                f"border-radius:4px;padding:12px;margin-bottom:12px;'>"
                 f"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>"
                 f"<span style='color:#00ffff;font-family:Share Tech Mono;font-size:11px;'>Post {idx+1} · {carousel_id}</span>"
                 f"<span class='{badge_class}' style='padding:2px 8px;border-radius:2px;font-size:10px;'>{status_label}</span>"
