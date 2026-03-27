@@ -555,6 +555,99 @@ def get_neo_ig_posts():
     return posts
 
 
+def render_content_calendar(schedule_items: list, posted_ids: set, approved_ids: set) -> str:
+    """Render a compact visual 30-day calendar grid as HTML colored day squares."""
+    if not schedule_items:
+        return "<div style='color:#334455;font-size:12px;'>No schedule loaded</div>"
+
+    cells = []
+    for item in schedule_items:
+        cid  = item.get("carousel_id", "")
+        day  = item.get("day", "?")
+        dt   = item.get("date", "")
+        if cid in posted_ids:
+            bg, border, dot = "#003366", "#0066cc", "🔵"
+        elif cid in approved_ids:
+            bg, border, dot = "#003322", "#00aa44", "✅"
+        else:
+            bg, border, dot = "#221a00", "#aa7700", "⏳"
+        cells.append(
+            f"<div title='Day {day} · {dt}' style='"
+            f"display:inline-flex;flex-direction:column;align-items:center;justify-content:center;"
+            f"width:32px;height:38px;margin:2px;background:{bg};border:1px solid {border};"
+            f"border-radius:4px;cursor:default;'>"
+            f"<span style='font-size:8px;font-family:Share Tech Mono;color:{border};'>{day}</span>"
+            f"<span style='font-size:10px;'>{dot}</span>"
+            f"</div>"
+        )
+    legend = (
+        "<div style='display:flex;gap:14px;font-size:10px;color:#556677;font-family:Share Tech Mono;"
+        "margin-top:6px;margin-bottom:2px;'>"
+        "<span>🔵 Posted</span><span>✅ Approved</span><span>⏳ Pending</span>"
+        "</div>"
+    )
+    return f"<div style='padding:4px 0;flex-wrap:wrap;'>{''.join(cells)}</div>{legend}"
+
+
+def _kling_queue_done_videos(video_queue: dict) -> list:
+    """Return list of (carousel_id, video_path) for completed Kling generations."""
+    done = []
+    for cid, entry in video_queue.items():
+        if entry.get("status") == "done":
+            vp = entry.get("video_path", "")
+            if vp and Path(vp).exists():
+                done.append((cid, vp, entry))
+    return done
+
+
+def _remove_ty_carousel(carousel_id: str, search_dirs: list):
+    """Delete all files belonging to a Ty carousel (shots + caption)."""
+    for d in search_dirs:
+        for f in list(Path(d).glob(f"{carousel_id}*")):
+            try:
+                f.unlink()
+            except Exception:
+                pass
+
+
+def _mark_posted_ty(carousel_id: str, caption: str, log_path: Path):
+    """Append carousel_id to Ty's post log as manually posted."""
+    log = load_json(log_path, default=[])
+    if not any(e.get("stem") == carousel_id for e in log):
+        log.append({"stem": carousel_id, "url": "", "posted_at": datetime.now().isoformat(), "manual": True})
+        log_path.write_text(json.dumps(log, indent=2))
+
+
+def _mark_posted_shay(carousel_id: str, log_path: Path, schedule_path: Path):
+    """Append carousel_id to Shay's post log and update schedule status."""
+    log = load_json(log_path, default=[])
+    if not any(e.get("carousel_id") == carousel_id for e in log):
+        log.append({"carousel_id": carousel_id, "url": "", "posted_at": datetime.now().isoformat(), "manual": True})
+        log_path.write_text(json.dumps(log, indent=2))
+    # Also update schedule status
+    schedule = load_json(schedule_path, default=[])
+    for item in schedule:
+        if item.get("carousel_id") == carousel_id:
+            item["status"] = "posted"
+            item["posted_at"] = datetime.now().isoformat()
+    schedule_path.write_text(json.dumps(schedule, indent=2))
+
+
+def _remove_shay_carousel(carousel_id: str, schedule_path: Path):
+    """Remove carousel from Shay schedule JSON."""
+    schedule = load_json(schedule_path, default=[])
+    schedule = [s for s in schedule if s.get("carousel_id") != carousel_id]
+    schedule_path.write_text(json.dumps(schedule, indent=2))
+
+
+def _mark_posted_neo(stem: str, log_path: Path):
+    """Append stem to Neo's post log."""
+    log = load_json(log_path, default=[])
+    if not any(e.get("stem") == stem for e in log):
+        log.append({"stem": stem, "url": "", "posted_at": datetime.now().isoformat(), "manual": True})
+        log_path.write_text(json.dumps(log, indent=2))
+
+
 def count_images_in(folder: Path) -> int:
     if not folder.exists():
         return 0
@@ -769,7 +862,24 @@ with tab_neo:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # ── NEO 30-DAY CALENDAR ───────────────────────────────────────────────────
+    st.markdown(
+        "<div class='section-header' style='font-size:12px;'>⚡ CONTENT CALENDAR</div>",
+        unsafe_allow_html=True,
+    )
     posts = get_neo_ig_posts()
+    neo_cal_items = [{"carousel_id": stem, "day": i+1, "date": ""} for i, (_, _, stem) in enumerate(posts)]
+    neo_approved_ids = {k for k, v in approved.items() if v}
+    st.markdown(render_content_calendar(neo_cal_items, neo_posted_stems, neo_approved_ids), unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── NEO CAROUSEL QUEUE ────────────────────────────────────────────────────
+    st.markdown(
+        "<div class='section-header' style='font-size:12px;'>⚡ CONTENT QUEUE</div>",
+        unsafe_allow_html=True,
+    )
+
     if not posts:
         st.markdown(
             "<div class='coming-soon'>"
@@ -779,117 +889,76 @@ with tab_neo:
             unsafe_allow_html=True,
         )
     else:
-        filter_col, view_col = st.columns([2, 2])
-        with filter_col:
-            neo_filter = st.radio(
-                "Filter",
-                ["Unposted", "All", "Approved", "Posted"],
-                horizontal=True,
-                key="neo_filter_status",
-                label_visibility="collapsed",
+        neo_filter = st.radio(
+            "Filter",
+            ["Unposted", "All", "Approved", "Posted"],
+            horizontal=True,
+            key="neo_filter_status",
+            label_visibility="collapsed",
+        )
+
+        for idx, (img_path, caption, stem) in enumerate(posts):
+            is_approved = approved.get(stem, False)
+            is_posted   = stem in neo_posted_stems
+
+            if neo_filter == "Unposted" and is_posted:
+                continue
+            if neo_filter == "Approved" and not is_approved:
+                continue
+            if neo_filter == "Posted" and not is_posted:
+                continue
+
+            if is_posted:
+                status_label, badge_class = "🔵 POSTED", "badge-approved"
+            elif is_approved:
+                status_label, badge_class = "✓ APPROVED", "badge-approved"
+            else:
+                status_label, badge_class = "READY", "badge-ready"
+
+            caption_short = caption[:180] + "…" if len(caption) > 180 else caption
+
+            st.markdown(
+                f"<div style='background:rgba(0,255,255,0.03);border:1px solid rgba(0,255,255,0.15);"
+                f"border-radius:4px;padding:12px;margin-bottom:4px;'>"
+                f"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>"
+                f"<span class='badge {badge_class}'>{status_label}</span>"
+                f"<span style='font-size:10px;color:#556677;font-family:Share Tech Mono;'>Post {idx+1} · {stem[-12:]}</span>"
+                f"</div>"
+                f"<div style='color:#aabbcc;font-size:13px;line-height:1.4;'>{caption_short or '<em style=color:#334455>No caption</em>'}</div>"
+                f"</div>",
+                unsafe_allow_html=True,
             )
-        with view_col:
-            view_mode = st.radio("View", ["Grid (3-col)", "Large (1-col)"], horizontal=True, key="neo_view_mode", label_visibility="collapsed")
 
-        if view_mode == "Large (1-col)":
-            for idx, (img_path, caption, stem) in enumerate(posts):
-                is_approved = approved.get(stem, False)
-                is_posted   = stem in neo_posted_stems
-
-                if neo_filter == "Unposted" and is_posted:
-                    continue
-                if neo_filter == "Approved" and not is_approved:
-                    continue
-                if neo_filter == "Posted" and not is_posted:
-                    continue
-
-                if is_posted:
-                    status_label, badge_class = "🔵 POSTED", "badge-approved"
-                elif is_approved:
-                    status_label, badge_class = "✓ APPROVED", "badge-approved"
-                else:
-                    status_label, badge_class = "READY", "badge-ready"
-
-                st.markdown(
-                    f"<div style='margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;'>"
-                    f"<span class='badge {badge_class}'>{status_label}</span>"
-                    f"<span style='font-size:11px;color:#556677;font-family:Share Tech Mono,monospace;'>Post {idx+1} · {stem[-12:]}</span>"
-                    f"</div>",
-                    unsafe_allow_html=True,
-                )
+            # Image in expander
+            with st.expander("🖼️ View image + Kling"):
                 st.image(str(img_path), use_container_width=True)
-                if caption:
-                    st.markdown(
-                        f"<div style='padding:8px 4px 4px;color:#8899aa;font-size:13px;line-height:1.5;'>{caption}</div>",
-                        unsafe_allow_html=True,
-                    )
                 if not is_posted:
-                    btn_label = "✓ APPROVED" if is_approved else "APPROVE"
-                    if st.button(btn_label, key=f"approve_large_{stem}"):
+                    if st.button("🎬 Kling Clip", key=f"neo_kling_{stem}"):
+                        st.info("Queue Kling from this image — wire to kling_client when ready")
+
+            # Action buttons
+            if not is_posted:
+                nc1, nc2, nc3, nc4 = st.columns([2, 2, 2, 3])
+                with nc1:
+                    if st.button("✓ Approve" if not is_approved else "✓ Approved", key=f"approve_{stem}"):
                         approved[stem] = not is_approved
                         save_approved(approved)
                         st.rerun()
-                st.markdown("<hr style='border-color:rgba(0,255,255,0.1);margin:20px 0;'>", unsafe_allow_html=True)
-        else:
-            # 3-col grid
-            filtered_posts = []
-            for item in posts:
-                img_path, caption, stem = item
-                is_posted = stem in neo_posted_stems
-                is_approved = approved.get(stem, False)
-                if neo_filter == "Unposted" and is_posted:
-                    continue
-                if neo_filter == "Approved" and not is_approved:
-                    continue
-                if neo_filter == "Posted" and not is_posted:
-                    continue
-                filtered_posts.append(item)
+                with nc2:
+                    if st.button("🔵 Mark Posted", key=f"neo_posted_{stem}"):
+                        _mark_posted_neo(stem, NEO_LOG)
+                        st.success("Marked as posted")
+                        st.rerun()
+                with nc3:
+                    if st.button("🗑️ Remove", key=f"neo_remove_{stem}"):
+                        for f in [img_path, NEO_IG / f"{stem}_caption.txt"]:
+                            try:
+                                Path(f).unlink()
+                            except Exception:
+                                pass
+                        st.rerun()
 
-            grid_cols = st.columns(3)
-            for idx, (img_path, caption, stem) in enumerate(filtered_posts):
-                col = grid_cols[idx % 3]
-                with col:
-                    is_approved = approved.get(stem, False)
-                    is_posted   = stem in neo_posted_stems
-                    b64 = img_to_b64(img_path)
-                    if is_posted:
-                        status_label, badge_class = "🔵 POSTED", "badge-approved"
-                    elif is_approved:
-                        status_label, badge_class = "✓ APPROVED", "badge-approved"
-                    else:
-                        status_label, badge_class = "READY", "badge-ready"
-                    caption_short = caption[:120] + "…" if len(caption) > 120 else caption
-
-                    img_html = (
-                        f'<img src="data:image/jpeg;base64,{b64}" '
-                        f'style="width:100%;height:auto;max-height:350px;object-fit:contain;display:block;">'
-                    ) if b64 else '<div style="height:200px;background:#1a1a2a;display:flex;align-items:center;justify-content:center;color:#334455;">NO IMAGE</div>'
-
-                    no_caption_html = '<em style="color:#334455;">No caption</em>'
-                    caption_div = f"<div class='ig-caption'>{caption_short if caption_short else no_caption_html}</div>"
-                    st.markdown(
-                        f"<div class='ig-grid-item'>"
-                        f"<div class='ig-img-wrap'>{img_html}</div>"
-                        f"{caption_div}"
-                        f"<div style='padding:6px 10px;display:flex;justify-content:space-between;align-items:center;'>"
-                        f"<span class='badge {badge_class}'>{status_label}</span>"
-                        f"<span style='font-size:10px;color:#334455;font-family:Share Tech Mono,monospace;'>{stem[-8:]}</span>"
-                        f"</div>"
-                        f"</div>",
-                        unsafe_allow_html=True,
-                    )
-
-                    with st.expander("🔍 View full"):
-                        st.image(str(img_path), use_container_width=True)
-                        if caption:
-                            st.caption(caption)
-
-                    if not is_posted:
-                        btn_label = "✓ APPROVED" if is_approved else "APPROVE"
-                        if st.button(btn_label, key=f"approve_{stem}"):
-                            approved[stem] = not is_approved
-                            save_approved(approved)
-                            st.rerun()
+            st.markdown("<br>", unsafe_allow_html=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -940,10 +1009,21 @@ with tab_shay:
         st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#ff00ff;'>{len(shay_schedule)}</span><span class='stat-label'>Scheduled</span></div>", unsafe_allow_html=True)
     
     st.markdown("<br>", unsafe_allow_html=True)
-    
+
+    # ── 30-DAY CALENDAR ───────────────────────────────────────────────────────
+    st.markdown(
+        "<div class='section-header' style='font-size:12px;'>💫 30-DAY CONTENT CALENDAR</div>",
+        unsafe_allow_html=True,
+    )
+    shay_approved_ids = set(shay_approvals.keys())
+    shay_cal_html = render_content_calendar(shay_schedule, shay_posted_ids, shay_approved_ids)
+    st.markdown(shay_cal_html, unsafe_allow_html=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     # Approval interface
     st.markdown(
-        "<div class='section-header' style='font-size:12px;margin-top:20px;'>💫 30-DAY CAROUSEL APPROVAL</div>",
+        "<div class='section-header' style='font-size:12px;margin-top:8px;'>💫 30-DAY CAROUSEL QUEUE</div>",
         unsafe_allow_html=True,
     )
     
@@ -977,56 +1057,55 @@ with tab_shay:
                 continue
 
             if is_posted:
-                badge_class  = "badge-approved"
-                status_label = "🔵 POSTED"
+                badge_class, status_label = "badge-approved", "🔵 POSTED"
             elif is_approved:
-                badge_class  = "badge-approved"
-                status_label = "✓ APPROVED"
+                badge_class, status_label = "badge-approved", "✓ APPROVED"
             else:
-                badge_class  = "badge-pending"
-                status_label = "⊙ PENDING"
+                badge_class, status_label = "badge-pending", "⊙ PENDING"
 
-            # Carousel card
+            # Carousel card — no images in main view
             st.markdown(
-                f"<div style='background:rgba(255,0,255,0.05);border:1px solid rgba(255,0,255,0.2);border-radius:4px;padding:12px;margin-bottom:12px;'>"
-                f"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'>"
+                f"<div style='background:rgba(255,0,255,0.05);border:1px solid rgba(255,0,255,0.2);"
+                f"border-radius:4px;padding:12px;margin-bottom:4px;'>"
+                f"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>"
                 f"<span style='color:#00ffff;font-family:Share Tech Mono;font-size:11px;'>Day {day} · {date_str}</span>"
                 f"<span class='{badge_class}' style='padding:2px 8px;border-radius:2px;font-size:10px;'>{status_label}</span>"
                 f"</div>"
-                f"<div style='color:#aabbcc;font-size:13px;line-height:1.4;margin-bottom:10px;'>{caption[:150]}...</div>"
-                f"<div style='color:#667788;font-size:11px;'>{len(images)} images in carousel</div>"
+                f"<div style='color:#aabbcc;font-size:13px;line-height:1.4;'>{caption[:180]}...</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
 
-            # Show carousel images
+            # Images in expander only
             if images:
-                img_cols = st.columns(min(len(images), 4))
-                for idx, img_path in enumerate(images[:4]):
-                    with img_cols[idx]:
-                        if Path(img_path).exists():
-                            st.image(str(img_path), use_container_width=True)
+                with st.expander(f"🖼️ View {len(images)} images + Kling"):
+                    img_cols = st.columns(min(len(images), 4))
+                    for im_idx, img_path in enumerate(images[:4]):
+                        with img_cols[im_idx]:
+                            if Path(img_path).exists():
+                                st.image(str(img_path), use_container_width=True)
+                            if not is_posted:
+                                if st.button("🎬 Kling", key=f"shay_kling_{carousel_id}_{im_idx}"):
+                                    st.info("Queue Kling from this image — wire to kling_client when ready")
 
-            # Approval buttons (skip if already posted)
+            # Action buttons
             if not is_posted:
-                col1, col2, col3 = st.columns([3, 1, 1])
-                with col2:
-                    if not is_approved:
-                        if st.button("✓ Approve", key=f"approve_{carousel_id}"):
-                            shay_approvals[carousel_id] = {"approved_at": datetime.now().isoformat()}
-                            approved_data["shay"] = shay_approvals
-                            save_approved(approved_data)
-                            st.success("Approved!")
-                            st.rerun()
-                with col3:
-                    if is_approved:
-                        if st.button("✗ Reject", key=f"reject_{carousel_id}"):
-                            if carousel_id in shay_approvals:
-                                del shay_approvals[carousel_id]
-                            approved_data["shay"] = shay_approvals
-                            save_approved(approved_data)
-                            st.info("Approval removed")
-                            st.rerun()
+                ac1, ac2, ac3, ac4 = st.columns([2, 2, 2, 3])
+                with ac1:
+                    if st.button("✓ Approve" if not is_approved else "✓ Approved", key=f"approve_{carousel_id}"):
+                        shay_approvals[carousel_id] = {"approved_at": datetime.now().isoformat()}
+                        approved_data["shay"] = shay_approvals
+                        save_approved(approved_data)
+                        st.rerun()
+                with ac2:
+                    if st.button("🔵 Mark Posted", key=f"shay_posted_{carousel_id}"):
+                        _mark_posted_shay(carousel_id, SHAY_LOG, shay_schedule_path)
+                        st.success("Marked as posted")
+                        st.rerun()
+                with ac3:
+                    if st.button("🗑️ Remove", key=f"shay_remove_{carousel_id}"):
+                        _remove_shay_carousel(carousel_id, shay_schedule_path)
+                        st.rerun()
 
             st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1108,78 +1187,52 @@ with tab_tyrie:
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── REELS SECTION ─────────────────────────────────────────────────────────
+    # ── KLING REELS SECTION ───────────────────────────────────────────────────
     st.markdown(
-        "<div class='section-header' style='font-size:12px;'>🎬 REELS</div>",
+        "<div class='section-header' style='font-size:12px;'>🎬 KLING VIDEO CLIPS</div>",
         unsafe_allow_html=True,
     )
+    VIDEO_QUEUE_FILE = PROJECT_ROOT / ".tmp" / "tyrie_video_queue.json"
+    video_queue = load_json(VIDEO_QUEUE_FILE, default={})
+    tyrie_approved_save_path = PROJECT_ROOT / ".tmp" / "tyrie_approved.json"
 
-    reels_dir = PROJECT_ROOT / "output" / "reels"
-    ty_reels  = sorted(reels_dir.glob("*.mp4"), reverse=True) if reels_dir.exists() else []
-
-    if ty_reels:
-        reel_cols = st.columns(min(len(ty_reels), 3))
-        for ri, reel_path in enumerate(ty_reels[:6]):
-            with reel_cols[ri % 3]:
-                st.video(str(reel_path))
-                # Try to load matching transcript for script preview
-                transcript_path = reels_dir / reel_path.name.replace(".mp4", "_transcript.json")
-                if not transcript_path.exists():
-                    transcript_path = reels_dir / (reel_path.stem + "_transcript.json")
-                if transcript_path.exists():
-                    try:
-                        t = json.loads(transcript_path.read_text())
-                        st.caption(f"_{t.get('script','')[:120]}_")
-                    except Exception:
-                        pass
-                st.caption(reel_path.stem)
+    done_videos = _kling_queue_done_videos(video_queue)
+    if done_videos:
+        vc = st.columns(min(len(done_videos), 3))
+        for ri, (cid, vp, entry) in enumerate(done_videos[:6]):
+            with vc[ri % 3]:
+                st.video(vp)
+                st.caption(f"{cid} · {entry.get('camera_move','')}")
     else:
         st.markdown(
-            "<div class='coming-soon'>No reels yet — generate one below or from the Pipeline tab</div>",
+            "<div class='coming-soon' style='padding:12px;'>No Kling clips yet — use 🎬 Make Clip buttons below</div>",
             unsafe_allow_html=True,
         )
 
-    # Quick generate reel button
-    with st.expander("🎙️ Generate New Reel"):
-        reel_context = st.text_input("Scene context", placeholder="Ty working late on rooftop Bangkok, 3am, AI running on autopilot", key="ty_reel_ctx")
-        reel_style   = st.selectbox("Style", ["hook", "builder", "lifestyle", "day_in_life"], key="ty_reel_style")
-        if st.button("Generate Reel", type="primary", key="ty_gen_reel"):
-            if reel_context:
-                import subprocess, time as _time
-                reel_id = f"ty_{int(_time.time())}"
-                with st.spinner(f"Generating VO + rendering reel ({reel_id})..."):
-                    try:
-                        from execution.generate_vo import generate_vo
-                        from execution.render_reel import render_reel
-                        vo = generate_vo(context=reel_context, account="ty",
-                                         output_dir=str(reels_dir), reel_id=reel_id, style=reel_style)
-                        mp4 = render_reel(reel_id=reel_id, vo_path=vo["audio_path"],
-                                          transcript_path=vo["transcript_path"], account="ty")
-                        st.success(f"✅ Reel ready: {mp4}")
-                        st.video(mp4)
-                    except Exception as e:
-                        st.error(f"Render failed: {e}")
-            else:
-                st.warning("Enter a scene context first.")
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # ── 30-DAY CALENDAR ───────────────────────────────────────────────────────
+    st.markdown(
+        "<div class='section-header' style='font-size:12px;margin-top:8px;'>◭ 30-DAY CONTENT CALENDAR</div>",
+        unsafe_allow_html=True,
+    )
+    # Build schedule-like list from tyrie_carousels for the calendar
+    ty_cal_items = [{"carousel_id": cid, "day": i+1, "date": ""} for i, (cid, _, _) in enumerate(tyrie_carousels)]
+    cal_html = render_content_calendar(ty_cal_items, posted_stems, set(tyrie_approved.keys()))
+    st.markdown(cal_html, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── CAROUSEL APPROVAL ─────────────────────────────────────────────────────
     st.markdown(
-        "<div class='section-header' style='font-size:12px;margin-top:20px;'>◭ 30-DAY CAROUSEL APPROVAL</div>",
+        "<div class='section-header' style='font-size:12px;margin-top:8px;'>◭ 30-DAY CAROUSEL QUEUE</div>",
         unsafe_allow_html=True,
     )
 
-    VIDEO_QUEUE_FILE = PROJECT_ROOT / ".tmp" / "tyrie_video_queue.json"
-    video_queue = load_json(VIDEO_QUEUE_FILE, default={})
-    tyrie_approved_save_path = PROJECT_ROOT / ".tmp" / "tyrie_approved.json"
-
     if not tyrie_carousels:
         st.markdown(
-            "<div class='coming-soon'>"
-            "<span class='coming-soon-value'>◭</span>"
-            "No carousels yet — generation is running in the background."
-            "</div>",
+            "<div class='coming-soon'><span class='coming-soon-value'>◭</span>"
+            "No carousels yet — generation is running in the background.</div>",
             unsafe_allow_html=True,
         )
     else:
@@ -1203,85 +1256,61 @@ with tab_tyrie:
                 continue
 
             if is_posted:
-                badge_class  = "badge-posted"
-                status_label = "🔵 POSTED"
+                badge_class, status_label = "badge-posted", "🔵 POSTED"
             elif is_approved:
-                badge_class  = "badge-approved"
-                status_label = "✓ APPROVED"
+                badge_class, status_label = "badge-approved", "✓ APPROVED"
             else:
-                badge_class  = "badge-pending"
-                status_label = "⊙ PENDING"
-            vid_entry    = video_queue.get(carousel_id, {})
+                badge_class, status_label = "badge-pending", "⊙ PENDING"
 
-            # Carousel card header
+            vid_entry = video_queue.get(carousel_id, {})
+
+            # Carousel card header (no images shown by default)
             st.markdown(
-                f"<div style='background:rgba(255,136,0,0.05);border:1px solid rgba(255,136,0,0.2);border-radius:4px;padding:12px;margin-bottom:8px;'>"
-                f"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;'>"
+                f"<div style='background:rgba(255,136,0,0.05);border:1px solid rgba(255,136,0,0.2);"
+                f"border-radius:4px;padding:12px;margin-bottom:4px;'>"
+                f"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>"
                 f"<span style='color:#00ffff;font-family:Share Tech Mono;font-size:11px;'>Post {idx+1} · {carousel_id}</span>"
                 f"<span class='{badge_class}' style='padding:2px 8px;border-radius:2px;font-size:10px;'>{status_label}</span>"
                 f"</div>"
-                f"<div style='color:#aabbcc;font-size:13px;line-height:1.4;margin-bottom:10px;'>{caption[:150]}...</div>"
-                f"<div style='color:#667788;font-size:11px;'>{len(shot_paths)} images in carousel</div>"
+                f"<div style='color:#aabbcc;font-size:13px;line-height:1.4;'>{caption[:180]}...</div>"
                 f"</div>",
                 unsafe_allow_html=True,
             )
 
-            # Show all shots side by side with per-shot video button below each
+            # Images hidden in expander
             if shot_paths:
-                img_cols = st.columns(min(len(shot_paths), 4))
-                for i, sp in enumerate(shot_paths[:4]):
-                    with img_cols[i]:
-                        if Path(sp).exists():
-                            st.image(str(sp), use_container_width=True)
+                with st.expander(f"🖼️ View {len(shot_paths)} images"):
+                    img_cols = st.columns(min(len(shot_paths), 4))
+                    for i, sp in enumerate(shot_paths[:4]):
+                        with img_cols[i]:
+                            if Path(sp).exists():
+                                st.image(str(sp), use_container_width=True)
 
-                        shot_key   = str(sp)
-                        # Queue may store relative or absolute path — match by filename
-                        queued_shot = vid_entry.get("shot", "")
-                        is_vid_sel = queued_shot == shot_key or Path(queued_shot).name == Path(shot_key).name
-                        vid_status = vid_entry.get("status", "") if is_vid_sel else ""
-                        vid_color  = {"approved": "#ffaa00", "generating": "#00ffff", "done": "#00ff88", "failed": "#ff4444"}.get(vid_status, "")
-
-                        if vid_status == "done":
-                            st.markdown(f"<div style='color:#00ff88;font-size:10px;font-family:Share Tech Mono;text-align:center;margin-bottom:4px;'>VIDEO READY</div>", unsafe_allow_html=True)
-                            vid_path = vid_entry.get("video_path", "")
-                            if vid_path and Path(vid_path).exists():
-                                st.video(vid_path)
-                        elif vid_status == "failed":
-                            log_path = PROJECT_ROOT / ".tmp" / f"video_{carousel_id}.log"
-                            err_hint = ""
-                            if log_path.exists():
-                                err_hint = log_path.read_text()[-300:]
-                            st.markdown(f"<div style='color:#ff4444;font-size:10px;font-family:Share Tech Mono;text-align:center;'>FAILED</div>", unsafe_allow_html=True)
-                            if err_hint:
-                                st.code(err_hint, language=None)
-                            if st.button("Retry", key=f"vid_retry_{carousel_id}_{i}"):
-                                video_queue[carousel_id]["status"] = "approved"
-                                VIDEO_QUEUE_FILE.write_text(json.dumps(video_queue, indent=2))
-                                st.rerun()
-                        elif vid_status == "generating":
-                            st.markdown(f"<div style='color:#00ffff;font-size:10px;font-family:Share Tech Mono;text-align:center;'>GENERATING...</div>", unsafe_allow_html=True)
-                        elif vid_status == "approved":
-                            st.markdown(f"<div style='color:#ffaa00;font-size:10px;font-family:Share Tech Mono;text-align:center;'>QUEUED FOR VIDEO</div>", unsafe_allow_html=True)
-                            if st.button("Generate Now", key=f"vid_gen_{carousel_id}_{i}"):
-                                import subprocess
-                                video_queue[carousel_id]["status"] = "generating"
-                                VIDEO_QUEUE_FILE.write_text(json.dumps(video_queue, indent=2))
-                                log_path = PROJECT_ROOT / ".tmp" / f"video_{carousel_id}.log"
-                                log_path.parent.mkdir(exist_ok=True)
-                                with open(log_path, "w") as log_f:
-                                    subprocess.Popen([
-                                        "python3", "execution/generate_video.py",
-                                        "--image", shot_key,
-                                        "--prompt", vid_entry.get("prompt", ""),
-                                        "--carousel_id", carousel_id,
-                                        "--queue_file", str(VIDEO_QUEUE_FILE),
-                                        "--model_version", "3.0",
-                                        "--output_folder", str(TYRIE_IG),
-                                    ], cwd=str(PROJECT_ROOT), stdout=log_f, stderr=log_f)
-                                st.rerun()
-                        else:
-                            if st.button(f"🎬 Make Video", key=f"vid_sel_{carousel_id}_{i}"):
-                                with st.spinner("Director AI analyzing image..."):
+            # Kling video status / buttons
+            kling_status = vid_entry.get("status", "")
+            if kling_status == "done":
+                vp = vid_entry.get("video_path", "")
+                if vp and Path(vp).exists():
+                    st.video(vp)
+            elif kling_status == "generating":
+                st.markdown(
+                    "<div style='color:#00ffff;font-size:11px;font-family:Share Tech Mono;'>⏳ Kling generating...</div>",
+                    unsafe_allow_html=True,
+                )
+            elif kling_status == "failed":
+                st.markdown(
+                    "<div style='color:#ff4444;font-size:11px;font-family:Share Tech Mono;'>❌ Generation failed</div>",
+                    unsafe_allow_html=True,
+                )
+            elif not is_posted:
+                # Show "Make 2 Kling clips" button
+                kling_col, _ = st.columns([2, 3])
+                with kling_col:
+                    if st.button("🎬 Make Kling Clips", key=f"kling_auto_{carousel_id}"):
+                        picks = [str(sp) for sp in shot_paths[:2] if Path(sp).exists()]
+                        if picks:
+                            with st.spinner("Queueing Kling generations..."):
+                                for ki, shot_key in enumerate(picks):
                                     try:
                                         from execution.generate_video_prompt import generate_motion_prompt
                                         ai_prompt = generate_motion_prompt(
@@ -1289,114 +1318,44 @@ with tab_tyrie:
                                             movement_type="Slow push in",
                                             physics_focus="High Physics",
                                             emotion="Confident",
-                                            additional_context="AI content creator, personal brand, Bangkok lifestyle.",
+                                            additional_context="AI influencer, Bangkok lifestyle.",
                                         )
                                     except Exception as e:
-                                        ai_prompt = f"Cinematic motion. Slow push in. Subject breathes naturally. Atmospheric light. Photorealistic. 5 seconds. Error generating AI prompt: {e}"
-                                video_queue[carousel_id] = {
-                                    "shot": shot_key,
-                                    "shot_index": i,
-                                    "status": "prompt_pending",
-                                    "prompt": ai_prompt,
-                                    "camera_move": "Slow push in",
-                                    "physics": "High Physics",
-                                    "emotion": "Confident",
-                                    "video_path": "",
-                                }
-                                VIDEO_QUEUE_FILE.parent.mkdir(exist_ok=True)
+                                        ai_prompt = f"Slow cinematic push in. Natural breathing. Atmospheric light. 5 seconds."
+                                    entry_key = f"{carousel_id}_clip{ki}"
+                                    video_queue[entry_key] = {
+                                        "shot": shot_key,
+                                        "shot_index": ki,
+                                        "status": "approved",
+                                        "prompt": ai_prompt,
+                                        "camera_move": "Slow push in",
+                                        "physics": "High Physics",
+                                        "emotion": "Confident",
+                                        "video_path": "",
+                                        "parent_carousel": carousel_id,
+                                    }
                                 VIDEO_QUEUE_FILE.write_text(json.dumps(video_queue, indent=2))
+                                st.success(f"Queued {len(picks)} Kling clips for {carousel_id}")
                                 st.rerun()
 
-            # If a shot is selected for video but not yet approved, show director AI prompt editor
-            if vid_entry.get("status") == "prompt_pending" and vid_entry.get("shot"):
-                st.markdown(
-                    "<div style='background:rgba(0,255,255,0.03);border:1px solid rgba(0,255,255,0.15);border-radius:4px;padding:14px;margin-top:8px;'>",
-                    unsafe_allow_html=True,
-                )
-                st.markdown(
-                    f"<div style='color:#00ffff;font-family:Share Tech Mono;font-size:11px;margin-bottom:10px;'>🎬 DIRECTOR AI — Shot {vid_entry.get('shot_index',0)+1}</div>",
-                    unsafe_allow_html=True,
-                )
-
-                # Parameter controls
-                param_c1, param_c2, param_c3 = st.columns(3)
-                with param_c1:
-                    camera_move = st.selectbox(
-                        "Camera",
-                        ["Slow push in", "Pull back", "Orbit left", "Orbit right", "Static locked", "Handheld drift", "Crane up", "Dutch tilt"],
-                        index=["Slow push in", "Pull back", "Orbit left", "Orbit right", "Static locked", "Handheld drift", "Crane up", "Dutch tilt"].index(vid_entry.get("camera_move", "Slow push in")),
-                        key=f"vid_cam_{carousel_id}",
-                    )
-                with param_c2:
-                    physics = st.selectbox(
-                        "Physics",
-                        ["High Physics", "Jiggle", "Water/Liquids", "standard"],
-                        index=["High Physics", "Jiggle", "Water/Liquids", "standard"].index(vid_entry.get("physics", "High Physics")),
-                        key=f"vid_phys_{carousel_id}",
-                    )
-                with param_c3:
-                    emotion = st.selectbox(
-                        "Vibe",
-                        ["Confident", "Neutral", "Intense", "Relaxed", "Mysterious", "Joyful"],
-                        index=["Confident", "Neutral", "Intense", "Relaxed", "Mysterious", "Joyful"].index(vid_entry.get("emotion", "Confident")),
-                        key=f"vid_emo_{carousel_id}",
-                    )
-
-                if st.button("↺ Regenerate Prompt", key=f"vid_regen_{carousel_id}"):
-                    with st.spinner("Director AI regenerating..."):
-                        try:
-                            from execution.generate_video_prompt import generate_motion_prompt
-                            ai_prompt = generate_motion_prompt(
-                                image_path=vid_entry["shot"],
-                                movement_type=camera_move,
-                                physics_focus=physics,
-                                emotion=emotion,
-                                additional_context="AI content creator, personal brand, Bangkok lifestyle.",
-                            )
-                        except Exception as e:
-                            ai_prompt = vid_entry.get("prompt", "")
-                    video_queue[carousel_id]["prompt"]      = ai_prompt
-                    video_queue[carousel_id]["camera_move"] = camera_move
-                    video_queue[carousel_id]["physics"]     = physics
-                    video_queue[carousel_id]["emotion"]     = emotion
-                    VIDEO_QUEUE_FILE.write_text(json.dumps(video_queue, indent=2))
-                    st.rerun()
-
-                new_prompt = st.text_area(
-                    "Prompt (editable)",
-                    value=vid_entry.get("prompt", ""),
-                    height=160,
-                    key=f"vid_prompt_{carousel_id}",
-                    label_visibility="collapsed",
-                )
-
-                approve_col, cancel_col = st.columns(2)
-                with approve_col:
-                    if st.button("✓ Approve for Video", key=f"vid_approve_{carousel_id}"):
-                        video_queue[carousel_id]["status"] = "approved"
-                        video_queue[carousel_id]["prompt"] = new_prompt
-                        VIDEO_QUEUE_FILE.write_text(json.dumps(video_queue, indent=2))
-                        st.rerun()
-                with cancel_col:
-                    if st.button("✗ Cancel", key=f"vid_cancel_{carousel_id}"):
-                        video_queue.pop(carousel_id, None)
-                        VIDEO_QUEUE_FILE.write_text(json.dumps(video_queue, indent=2))
-                        st.rerun()
-                st.markdown("</div>", unsafe_allow_html=True)
-
-            # Approve / Reject carousel buttons
-            col1, col2, col3 = st.columns([3, 1, 1])
-            with col2:
-                if not is_approved:
-                    if st.button("✓ Approve", key=f"ty_approve_{carousel_id}"):
+            # Action buttons: Approve | Mark Posted | Remove
+            if not is_posted:
+                act_c1, act_c2, act_c3, act_c4 = st.columns([2, 2, 2, 3])
+                with act_c1:
+                    btn_label = "✓ Approved" if is_approved else "✓ Approve"
+                    if st.button(btn_label, key=f"ty_approve_{carousel_id}"):
                         tyrie_approved[carousel_id] = {"approved_at": datetime.now().isoformat()}
                         tyrie_approved_save_path.parent.mkdir(exist_ok=True)
                         tyrie_approved_save_path.write_text(json.dumps(tyrie_approved, indent=2))
-                        st.success("Approved!")
                         st.rerun()
-            with col3:
-                if is_approved:
-                    if st.button("✗ Reject", key=f"ty_reject_{carousel_id}"):
+                with act_c2:
+                    if st.button("🔵 Mark Posted", key=f"ty_posted_{carousel_id}"):
+                        _mark_posted_ty(carousel_id, caption, TYRIE_LOG)
+                        st.success("Marked as posted")
+                        st.rerun()
+                with act_c3:
+                    if st.button("🗑️ Remove", key=f"ty_remove_{carousel_id}"):
+                        _remove_ty_carousel(carousel_id, [TYRIE_IG, TYRIE_IG / "couple"])
                         tyrie_approved.pop(carousel_id, None)
                         tyrie_approved_save_path.write_text(json.dumps(tyrie_approved, indent=2))
                         st.rerun()
