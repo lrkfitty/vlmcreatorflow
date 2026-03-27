@@ -983,19 +983,24 @@ with tab_neo:
 # ══════════════════════════════════════════════════════════════════════════════
 
 def get_shay_ig_posts():
+    """Scan disk for Shay carousels grouped by caption file — same pattern as Neo."""
     if not SHAY_IG.exists():
         return []
-    posts = [
-        (f, f.stem)
-        for f in sorted(SHAY_IG.glob("*.jpg"), reverse=True)
-        if "_thumb" not in f.name and "_carousel" not in f.name
-    ]
-    result = []
-    for img_path, stem in posts:
-        caption_path = SHAY_IG / f"{stem}_caption.txt"
-        caption = caption_path.read_text().strip() if caption_path.exists() else ""
-        result.append((img_path, caption, stem))
-    return result
+    carousels = []
+    seen = set()
+    for caption_path in sorted(SHAY_IG.glob("*_caption.txt")):
+        carousel_id = caption_path.stem.replace("_caption", "")
+        caption = caption_path.read_text(encoding="utf-8").strip()
+        shot_paths = sorted(SHAY_IG.glob(f"{carousel_id}_shot*.jpg"))
+        if not shot_paths:
+            single = SHAY_IG / f"{carousel_id}.jpg"
+            if single.exists():
+                shot_paths = [single]
+        if shot_paths:
+            carousels.append((carousel_id, shot_paths, caption))
+            for sp in shot_paths:
+                seen.add(sp.name)
+    return carousels
 
 with tab_shay:
     st.markdown(
@@ -1003,28 +1008,27 @@ with tab_shay:
         unsafe_allow_html=True,
     )
 
-    # Load Shay schedule + post log
-    shay_schedule_path = PROJECT_ROOT / ".tmp" / "shay_schedule.json"
-    shay_schedule = load_json(shay_schedule_path, default=[])
+    # Load post log + approvals
     shay_log = load_json(SHAY_LOG, default=[])
     shay_posted_ids = {e.get("carousel_id", "") for e in shay_log if e.get("carousel_id")}
-
-    # Count approvals
     approved_data = load_approved()
     shay_approvals = approved_data.get("shay", {})
-    approved_count = sum(1 for post in shay_schedule if post.get("carousel_id") in shay_approvals)
-    
-    posts = get_shay_ig_posts()
+    shay_approved_ids = set(shay_approvals.keys())
+
+    # Discover carousels from disk
+    shay_posts = get_shay_ig_posts()
+    approved_count = sum(1 for cid, _, _ in shay_posts if cid in shay_approved_ids)
+
     stat_cols = st.columns(4)
     with stat_cols[0]:
         st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#ff00ff;'>150</span><span class='stat-label'>Followers</span></div>", unsafe_allow_html=True)
     with stat_cols[1]:
-        st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#ff00ff;'>{approved_count}/{len(shay_schedule)}</span><span class='stat-label'>Approved</span></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#ff00ff;'>{approved_count}/{len(shay_posts)}</span><span class='stat-label'>Approved</span></div>", unsafe_allow_html=True)
     with stat_cols[2]:
         st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#00ff88;'>{len(shay_log)}</span><span class='stat-label'>Posted</span></div>", unsafe_allow_html=True)
     with stat_cols[3]:
-        st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#ff00ff;'>{len(shay_schedule)}</span><span class='stat-label'>Scheduled</span></div>", unsafe_allow_html=True)
-    
+        st.markdown(f"<div class='stat-box'><span class='stat-value' style='color:#ff00ff;'>{len(shay_posts)}</span><span class='stat-label'>Scheduled</span></div>", unsafe_allow_html=True)
+
     st.markdown("<br>", unsafe_allow_html=True)
 
     # ── 30-DAY CALENDAR ───────────────────────────────────────────────────────
@@ -1032,22 +1036,20 @@ with tab_shay:
         "<div class='section-header' style='font-size:12px;'>💫 30-DAY CONTENT CALENDAR</div>",
         unsafe_allow_html=True,
     )
-    shay_approved_ids = set(shay_approvals.keys())
-    shay_cal_html = render_content_calendar(shay_schedule, shay_posted_ids, shay_approved_ids)
+    shay_cal_items = [{"carousel_id": cid, "day": i+1, "date": ""} for i, (cid, _, _) in enumerate(shay_posts)]
+    shay_cal_html = render_content_calendar(shay_cal_items, shay_posted_ids, shay_approved_ids)
     st.markdown(shay_cal_html, unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Approval interface
     st.markdown(
         "<div class='section-header' style='font-size:12px;margin-top:8px;'>💫 30-DAY CAROUSEL QUEUE</div>",
         unsafe_allow_html=True,
     )
-    
-    if not shay_schedule:
-        st.markdown("<div class='coming-soon'><span class='coming-soon-value'>📋</span>No carousel schedule found</div>", unsafe_allow_html=True)
+
+    if not shay_posts:
+        st.markdown("<div class='coming-soon'><span class='coming-soon-value'>📋</span>Generating content… check back soon</div>", unsafe_allow_html=True)
     else:
-        # Filter by status
         filter_status = st.radio(
             "Filter",
             ["Unposted", "All", "Approved", "Posted"],
@@ -1056,22 +1058,11 @@ with tab_shay:
             label_visibility="collapsed"
         )
 
-        for post in shay_schedule:
-            carousel_id = post.get("carousel_id")
-            day = post.get("day")
-            date_str = post.get("date")
-            caption = post.get("caption", "")
-            # Resolve images: prefer disk shots, fall back to schedule image list
-            disk_shots = sorted(SHAY_IG.glob(f"{carousel_id}_shot*.jpg"))
-            if disk_shots:
-                images = [str(p) for p in disk_shots]
-            else:
-                images = [p for p in post.get("images", []) if Path(p).exists()]
-
-            is_approved = carousel_id in shay_approvals
+        for idx, (carousel_id, shot_paths, caption) in enumerate(shay_posts):
+            images = [str(p) for p in shot_paths]
+            is_approved = carousel_id in shay_approved_ids
             is_posted   = carousel_id in shay_posted_ids
 
-            # Filter logic
             if filter_status == "Unposted" and is_posted:
                 continue
             if filter_status == "Approved" and not is_approved:
@@ -1086,12 +1077,11 @@ with tab_shay:
             else:
                 badge_class, status_label = "badge-pending", "⊙ PENDING"
 
-            # Carousel card — no images in main view
             st.markdown(
                 f"<div style='background:rgba(255,0,255,0.05);border:1px solid rgba(255,0,255,0.2);"
                 f"border-radius:4px;padding:12px;margin-bottom:12px;'>"
                 f"<div style='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;'>"
-                f"<span style='color:#00ffff;font-family:Share Tech Mono;font-size:11px;'>Day {day} · {date_str}</span>"
+                f"<span style='color:#00ffff;font-family:Share Tech Mono;font-size:11px;'>Day {idx+1} · {carousel_id}</span>"
                 f"<span class='{badge_class}' style='padding:2px 8px;border-radius:2px;font-size:10px;'>{status_label}</span>"
                 f"</div>"
                 f"<div style='color:#aabbcc;font-size:13px;line-height:1.4;'>{caption[:180]}...</div>"
@@ -1099,7 +1089,6 @@ with tab_shay:
                 unsafe_allow_html=True,
             )
 
-            # Images in expander only
             if images:
                 with st.expander(f"🖼️ View {len(images)} images"):
                     img_cols = st.columns(min(len(images), 4))
@@ -1110,23 +1099,26 @@ with tab_shay:
                                 if st.button("🎬 Kling", key=f"shay_kling_{carousel_id}_{im_idx}"):
                                     st.info("Queue Kling from this image — wire to kling_client when ready")
 
-            # Action buttons
             if not is_posted:
-                ac1, ac2, ac3, ac4 = st.columns([2, 2, 2, 3])
+                ac1, ac2, ac3 = st.columns([2, 2, 2])
                 with ac1:
-                    if st.button("✓ Approve" if not is_approved else "✓ Approved", key=f"approve_{carousel_id}"):
+                    if st.button("✓ Approve" if not is_approved else "✓ Approved", key=f"shay_approve_{carousel_id}"):
                         shay_approvals[carousel_id] = {"approved_at": datetime.now().isoformat()}
                         approved_data["shay"] = shay_approvals
                         save_approved(approved_data)
                         st.rerun()
                 with ac2:
                     if st.button("🔵 Mark Posted", key=f"shay_posted_{carousel_id}"):
-                        _mark_posted_shay(carousel_id, SHAY_LOG, shay_schedule_path)
+                        _mark_posted_shay(carousel_id, SHAY_LOG, PROJECT_ROOT / ".tmp" / "shay_schedule.json")
                         st.success("Marked as posted")
                         st.rerun()
                 with ac3:
                     if st.button("🗑️ Remove", key=f"shay_remove_{carousel_id}"):
-                        _remove_shay_carousel(carousel_id, shay_schedule_path)
+                        for sp in shot_paths:
+                            sp.unlink(missing_ok=True)
+                        cap_file = SHAY_IG / f"{carousel_id}_caption.txt"
+                        if cap_file.exists():
+                            cap_file.unlink()
                         st.rerun()
 
             st.markdown("<br>", unsafe_allow_html=True)
