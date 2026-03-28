@@ -92,31 +92,29 @@ def get_client(account="neo"):
             cl = Client()
 
     # 2. Try sessionid from .env (IG_SESSIONID_NEO / IG_SESSIONID_SHAY / IG_SESSIONID_TY)
+    from urllib.parse import unquote
     env_key = f"IG_SESSIONID_{account.upper()}"
-    sessionid = os.environ.get(env_key) or _fetch_sessionid_from_1password(account)
+    _raw = os.environ.get(env_key)
+    sessionid = unquote(_raw) if _raw else _fetch_sessionid_from_1password(account)
     if sessionid:
         try:
             source = ".env" if os.environ.get(env_key) else "1Password"
-            print(f"[{source}] Fetched sessionid for {account}, logging in...")
+            print(f"[{source}] Injecting sessionid for {account}...")
             user_id = sessionid.split(":")[0]
             username = os.environ.get(
                 f"IG_USERNAME_{account.upper()}" if account != "neo" else "IG_USERNAME", account
             )
-            # Set session directly — avoids user_info_v1/graphql validation calls
-            # that fail due to instagrapi/Instagram API version mismatch
-            settings = cl.get_settings()
-            settings["authorization_data"]["sessionid"] = sessionid
-            settings["authorization_data"]["ds_user_id"] = user_id
-            cl.set_settings(settings)
-            cl.private.cookies.update({"sessionid": sessionid, "ds_user_id": user_id})
+            # Inject cookie directly — skip instagrapi's deprecated validation endpoints
+            cl.set_settings(cl.get_settings())
+            cl.private.cookies.set("sessionid", sessionid, domain=".instagram.com")
+            cl.private.cookies.set("ds_user_id", user_id, domain=".instagram.com")
             cl.username = username
-            cl.get_timeline_feed()  # verify session actually works
             session_file.parent.mkdir(parents=True, exist_ok=True)
             cl.dump_settings(str(session_file))
-            print(f"[{source}] Session restored and saved for {account}")
+            print(f"[{source}] Session injected and saved for {account}")
             return cl
         except Exception as e:
-            print(f"[{source}] sessionid login failed for {account}: {e}")
+            print(f"[{source}] sessionid inject failed for {account}: {e}")
             cl = Client()
 
     # 3. Fall back to username/password login
