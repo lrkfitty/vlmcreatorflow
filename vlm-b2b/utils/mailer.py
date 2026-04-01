@@ -94,3 +94,50 @@ hello@vlmcreateflow.com
 """
     subject = "Your VLM setup call request — confirmed"
     _send_from(subject, body, booking.get('email'), HELLO_USER, HELLO_PASS)
+
+
+def send_magnet_notification(lead: dict):
+    body = f"""New Magnet Lead — CreateFlow
+
+Name:    {lead.get('name')}
+Company: {lead.get('company')}
+Email:   {lead.get('email')}
+Vertical:{lead.get('niche')}
+Status:  Magnet_Pending
+Lead ID: {lead.get('id')}
+
+Action required: Generate 5 AI influencer posts for the {lead.get('niche')} vertical and deliver within 24 hours.
+"""
+    subject = f"New Magnet Lead — {lead.get('name')} @ {lead.get('company')} [{lead.get('niche')}]"
+    _send(subject, body, NOTIFY)
+    _send(subject, body, NOTIFY_GMAIL)
+
+
+def send_magnet_confirmation(lead: dict):
+    first    = lead.get('name', '').split()[0] or lead.get('name', 'there')
+    vertical = lead.get('niche', 'your vertical')
+    company  = lead.get('company', 'your company')
+    email    = lead.get('email', '')
+    body = f"""Hey {first},
+
+You're in. We're putting together 5 AI-generated influencer posts for {vertical} brands like {company}.
+
+You'll have them in your inbox within 24 hours — usually faster.
+
+In the meantime, here's what to expect:
+
+→ 5 real AI-generated posts — not mock-ups, not stock imagery.
+→ Each post includes an image + caption in Instagram/LinkedIn format.
+→ These are the same outputs our clients use to replace $8k+ monthly shoots.
+
+If you want to see what a full pipeline looks like for {company}, just reply to this email.
+No pitch — just a live look at the system.
+
+Talk soon,
+
+— Ty
+Viral Lense Media
+hello@vlmcreateflow.com
+"""
+    subject = f"Your 5 free posts — we're on it, {first}"
+    _send_from(subject, body, email, HELLO_USER, HELLO_PASS)

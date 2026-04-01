@@ -12,7 +12,7 @@ except Exception:
     pass
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from utils.sheets import add_lead
-from utils.mailer import send_lead_notification, send_booking_notification, send_booking_confirmation
+from utils.mailer import send_lead_notification, send_booking_notification, send_booking_confirmation, send_magnet_notification, send_magnet_confirmation
 from utils.stripe_checkout import handle_stripe_button
 
 ASSETS = Path(__file__).parent / "assets"
@@ -139,6 +139,7 @@ label { color: #64748B !important; font-size: 0.9rem !important; font-weight: 60
 if "submitted"       not in st.session_state: st.session_state.submitted       = False
 if "lead"            not in st.session_state: st.session_state.lead            = {}
 if "booking_sent"    not in st.session_state: st.session_state.booking_sent    = False
+if "magnet_submitted" not in st.session_state: st.session_state.magnet_submitted = False
 
 # ─── BOOKING PAGE (?book=1) ───────────────────────────────────────────────────
 if st.query_params.get("book") == "1" or st.query_params.get("book") == "true":
@@ -204,6 +205,110 @@ if st.query_params.get("book") == "1" or st.query_params.get("book") == "true":
                 st.rerun()
 
     st.markdown('<p class="secure" style="margin-top:24px;">Ty responds personally within a few hours. No automated sequences after this.</p>', unsafe_allow_html=True)
+    st.stop()
+
+# ─── LEAD MAGNET PAGE (?magnet=1) ────────────────────────────────────────────
+if st.query_params.get("magnet") == "1" or st.query_params.get("magnet") == "true":
+    if st.session_state.magnet_submitted:
+        lead_email = st.session_state.get("magnet_lead", {}).get("email", "your inbox")
+        st.markdown('<div class="eyebrow">We\'re on it</div>', unsafe_allow_html=True)
+        st.markdown("# We're on it.")
+        st.markdown(f'<p class="lede">Check {lead_email} — your 5 posts will be there within 24 hours.</p>', unsafe_allow_html=True)
+        st.markdown("""
+<div class="value-stack" style="margin-top:32px;">
+  <div class="value-item"><div class="check">&#10003;</div><div>
+    <div class="value-title">What you're getting</div>
+    <div class="value-desc">5 real AI-generated posts — not mock-ups, not stock imagery. Each includes an image + caption in Instagram/LinkedIn format.</div>
+  </div></div>
+  <div class="value-item"><div class="check">&#10003;</div><div>
+    <div class="value-title">Delivery time</div>
+    <div class="value-desc">Within 24 hours — usually faster. Ty generates them personally for your vertical.</div>
+  </div></div>
+</div>
+""", unsafe_allow_html=True)
+        st.markdown('<hr class="divider">', unsafe_allow_html=True)
+        st.markdown('<p class="lede" style="font-size:1.1rem;">Want to skip the wait and see the full system live?</p>', unsafe_allow_html=True)
+        if st.button("Book a 30-min call →", use_container_width=True):
+            st.query_params["book"] = "1"
+            st.rerun()
+        st.stop()
+
+    st.markdown('<div class="eyebrow">CreateFlow — Free Sample</div>', unsafe_allow_html=True)
+    st.markdown("# Get 5 Free AI Influencer Posts Made for Your Brand — No Call Required")
+    st.markdown('<p class="lede">See exactly what CreateFlow can do for your brand — before you ever talk to anyone.</p>', unsafe_allow_html=True)
+
+    st.markdown("""
+<div class="value-stack" style="margin-bottom:24px;">
+  <div class="value-item"><div class="check">&#10003;</div><div>
+    <div class="value-title">No credit card. No setup call.</div>
+    <div class="value-desc">We generate 5 on-brand AI influencer posts for your vertical — free.</div>
+  </div></div>
+  <div class="value-item"><div class="check">&#10003;</div><div>
+    <div class="value-title">If you like what you see, we can talk about building a full pipeline.</div>
+    <div class="value-desc"></div>
+  </div></div>
+</div>
+""", unsafe_allow_html=True)
+
+    st.markdown('<div class="pull-quote">"This is what our clients used to spend $8–15k on a shoot to get. We made these in under 10 minutes."</div>', unsafe_allow_html=True)
+
+    st.markdown('<hr class="divider">', unsafe_allow_html=True)
+
+    with st.form("magnet_form"):
+        c1, c2 = st.columns(2)
+        with c1: m_name    = st.text_input("First Name")
+        with c2: m_email   = st.text_input("Work Email")
+        m_company  = st.text_input("Company Name")
+        m_vertical = st.selectbox("Your Vertical", [
+            "— Select —",
+            "Ad Agency",
+            "E-commerce Brand",
+            "Real Estate",
+            "Hospitality / Travel",
+            "Health & Wellness",
+            "Fitness",
+            "Food & Beverage",
+            "Other",
+        ])
+
+        if st.form_submit_button("Get My 5 Free Posts →", use_container_width=True):
+            errs = []
+            if not m_name.strip():          errs.append("First name required.")
+            if "@" not in m_email:          errs.append("Valid work email required.")
+            if not m_company.strip():       errs.append("Company name required.")
+            if m_vertical == "— Select —":  errs.append("Select your vertical.")
+            if errs:
+                for e in errs: st.error(e)
+            else:
+                magnet_lead = {
+                    "funnel_type":  "B2B_MAGNET",
+                    "status":       "Magnet_Pending",
+                    "name":         m_name.strip(),
+                    "email":        m_email.strip(),
+                    "company":      m_company.strip(),
+                    "niche":        m_vertical,
+                    "how_heard":    "b2b_lead_magnet",
+                    "role":         "",
+                    "budget":       "",
+                    "challenge":    "",
+                    "content_type": "",
+                    "frequency":    "",
+                    "team_size":    "",
+                }
+                magnet_lead["id"] = add_lead(magnet_lead)
+                send_magnet_notification(magnet_lead)
+                send_magnet_confirmation(magnet_lead)
+                # Fire Make.com webhook (magnet scenario first, fall back to standard)
+                import requests as _req, os as _os
+                _webhook = _os.getenv("MAKE_B2B_MAGNET_WEBHOOK_URL") or _os.getenv("MAKE_B2B_WEBHOOK_URL")
+                if _webhook:
+                    try: _req.post(_webhook, json=magnet_lead, timeout=5)
+                    except Exception as _e: print(f"[WEBHOOK ERROR] {_e}")
+                st.session_state.magnet_lead = magnet_lead
+                st.session_state.magnet_submitted = True
+                st.rerun()
+
+    st.markdown('<p class="secure" style="margin-top:12px;">No credit card. No sales call. Just the posts.</p>', unsafe_allow_html=True)
     st.stop()
 
 # ─── SALES LETTER ────────────────────────────────────────────────────────────
