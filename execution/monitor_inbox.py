@@ -22,8 +22,10 @@ Cron (runs 5 min after outreach sender):
     5 3 * * * /opt/homebrew/bin/python3.11 "/.../execution/monitor_inbox.py"
 """
 
-import os, sys, json, imaplib, email, email.message, argparse, logging
+import os, sys, json, imaplib, email, email.message, argparse, logging, smtplib
 from email.header import decode_header
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -53,6 +55,44 @@ GMAIL_USER     = "virallensemediavlm@gmail.com"
 GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
 IMAP_HOST      = "imap.gmail.com"
 IMAP_PORT      = 993
+
+# ── Notification config ───────────────────────────────────────────────────────
+NOTIFY_TO      = "tylarkin@vlmcreateflow.com"
+SMTP_HOST      = "mail.privateemail.com"
+SMTP_PORT      = 587
+SMTP_USER      = "hello@vlmcreateflow.com"
+SMTP_PASS      = os.getenv("SMTP_PASSWORD", "Vlmcreateflow1!")
+
+
+def notify_reply(name: str, email_addr: str, company: str, intent: str,
+                 snippet: str, dry_run: bool = False):
+    """Send an alert email to Ty when a lead needs a draft reply."""
+    subject = f"[VLM Reply] {name or email_addr} replied"
+    body = (
+        f"Hot lead alert — reply received and classified as: {intent.upper()}\n\n"
+        f"Name:    {name or '(unknown)'}\n"
+        f"Email:   {email_addr}\n"
+        f"Company: {company or '(unknown)'}\n\n"
+        f"--- Their reply ---\n{snippet}\n---\n\n"
+        f"Open Claude Code and check .tmp/reply_drafts/ to draft a response."
+    )
+    if dry_run:
+        log.info(f"  [DRY RUN] Would notify {NOTIFY_TO}: {subject}")
+        return
+    try:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"]    = f"VLM Inbox <{SMTP_USER}>"
+        msg["To"]      = NOTIFY_TO
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.sendmail(SMTP_USER, [NOTIFY_TO], msg.as_string())
+        log.info(f"  Notification sent to {NOTIFY_TO}: {subject}")
+    except Exception as e:
+        log.error(f"  Failed to send notification: {e}")
 
 
 # ── Lead helpers ──────────────────────────────────────────────────────────────
@@ -281,6 +321,17 @@ def main():
                 leads_updated   = True
         else:
             log.info(f"  [DRY RUN] Would save draft, intent={intent}")
+
+        # Notify Ty immediately for hot leads that need a draft response
+        if status == "needs_draft":
+            notify_reply(
+                name=draft["lead_name"],
+                email_addr=draft["lead_email"],
+                company=draft["company"],
+                intent=intent,
+                snippet=r["body"][:500],
+                dry_run=args.dry_run,
+            )
 
     if leads_updated and not args.dry_run:
         save_leads(leads)

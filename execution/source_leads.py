@@ -9,12 +9,13 @@ Verticals:
 
 Usage:
     python3 execution/source_leads.py [--dry-run]
+    python3 execution/source_leads.py --from-csv <path>   # import leads from CSV via vlm-crm/import_leads.py
 
 Outputs:
     .tmp/leads.json  — full lead list (new leads appended, no duplicates by email)
 """
 
-import os, sys, json, time, argparse, requests
+import os, sys, json, time, argparse, requests, subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -161,7 +162,27 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dry-run", action="store_true",
                         help="Print what would happen without calling the API")
+    parser.add_argument("--from-csv", metavar="PATH",
+                        help="Import leads from a CSV file via vlm-crm/import_leads.py (skips Explorium API)")
     args = parser.parse_args()
+
+    # ── CSV import mode ───────────────────────────────────────────────────────
+    if args.from_csv:
+        csv_path = Path(args.from_csv)
+        if not csv_path.exists():
+            print(f"ERROR: CSV file not found: {csv_path}")
+            sys.exit(1)
+        import_script = BASE_DIR / "vlm-crm" / "import_leads.py"
+        if not import_script.exists():
+            print(f"ERROR: import script not found: {import_script}")
+            sys.exit(1)
+        print(f"=== VLM Lead Import — CSV ===\n", flush=True)
+        print(f"Delegating to {import_script} with {csv_path}\n", flush=True)
+        result = subprocess.run(
+            [sys.executable, str(import_script), str(csv_path)],
+            cwd=str(BASE_DIR),
+        )
+        sys.exit(result.returncode)
 
     print("=== VLM Lead Sourcing — Explorium API ===\n")
 

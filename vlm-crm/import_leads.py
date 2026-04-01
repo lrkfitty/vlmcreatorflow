@@ -18,7 +18,7 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent))
-from utils.sheets import _sheet, _load, HEADERS, LOCAL_FILE, SHEET_NAME
+from utils.sheets import _sheet, HEADERS, LOCAL_FILE, SHEET_NAME
 
 CSV_HEADERS_MAP = {
     # CSV column name → CRM header (add more mappings if your CSV uses different names)

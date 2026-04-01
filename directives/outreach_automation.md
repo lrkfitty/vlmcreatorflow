@@ -30,22 +30,26 @@ Response: emails nested under `item["data"]["professions_email"]`
 
 **Credit note:** 100 API credits available. Each fetch batch of 10 costs ~10 credits.
 When credits run out: export leads from app.vibeprospecting.ai (chat credits) as CSV,
-then run `python3 vlm-crm/import_leads.py path/to/leads.csv`
+then import via either of these equivalent paths:
+
+```bash
+# Preferred (consistent entry point):
+python3 execution/source_leads.py --from-csv path/to/leads.csv
+
+# Direct (same result):
+python3 vlm-crm/import_leads.py path/to/leads.csv
+```
 
 ## Step 2: Push to CRM
 
-Run this after sourcing leads:
-```bash
-python3 -c "
-import json
-from pathlib import Path
-# [see inline push logic in main project context or re-run the push_crm block]
-"
-```
-
-Or use the import script with a CSV export:
+Use the import script with a CSV export:
 ```bash
 python3 vlm-crm/import_leads.py .tmp/leads.csv
+```
+
+Or via the unified entry point:
+```bash
+python3 execution/source_leads.py --from-csv .tmp/leads.csv
 ```
 
 CRM lives at crm.vlmcreateflow.com. Backed by Google Sheets (prod) or
@@ -96,7 +100,25 @@ Sequence logic:
 - emails_sent=3 → sequence complete, no more sends
 - If lead.replied=True or lead.booked=True → skip
 
-## Step 5: Appointment Setting
+## Step 5: Reply Monitoring & Notifications
+
+Script: `execution/monitor_inbox.py`
+Cron: `5 3 * * *` (5 min after outreach sender)
+Log: `.tmp/inbox_monitor.log`
+Drafts: `.tmp/reply_drafts/`
+
+When a reply is detected with `needs_draft` status (interested / objection / not_now / other),
+`monitor_inbox.py` immediately sends an alert email:
+- **To:** tylarkin@vlmcreateflow.com
+- **Subject:** `[VLM Reply] {name} replied`
+- **Body:** intent classification + 500-char snippet + link to check reply_drafts/
+- **SMTP:** mail.privateemail.com:587 via hello@vlmcreateflow.com
+
+`unsubscribe` replies get a canned reply saved as `pending_review` (no alert — no draft needed).
+
+Hot leads go cold in 48h. The notification fires immediately when monitor_inbox.py runs.
+
+## Step 6: Appointment Setting
 
 When a lead replies or books, update leads.json:
 ```json
