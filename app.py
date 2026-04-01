@@ -16,7 +16,7 @@ try:
     from load_assets import load_assets, promote_image_to_asset
     import execution.magic_ui as magic_ui_module
     importlib.reload(magic_ui_module)
-    from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button, icon_grid_selector, thumbnail_carousel, fidelity_mode_selector
+    from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button, icon_grid_selector, thumbnail_carousel, outfit_carousel, fidelity_mode_selector
     import generate_image as gi_module
     importlib.reload(gi_module)
     from generate_image import generate_image_from_prompt
@@ -1027,12 +1027,10 @@ if selection == "Workflow Wizard":
             if st.session_state.get("wiz_char"):
                 st.markdown("#### 2. Choose Outfit")
                 outfit_carousel_data = {k: v for k, v in o_data.items()}
-                thumbnail_carousel(
-                    "Outfits",
+                outfit_carousel(
                     outfit_carousel_data,
                     state_key="wiz_outfit",
                     thumb_cols=3,
-                    show_label=False
                 )
 
             st.markdown("#### 3. Vibe / Atmosphere")
@@ -1700,13 +1698,11 @@ if selection == "World Builder":
                     st.markdown("###### 1b. Main Character Outfit")
                     fit_opts = assets.get('outfits', {})
 
-                    # --- OUTFIT CAROUSEL ---
-                    fit_key = thumbnail_carousel(
-                        "Select Outfit",
+                    # --- OUTFIT CAROUSEL (categorized) ---
+                    fit_key = outfit_carousel(
                         {"None": None, **fit_opts},
                         state_key="wb_outfit_main",
                         thumb_cols=3,
-                        show_label=False
                     )
                     
                     if fit_key and fit_key != "None":

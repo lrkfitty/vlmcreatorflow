@@ -2,9 +2,9 @@ import os, smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 
-NOTIFY  = "virallensemediavlm@gmail.com"
-USER    = os.getenv("GMAIL_USER", "virallensemediavlm@gmail.com")
-PASS    = os.getenv("GMAIL_APP_PASSWORD", "PLACEHOLDER")
+NOTIFY  = "tylarkin@vlmcreateflow.com"
+USER    = os.getenv("SMTP_USER", "noreply@vlmcreateflow.com")
+PASS    = os.getenv("SMTP_PASS", "PLACEHOLDER")
 
 def send_lead_notification(lead: dict):
     if PASS == "PLACEHOLDER":
@@ -24,6 +24,6 @@ Lead ID:   {lead.get('id')}
 """
     msg.attach(MIMEText(body, "plain"))
     try:
-        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as s:
-            s.login(USER, PASS); s.sendmail(USER, NOTIFY, msg.as_string())
+        with smtplib.SMTP("mail.privateemail.com", 587) as s:
+            s.starttls(); s.login(USER, PASS); s.sendmail(USER, NOTIFY, msg.as_string())
     except Exception as e: print(f"[EMAIL ERROR] {e}")

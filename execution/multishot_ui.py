@@ -61,7 +61,6 @@ def render_multishot_ui(get_user_out_dir_func):
             help="Select an outfit for wardrobe consistency",
             key="ms_outfit_select"
         )
-        custom_outfit = st.text_input("Or describe a custom outfit", placeholder="e.g., vintage leather jacket and blue jeans", key="ms_custom_outfit")
     
     # Resolve paths
     char_ref_path = characters_data.get(selected_char) if selected_char != "None (use uploaded reference only)" else None
@@ -109,7 +108,6 @@ def render_multishot_ui(get_user_out_dir_func):
     coverage_angles = []
     coverage_cast = []
     coverage_outfits = {}
-    coverage_custom_outfits = {}
     
     if multishot_mode == "Individual Shots (Batch)":
         angle_opts = [
@@ -267,12 +265,6 @@ def render_multishot_ui(get_user_out_dir_func):
                         index=0,
                         key=f"coverage_outfit_{i}"
                     )
-                    coverage_custom_outfits[char_name] = st.text_input(
-                        "Or custom outfit",
-                        placeholder="e.g. blue dress",
-                        key=f"coverage_custom_{i}",
-                        label_visibility="collapsed"
-                    )
             
             # Show cast + outfit thumbnails
             thumb_cols = st.columns(min(len(coverage_cast), 4))
@@ -350,10 +342,7 @@ def render_multishot_ui(get_user_out_dir_func):
                             outfit_info = []
                             for c in coverage_cast:
                                 o = coverage_outfits.get(c, "None")
-                                custom_o = coverage_custom_outfits.get(c, "")
-                                if custom_o:
-                                    outfit_info.append(f"{c.replace('(My) ', '')} wearing {custom_o}")
-                                elif o != "None":
+                                if o != "None":
                                     outfit_info.append(f"{c.replace('(My) ', '')} wearing {o}")
                             if outfit_info:
                                 context_parts.append(f"OUTFITS: {'; '.join(outfit_info)}")
@@ -639,10 +628,6 @@ def render_multishot_ui(get_user_out_dir_func):
                 f"{subject_noun} maintaining EXACT identity, shape, colors, and features from the main reference image"
                 + identity_lock_instruction
             )
-            
-            if custom_outfit:
-                base_prompt += f", wearing {custom_outfit}"
-                
             if additional_prompt:
                 base_prompt += f", {additional_prompt}"
 
@@ -924,14 +909,10 @@ def render_multishot_ui(get_user_out_dir_func):
                                 cast_assets.append({"path": c_path, "label": f"Cast: {clean}"})
                                 # Add outfit if assigned
                                 outfit_choice = coverage_outfits.get(c_name, "None")
-                                custom_o = coverage_custom_outfits.get(c_name, "")
-                                
-                                # Add the outfit reference image if it was picked from the dropdown
                                 if outfit_choice != "None":
                                     o_path = outfits_data.get(outfit_choice)
                                     if o_path:
-                                        label = f"Outfit style roughly matching custom description for {clean}" if custom_o else f"Outfit for {clean}"
-                                        cast_assets.append({"path": o_path, "label": label})
+                                        cast_assets.append({"path": o_path, "label": f"Outfit for {clean}"})
                         
                         # Generate each angle with cascading reference
                         last_generated_path = None

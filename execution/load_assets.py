@@ -401,6 +401,7 @@ def load_assets(base_path="assets", user_assets_dir=None, skip_base=False, targe
             "Friends", "Pets", "Props", "Vehicles", "Foods", ".DS_Store",
             "AI Content Creators", "ai content creators", "Ai Content Creators", "Assets",
             "ui_icons", "UI_Icons", "Ui_icons", "icons", "Icons",  # Never load UI icon folders
+            "sprites", "Sprites", "sprites_2d", "Sprites_2d",  # 2D animation sprites — not content characters
         ]
         
         if os.path.exists(base_path):

@@ -12,7 +12,7 @@ except Exception:
     pass
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from utils.sheets import add_lead
-from utils.mailer import send_lead_notification
+from utils.mailer import send_lead_notification, send_booking_notification, send_booking_confirmation
 from utils.stripe_checkout import handle_stripe_button
 
 ASSETS = Path(__file__).parent / "assets"
@@ -136,8 +136,75 @@ label { color: #64748B !important; font-size: 0.9rem !important; font-weight: 60
 </style>
 """, unsafe_allow_html=True)
 
-if "submitted" not in st.session_state: st.session_state.submitted = False
-if "lead"      not in st.session_state: st.session_state.lead      = {}
+if "submitted"       not in st.session_state: st.session_state.submitted       = False
+if "lead"            not in st.session_state: st.session_state.lead            = {}
+if "booking_sent"    not in st.session_state: st.session_state.booking_sent    = False
+
+# ─── BOOKING PAGE (?book=1) ───────────────────────────────────────────────────
+if st.query_params.get("book") == "1" or st.query_params.get("book") == "true":
+    if st.session_state.booking_sent:
+        st.markdown('<div class="eyebrow">You\'re confirmed</div>', unsafe_allow_html=True)
+        st.markdown("# We'll be in touch within a few hours.")
+        st.markdown('<p class="lede">Ty will reach out to your email to lock in a time. The call is 30 minutes — no pitch deck, just a live look at the system and an honest conversation about whether it fits.</p>', unsafe_allow_html=True)
+        st.markdown("""
+<div class="value-stack" style="margin-top:32px;">
+  <div class="value-item"><div class="check">&#10003;</div><div>
+    <div class="value-title">What to expect on the call</div>
+    <div class="value-desc">Live demo of the AI content engine — your vertical, your use case. Then we'll talk setup, timeline, and pricing. One-time setup fee + monthly retainer starting at $1,500/mo.</div>
+  </div></div>
+  <div class="value-item"><div class="check">&#10003;</div><div>
+    <div class="value-title">What to prepare</div>
+    <div class="value-desc">Nothing. Just show up. If you have brand assets (logo, reference images, existing content), that's a bonus — but not required.</div>
+  </div></div>
+</div>
+""", unsafe_allow_html=True)
+        st.stop()
+
+    st.markdown('<div class="eyebrow">Viral Lense Media — Setup Call</div>', unsafe_allow_html=True)
+    st.markdown("# Book your 30-minute setup call.")
+    st.markdown('<p class="lede">We\'ll walk through the system live, scope your first use case, and talk pricing. One-time setup fee + monthly retainer from $1,500/mo. No obligation on the call.</p>', unsafe_allow_html=True)
+
+    st.markdown('<hr class="divider">', unsafe_allow_html=True)
+
+    with st.form("booking_form"):
+        c1, c2 = st.columns(2)
+        with c1: b_name    = st.text_input("Your Name")
+        with c2: b_email   = st.text_input("Your Email")
+        b_company  = st.text_input("Company Name")
+        b_avail    = st.text_area(
+            "When are you available? (e.g. Mon–Wed after 2pm EST, or anytime Fri)",
+            height=80,
+            placeholder="Give us 2–3 windows and we'll confirm one within a few hours."
+        )
+        b_message  = st.text_area(
+            "Anything you want us to know beforehand? (optional)",
+            height=80,
+            placeholder="Your biggest content bottleneck, what you've tried, questions..."
+        )
+
+        if st.form_submit_button("Request My Setup Call →", use_container_width=True):
+            errs = []
+            if not b_name.strip():    errs.append("Name required.")
+            if "@" not in b_email:    errs.append("Valid email required.")
+            if not b_company.strip(): errs.append("Company name required.")
+            if not b_avail.strip():   errs.append("Please share your availability.")
+            if errs:
+                for e in errs: st.error(e)
+            else:
+                booking = {
+                    "name":         b_name.strip(),
+                    "email":        b_email.strip(),
+                    "company":      b_company.strip(),
+                    "availability": b_avail.strip(),
+                    "message":      b_message.strip(),
+                }
+                send_booking_notification(booking)
+                send_booking_confirmation(booking)
+                st.session_state.booking_sent = True
+                st.rerun()
+
+    st.markdown('<p class="secure" style="margin-top:24px;">Ty responds personally within a few hours. No automated sequences after this.</p>', unsafe_allow_html=True)
+    st.stop()
 
 # ─── SALES LETTER ────────────────────────────────────────────────────────────
 if not st.session_state.submitted:
@@ -241,7 +308,7 @@ Same brand integrity. In minutes, not weeks. No shoot coordination. No model fee
   <div class="roi-row"><span class="roi-label">Single commercial shoot (studio + talent + post)</span><span class="roi-old">$8,000–$15,000</span></div>
   <div class="roi-row"><span class="roi-label">Turnaround time</span><span class="roi-old">2–3 weeks</span></div>
   <div class="roi-row"><span class="roi-label">Campaigns produced per shoot</span><span class="roi-old">1</span></div>
-  <div class="roi-row"><span class="roi-label">CreateFlow Enterprise — unlimited generations</span><span class="roi-new">$997/mo</span></div>
+  <div class="roi-row"><span class="roi-label">CreateFlow Enterprise — unlimited generations</span><span class="roi-new">From $1,500/mo</span></div>
   <div class="roi-row"><span class="roi-label">Turnaround time</span><span class="roi-new">Same session</span></div>
   <div class="roi-row"><span class="roi-label">Campaigns produced per month</span><span class="roi-new">Unlimited</span></div>
 </div>
@@ -307,8 +374,8 @@ else:
   <div class="value-item"><div class="check">&#10003;</div><div><div class="value-title">Cancel Anytime</div><div class="value-desc">No contracts. No lock-in.</div></div></div>
 </div>
 <div class="price-block">
-  <div class="price-main">$997 <span class="price-period">/ month</span></div>
-  <div class="price-note">Includes onboarding session &nbsp;·&nbsp; Cancel anytime</div>
+  <div class="price-main">$1,500–$3,000 <span class="price-period">/ month</span></div>
+  <div class="price-note">One-time setup fee &nbsp;·&nbsp; Monthly retainer &nbsp;·&nbsp; Cancel anytime</div>
 </div>
 """, unsafe_allow_html=True)
 

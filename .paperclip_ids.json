@@ -1,0 +1,20 @@
+{
+  "company_id": "4b053f80-4a36-43c8-8e21-cfc965c088c2",
+  "agents": {
+    "claude":     "27e154e0-9adb-4b84-95a0-b032b77c2026",
+    "autoposter": "57bfada2-22dc-4e68-9686-98d272f551cb",
+    "outreach":   "9f5e5805-4b5b-4cac-bf05-7300be3a4a84",
+    "gemini":     "f0d20bfe-7d31-456e-97ad-cc6ab35183f7",
+    "kling":      "3f809ab8-5fec-48d9-9405-fdd8b6c47b35",
+    "crm":        "33498980-cce4-4841-8a25-62aa69e77c08",
+    "gmail":      "e158013d-dcb1-416a-a481-283fdddc8e03",
+    "developer":  "f070a287-c325-48f1-8f09-52a785f0f802",
+    "designer":   "9fe42a15-9788-4406-9169-e9b84945ae45"
+  },
+  "goals": {
+    "mrr":      "7d597120-0443-4134-8891-e723490a06e9",
+    "followers": "60f7184c-7d6d-4042-a18d-b53161080d39",
+    "pipeline": "51802da7-6312-4dc8-9f39-77fa446c02b1"
+  },
+  "paperclip_url": "http://localhost:3100"
+}

@@ -2,7 +2,7 @@
 import streamlit as st
 import os
 import json
-from execution.magic_ui import card_begin, card_end, thumbnail_carousel
+from execution.magic_ui import card_begin, card_end
 from execution.character_utils import build_character_prompt
 from execution.generate_image import generate_image_from_prompt
 from execution.series_processor import parse_script_to_scenes
@@ -226,54 +226,44 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
 
                         with c2:
                              # Outfit Select
-                             st.markdown(f"**Wardrobe**")
-                             
-                             # Prepare dict for carousel
-                             fit_opts_dict = {"Default": None}
-                             for k, v in outfits_data.items():
-                                 fit_opts_dict[k] = v
-                                 
-                             sel_fit = thumbnail_carousel(
-                                 "", # Hidden label
-                                 fit_opts_dict,
-                                 state_key=f"series_fit_{member}",
-                                 thumb_cols=3,
-                                 show_label=False
-                             )
-                             
-                             if not sel_fit: sel_fit = "Default"
+                             outfit_opts = list(outfits_data.keys())
+                             sel_fit = st.selectbox(f"Outfit", ["Default"] + outfit_opts, key=f"series_fit_{member}")
                              cast_wardrobe_map[member] = sel_fit
                              
-                             custom_fit = st.text_input("Custom Outfit Description", placeholder="e.g. Red silk dress", key=f"series_custom_fit_{member}")
-                             cast_wardrobe_map[f"{member}_custom"] = custom_fit
+                             # Show Outfit Preview
+                             if sel_fit != "Default":
+                                 o_path = outfits_data.get(sel_fit)
+                                 if isinstance(o_path, dict): o_path = o_path.get('default_img')
+                                 if o_path:
+                                     st.image(o_path, width=80)
                                          
                 with st.expander("🛠️ Debug: Wardrobe Selections (Raw)", expanded=False):
                     st.write(cast_wardrobe_map)
 
         with col_sb2:
             st.markdown("#### 🌍 Series Environments")
+            # Combine Vibes and Locations
+            all_locs = list(vibes_data.keys()) + list(assets.get('locations', {}).keys())
             
-            # Combine Vibes and Locations into a dict for carousel
-            loc_opts_dict = {"None": None}
-            for k in list(vibes_data.keys()): loc_opts_dict[k] = vibes_data[k]
-            for k in list(assets.get('locations', {}).keys()): loc_opts_dict[k] = assets['locations'][k]
+            st.write("**Primary Location** (Main Action)")
+            series_env = st.selectbox("Choose Primary", ["None"] + all_locs)
             
-            series_env = thumbnail_carousel(
-                "Primary Location",
-                loc_opts_dict,
-                state_key="series_primary_env",
-                thumb_cols=3
-            )
-            if not series_env: series_env = "None"
+            if series_env and series_env != "None":
+                # Preview
+                path = vibes_data.get(series_env) or assets.get('locations', {}).get(series_env)
+                if path:
+                    if isinstance(path, dict): path = path.get('default_img')
+                    st.image(path, caption="Primary Environment")
             
-            st.markdown("<br>", unsafe_allow_html=True)
-            sec_env = thumbnail_carousel(
-                "Secondary Location (B-Roll)",
-                loc_opts_dict,
-                state_key="series_sec_env",
-                thumb_cols=3
-            )
-            if not sec_env: sec_env = "None"
+            st.write("**Secondary Location** (B-Roll / Cutaways)")
+            sec_env = st.selectbox("Choose B-Roll Vibe", ["None"] + all_locs, key="sec_env")
+            
+            if sec_env and sec_env != "None":
+                # Preview Secondary
+                path_sec = vibes_data.get(sec_env) or assets.get('locations', {}).get(sec_env)
+                if path_sec:
+                    if isinstance(path_sec, dict): path_sec = path_sec.get('default_img')
+                    st.image(path_sec, caption="Secondary Environment")
 
     # --- STEP 2: WRITER'S ROOM ---
     st.markdown("---")
