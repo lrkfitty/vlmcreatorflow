@@ -202,6 +202,8 @@ activity_log     = load_json(TMP / "activity_log.json", [])
 outfit_usage     = load_json(TMP / "outfit_usage.json", {})
 outreach_leads   = load_json(TMP / "leads.json", [])
 outreach_log     = load_json(TMP / "outreach_log.json", [])
+ig_dm_leads      = load_json(TMP / "ig_dm_leads.json", [])
+ig_dm_log        = load_json(TMP / "ig_dm_log.json", [])
 
 neo_posted   = {e["stem"] for e in neo_log}
 shay_posted  = {e["carousel_id"] for e in shay_log}
@@ -826,6 +828,175 @@ with tab_outreach:
             st.dataframe(df_out, use_container_width=True, hide_index=True, height=420)
         else:
             st.markdown('<div class="acct-handle">No leads yet. Click "Source New Leads" to start.</div>', unsafe_allow_html=True)
+
+    # ── IG DM PIPELINE ────────────────────────────────────────────────────────
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown('<div class="section-hdr" style="color:#a050ff;border-color:#a050ff44;">📲  Instagram DM Pipeline — Local Trades</div>', unsafe_allow_html=True)
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Build merged view: leads + log status
+    STAGES = ["prospect", "contacted", "responded", "demo_booked", "closed_won", "closed_lost"]
+    STAGE_COLOR = {
+        "prospect":    "#445566",
+        "contacted":   "#00ffff",
+        "responded":   "#ffc800",
+        "demo_booked": "#a050ff",
+        "closed_won":  "#00ff88",
+        "closed_lost": "#ff4466",
+    }
+
+    dm_log_by_handle = {e["handle"].lower(): e for e in ig_dm_log}
+
+    # Merge: for each lead, pull contact status from log
+    merged = []
+    for lead in ig_dm_leads:
+        handle = lead.get("handle", "").lower()
+        log_entry = dm_log_by_handle.get(handle, {})
+        stage = log_entry.get("stage", "contacted" if log_entry.get("status") == "sent" else "prospect")
+        merged.append({
+            "handle":        handle,
+            "business_name": lead.get("business_name", ""),
+            "vertical":      lead.get("vertical", ""),
+            "followers":     lead.get("followers", 0),
+            "website":       "✓" if lead.get("website") else "—",
+            "dm_status":     log_entry.get("status", "not sent"),
+            "sent_at":       log_entry.get("sent_at", "")[:10] if log_entry.get("sent_at") else "—",
+            "stage":         stage,
+            "notes":         log_entry.get("notes", ""),
+        })
+    # Leads not yet in ig_dm_leads but contacted (edge case)
+    for entry in ig_dm_log:
+        h = entry["handle"].lower()
+        if not any(m["handle"] == h for m in merged):
+            merged.append({
+                "handle": h, "business_name": entry.get("business_name", ""),
+                "vertical": entry.get("vertical", ""), "followers": 0, "website": "—",
+                "dm_status": entry.get("status", ""), "sent_at": entry.get("sent_at", "")[:10],
+                "stage": entry.get("stage", "contacted"), "notes": entry.get("notes", ""),
+            })
+
+    # Stats row
+    dm_total     = len(merged)
+    dm_contacted = sum(1 for m in merged if m["dm_status"] == "sent")
+    dm_responded = sum(1 for m in merged if m["stage"] in ["responded", "demo_booked", "closed_won"])
+    dm_booked    = sum(1 for m in merged if m["stage"] == "demo_booked")
+    dm_won       = sum(1 for m in merged if m["stage"] == "closed_won")
+
+    dc1, dc2, dc3, dc4, dc5 = st.columns(5)
+    def _dmet(col, val, label, sub, color=""):
+        col.markdown(f"""<div class="metric-card {color}">
+            <div class="metric-val {color}">{val}</div>
+            <div class="metric-lbl">{label}</div>
+            <div class="metric-sub">{sub}</div>
+        </div>""", unsafe_allow_html=True)
+
+    _dmet(dc1, dm_total,     "IG Leads",       "sourced via hashtags")
+    _dmet(dc2, dm_contacted, "DMs Sent",        "via @virallensemediavlm", "yellow")
+    _dmet(dc3, dm_responded, "Responded",       f"{int(dm_responded/dm_contacted*100) if dm_contacted else 0}% response rate", "purple")
+    _dmet(dc4, dm_booked,    "Demo Booked",     "ready to close", "green")
+    _dmet(dc5, dm_won,       "Closed Won",      "local biz clients", "green")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    ig1, ig2 = st.columns([1, 1])
+
+    with ig1:
+        st.markdown('<div class="section-hdr">Source & Send</div>', unsafe_allow_html=True)
+        city_input = st.text_input("City", placeholder="dallas", key="ig_city")
+        vert_options = ["roofing", "plumbing", "electrical", "hvac", "contractor", "landscaping", "remodeling"]
+        sel_verts = st.multiselect("Verticals", vert_options, default=["roofing", "contractor"], key="ig_verts")
+        ig_limit = st.slider("Posts to scan per hashtag", 10, 100, 30, key="ig_limit")
+
+        b1, b2 = st.columns(2)
+        with b1:
+            if st.button("🔍 Source IG Leads", key="source_ig"):
+                if not city_input:
+                    st.warning("Enter a city first.")
+                else:
+                    cmd = ["/opt/homebrew/bin/python3.11", "execution/source_ig_leads.py",
+                           "--city", city_input, "--limit", str(ig_limit)]
+                    if sel_verts:
+                        cmd += ["--vertical"] + sel_verts
+                    with st.spinner(f"Searching #{city_input} hashtags..."):
+                        r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, timeout=300)
+                    st.code(r.stdout + r.stderr, language=None)
+                    st.rerun()
+
+        with b2:
+            ig_max = st.number_input("Max DMs", min_value=1, max_value=25, value=10, key="ig_max")
+            if st.button("📲 Send DMs", key="send_ig_dms"):
+                cmd = ["/opt/homebrew/bin/python3.11", "execution/send_ig_dm.py",
+                       "--from-file", str(TMP / "ig_dm_leads.json"),
+                       "--max", str(ig_max)]
+                with st.spinner(f"Sending up to {ig_max} DMs..."):
+                    r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, timeout=600)
+                st.code(r.stdout + r.stderr, language=None)
+                st.rerun()
+
+        # Stage breakdown bars
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown('<div class="section-hdr">Pipeline Stages</div>', unsafe_allow_html=True)
+        for stage in STAGES:
+            count = sum(1 for m in merged if m["stage"] == stage)
+            pct = int(count / dm_total * 100) if dm_total else 0
+            color = STAGE_COLOR.get(stage, "#445566")
+            st.markdown(f"""
+            <div class="stage-bar">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-family:'Share Tech Mono',monospace;color:{color};font-size:0.82rem;">{stage.replace('_', ' ').title()}</span>
+                    <span style="font-family:'Share Tech Mono',monospace;color:{color};font-size:1rem;">{count}</span>
+                </div>
+                <div style="background:#111122;height:2px;border-radius:2px;margin-top:6px;">
+                    <div style="width:{pct}%;height:2px;background:{color};border-radius:2px;opacity:0.6;"></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+    with ig2:
+        st.markdown('<div class="section-hdr">Lead Pipeline Table</div>', unsafe_allow_html=True)
+        if merged:
+            import pandas as pd
+            df_dm = pd.DataFrame(merged)[[
+                "handle", "business_name", "vertical", "followers", "website", "dm_status", "sent_at", "stage"
+            ]].rename(columns={
+                "handle": "Handle", "business_name": "Business", "vertical": "Vertical",
+                "followers": "Followers", "website": "Site", "dm_status": "DM",
+                "sent_at": "Sent", "stage": "Stage",
+            })
+
+            edited = st.data_editor(
+                df_dm,
+                column_config={
+                    "Stage": st.column_config.SelectboxColumn(
+                        "Stage", options=STAGES, required=True
+                    ),
+                    "Handle": st.column_config.TextColumn("Handle", disabled=True),
+                    "Followers": st.column_config.NumberColumn("Followers", format="%d"),
+                },
+                use_container_width=True,
+                hide_index=True,
+                height=500,
+                key="dm_pipeline_editor",
+            )
+
+            if st.button("💾 Save Stage Updates", key="save_stages"):
+                # Persist stage changes back to ig_dm_log
+                updated_log = list(ig_dm_log)
+                log_by_handle = {e["handle"].lower(): e for e in updated_log}
+                for _, row in edited.iterrows():
+                    h = str(row["Handle"]).lower()
+                    if h in log_by_handle:
+                        log_by_handle[h]["stage"] = row["Stage"]
+                    else:
+                        # Lead was sourced but never DM'd yet — create placeholder log entry
+                        updated_log.append({"handle": h, "status": "not_sent", "stage": row["Stage"], "account": "vlm"})
+                        log_by_handle[h] = updated_log[-1]
+                with open(TMP / "ig_dm_log.json", "w") as f:
+                    json.dump(updated_log, f, indent=2)
+                st.success("Stages saved.")
+                st.rerun()
+        else:
+            st.markdown('<div class="acct-handle">No IG leads yet. Source some with the tool on the left.</div>', unsafe_allow_html=True)
 
 
 # ═══════════════════════════════════════════════════════
