@@ -80,15 +80,13 @@ def get_client(account="neo"):
     cl = Client()
     session_file = get_session_file(account)
 
-    # 1. Try existing session file
+    # 1. Try existing session file — trust it, no re-auth API call
     if session_file.exists():
         try:
             cl.load_settings(str(session_file))
-            # Use cl.sessionid which checks both cookie_dict and authorization_data
-            sid = cl.sessionid
-            if not sid:
+            if not cl.sessionid:
                 raise ValueError("No sessionid in saved session")
-            cl.login_by_sessionid(sid)
+            print(f"[session] Loaded cached session for {account}")
             return cl
         except Exception:
             session_file.unlink(missing_ok=True)
