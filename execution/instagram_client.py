@@ -84,14 +84,17 @@ def get_client(account="neo"):
     if session_file.exists():
         try:
             cl.load_settings(str(session_file))
-            cl.login_by_sessionid(cl.settings.get("authorization_data", {}).get("sessionid", ""))
-            cl.get_timeline_feed()
+            # Use cl.sessionid which checks both cookie_dict and authorization_data
+            sid = cl.sessionid
+            if not sid:
+                raise ValueError("No sessionid in saved session")
+            cl.login_by_sessionid(sid)
             return cl
         except Exception:
             session_file.unlink(missing_ok=True)
             cl = Client()
 
-    # 2. Try sessionid from .env (IG_SESSIONID_NEO / IG_SESSIONID_SHAY / IG_SESSIONID_TY)
+    # 2. Try sessionid from .env (IG_SESSIONID_NEO / IG_SESSIONID_SHAY / IG_SESSIONID_TY / IG_SESSIONID_VLM)
     from urllib.parse import unquote
     env_key = f"IG_SESSIONID_{account.upper()}"
     _raw = os.environ.get(env_key)
@@ -99,22 +102,15 @@ def get_client(account="neo"):
     if sessionid:
         try:
             source = ".env" if os.environ.get(env_key) else "1Password"
-            print(f"[{source}] Injecting sessionid for {account}...")
-            user_id = sessionid.split(":")[0]
-            username = os.environ.get(
-                f"IG_USERNAME_{account.upper()}" if account != "neo" else "IG_USERNAME", account
-            )
-            # Inject cookie directly — skip instagrapi's deprecated validation endpoints
-            cl.set_settings(cl.get_settings())
-            cl.private.cookies.set("sessionid", sessionid, domain=".instagram.com")
-            cl.private.cookies.set("ds_user_id", user_id, domain=".instagram.com")
-            cl.username = username
+            print(f"[{source}] Logging in with sessionid for {account}...")
+            # Extractors are already patched above — login_by_sessionid is safe to call
+            cl.login_by_sessionid(sessionid)
             session_file.parent.mkdir(parents=True, exist_ok=True)
             cl.dump_settings(str(session_file))
-            print(f"[{source}] Session injected and saved for {account}")
+            print(f"[{source}] Authenticated and session saved for {account}")
             return cl
         except Exception as e:
-            print(f"[{source}] sessionid inject failed for {account}: {e}")
+            print(f"[{source}] sessionid login failed for {account}: {e}")
             cl = Client()
 
     # 3. Fall back to username/password login
@@ -131,6 +127,12 @@ def get_client(account="neo"):
         )
 
     def challenge_code_handler(username, choice):
+        # When running from the dashboard, we can't prompt for input
+        if os.environ.get("VLM_NONINTERACTIVE"):
+            raise RuntimeError(
+                f"Instagram challenge required for @{username} but running non-interactively. "
+                "Update IG_SESSIONID in .env with a fresh session cookie."
+            )
         print(f"\nInstagram verification required for @{username}.")
         print("Check your email/SMS — a 6-digit code was sent.")
         return input("Enter the code: ").strip()
