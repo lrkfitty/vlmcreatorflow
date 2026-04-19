@@ -30,10 +30,12 @@ ACTIVITY_LOG = TMP / "activity_log.json"
 NEO_IG       = BASE / "output/users/Neo/Instagram"
 SHAY_IG      = BASE / "output/users/Shay/Instagram"
 TYRIE_IG     = BASE / "output/users/Tyrie/Instagram"
+VLM_IG       = BASE / "output/users/VLM/Instagram"
 
 NEO_POST_LOG   = TMP / "neo_post_log.json"
 SHAY_POST_LOG  = TMP / "shay_post_log.json"
 TYRIE_POST_LOG = TMP / "tyrie_post_log.json"
+VLM_POST_LOG   = TMP / "vlm_post_log.json"
 
 APPROVED_FILE   = TMP / "approved_posts.json"
 TYRIE_APPROVED  = TMP / "tyrie_approved.json"
@@ -147,20 +149,20 @@ def post_neo():
 
     post = queue[0]
     try:
-        from execution.instagram_client import post_photo
-        media = post_photo(post["image"], post["caption"], account="neo")
+        from execution.post_via_browser import post_to_instagram
+        url = post_to_instagram([post["image"]], post["caption"], account="neo", headless=True)
 
         log = load_json(NEO_POST_LOG, [])
         log.append({
             "stem":      post["stem"],
-            "url":       f"https://www.instagram.com/p/{media.code}/",
+            "url":       url or "",
             "posted_at": datetime.now().isoformat(),
         })
         save_json(NEO_POST_LOG, log)
 
         track_outfit("neo", post["stem"], "")
-        log_activity("NEO_POST", f"Posted {post['stem']} — instagram.com/p/{media.code}/", "success")
-        return media
+        log_activity("NEO_POST", f"Posted {post['stem']} — {url}", "success")
+        return url
 
     except Exception as e:
         log_activity("NEO_POST", f"Failed: {e}", "failed")
@@ -204,24 +206,21 @@ def post_shay():
 
     post = queue[0]
     try:
-        from execution.instagram_client import post_carousel, post_photo
-        if len(post["images"]) > 1:
-            media = post_carousel(post["images"], post["caption"], account="shay")
-        else:
-            media = post_photo(post["images"][0], post["caption"], account="shay")
+        from execution.post_via_browser import post_to_instagram
+        url = post_to_instagram(post["images"], post["caption"], account="shay", headless=True)
 
         log = load_json(SHAY_POST_LOG, [])
         log.append({
             "carousel_id": post["carousel_id"],
             "outfit":      post["outfit"],
-            "url":         f"https://www.instagram.com/p/{media.code}/",
+            "url":         url or "",
             "posted_at":   datetime.now().isoformat(),
         })
         save_json(SHAY_POST_LOG, log)
 
         track_outfit("shay", post["carousel_id"], post["outfit"])
-        log_activity("SHAY_POST", f"Posted {post['carousel_id']} (outfit: {post['outfit']}) — instagram.com/p/{media.code}/", "success")
-        return media
+        log_activity("SHAY_POST", f"Posted {post['carousel_id']} (outfit: {post['outfit']}) — {url}", "success")
+        return url
 
     except Exception as e:
         log_activity("SHAY_POST", f"Failed: {e}", "failed")
@@ -273,26 +272,82 @@ def post_ty():
         return None
 
     try:
-        from execution.instagram_client import post_carousel, post_photo
-        if len(images) > 1:
-            media = post_carousel(images, post["caption"], account="ty")
-        else:
-            media = post_photo(images[0], post["caption"], account="ty")
+        from execution.post_via_browser import post_to_instagram
+        url = post_to_instagram(images, post["caption"], account="ty", headless=True)
 
         log = load_json(TYRIE_POST_LOG, [])
         log.append({
             "stem":      post["stem"],
-            "url":       f"https://www.instagram.com/p/{media.code}/",
+            "url":       url or "",
             "posted_at": datetime.now().isoformat(),
         })
         save_json(TYRIE_POST_LOG, log)
 
         track_outfit("ty", post["stem"], "")
-        log_activity("TY_POST", f"Posted {post['stem']} — instagram.com/p/{media.code}/", "success")
-        return media
+        log_activity("TY_POST", f"Posted {post['stem']} — {url}", "success")
+        return url
 
     except Exception as e:
         log_activity("TY_POST", f"Failed: {e}", "failed")
+        return None
+
+
+# ── VLM ───────────────────────────────────────────────────────────────────────
+
+def get_vlm_queue():
+    approved  = load_json(APPROVED_FILE, {}).get("vlm", {})
+    post_log  = load_json(VLM_POST_LOG, [])
+    posted    = {e["carousel_id"] for e in post_log}
+
+    queue = []
+    if not VLM_IG.exists():
+        return queue
+        
+    for carousel_path in sorted(VLM_IG.glob("*_carousel.json")):
+        try:
+            data = json.loads(carousel_path.read_text())
+        except Exception:
+            continue
+        cid = data.get("id", carousel_path.stem.replace("_carousel", ""))
+        if cid not in approved or cid in posted:
+            continue
+        images = [p for p in data.get("images", []) if Path(p).exists()]
+        if not images:
+            continue
+        queue.append({
+            "carousel_id": cid,
+            "images":      images,
+            "caption":     data.get("caption", ""),
+        })
+
+    return queue
+
+
+def post_vlm():
+    queue = get_vlm_queue()
+    if not queue:
+        log_activity("VLM_POST", "No approved content remaining — approve more VLM posts in dashboard", "pending")
+        return None
+
+    post = queue[0]
+    try:
+        from execution.post_via_browser import post_to_instagram
+        url = post_to_instagram(post["images"], post["caption"], account="vlm", headless=True)
+
+        log = load_json(VLM_POST_LOG, [])
+        log.append({
+            "carousel_id": post["carousel_id"],
+            "url":         url or "",
+            "posted_at":   datetime.now().isoformat(),
+        })
+        save_json(VLM_POST_LOG, log)
+
+        track_outfit("vlm", post["carousel_id"], "VLM/B2B")
+        log_activity("VLM_POST", f"Posted {post['carousel_id']} — {url}", "success")
+        return url
+
+    except Exception as e:
+        log_activity("VLM_POST", f"Failed: {e}", "failed")
         return None
 
 
@@ -302,13 +357,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="VLM Auto-Poster")
     parser.add_argument(
         "--account",
-        choices=["neo", "shay", "ty", "all"],
+        choices=["neo", "shay", "ty", "vlm", "all"],
         default="all",
         help="Which account to post for",
     )
     args = parser.parse_args()
 
-    accounts = ["neo", "shay", "ty"] if args.account == "all" else [args.account]
+    accounts = ["neo", "shay", "ty", "vlm"] if args.account == "all" else [args.account]
 
     print(f"\n=== VLM AUTO-POSTER — {datetime.now().strftime('%Y-%m-%d %H:%M')} ===")
     for account in accounts:
@@ -319,5 +374,7 @@ if __name__ == "__main__":
             post_shay()
         elif account == "ty":
             post_ty()
+        elif account == "vlm":
+            post_vlm()
 
     print("\n=== DONE ===")
