@@ -98,18 +98,29 @@ def get_client(account="neo"):
     _raw = os.environ.get(env_key)
     sessionid = unquote(_raw) if _raw else _fetch_sessionid_from_1password(account)
     if sessionid:
-        try:
-            source = ".env" if os.environ.get(env_key) else "1Password"
-            print(f"[{source}] Logging in with sessionid for {account}...")
-            # Extractors are already patched above — login_by_sessionid is safe to call
-            cl.login_by_sessionid(sessionid)
-            session_file.parent.mkdir(parents=True, exist_ok=True)
-            cl.dump_settings(str(session_file))
-            print(f"[{source}] Authenticated and session saved for {account}")
-            return cl
-        except Exception as e:
-            print(f"[{source}] sessionid login failed for {account}: {e}")
-            cl = Client()
+        source = ".env" if os.environ.get(env_key) else "1Password"
+        print(f"[{source}] Injecting sessionid for {account}...")
+        user_id = sessionid.split(":")[0]
+        username_key = f"IG_USERNAME_{account.upper()}" if account != "neo" else "IG_USERNAME"
+        username_val = os.environ.get(username_key, account)
+
+        # Build a minimal settings dict — avoids any Instagram API call on init
+        settings = cl.get_settings()
+        settings["cookies"] = {"sessionid": sessionid, "ds_user_id": user_id}
+        settings["authorization_data"] = {
+            "ds_user_id": user_id,
+            "sessionid": sessionid,
+            "should_use_header_over_cookies": True,
+        }
+        settings["username"] = username_val
+        cl.set_settings(settings)
+        cl.username = username_val
+        cl.cookie_dict["ds_user_id"] = user_id
+
+        session_file.parent.mkdir(parents=True, exist_ok=True)
+        cl.dump_settings(str(session_file))
+        print(f"[{source}] Session injected and saved for {account} (no API call)")
+        return cl
 
     # 3. Fall back to username/password login
     username_key = f"IG_USERNAME_{account.upper()}" if account != "neo" else "IG_USERNAME"
