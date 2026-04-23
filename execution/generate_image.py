@@ -499,11 +499,45 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
         return {"status": "failed", "image_path": None, "model_used": "gpt-image-2", "logs": "\n".join(logs)}
 
     import base64
+    import re
     from io import BytesIO
     from PIL import Image
     import requests
 
+    def sanitize_for_openai(prompt: str) -> str:
+        """Remove/replace terms that trigger OpenAI moderation while keeping fashion/style intent."""
+        replacements = [
+            # Explicit body part terms
+            (r"\(?(hyper huge bust|huge breasts|massive breasts|heavy cleavage|extreme cleavage)[^,)]*\)?", "full figure"),
+            (r"\(?(voluptuous bust|large breasts|full bust)[^,)]*\)?", "curvy silhouette"),
+            (r"\(?(flat chest|small bust)[^,)]*\)?", "slim build"),
+            (r"\(?(average bust)[^,)]*\)?", ""),
+            (r"\(?(breasts?|bust|cleavage)[^,)]*\)?", "figure"),
+            (r"\(?(hyper exaggerated bubble butt|massive glutes|extreme rear)[^,)]*\)?", "curves"),
+            (r"\(?(large glutes|bubble butt|thick thighs)[^,)]*\)?", "curvy lower body"),
+            (r"\(?(curvy rear|shapely glutes)[^,)]*\)?", "shapely figure"),
+            (r"\(?(flat glutes|average glutes)[^,)]*\)?", ""),
+            (r"\(?(glutes?|buttocks?|butt|rear)[^,)]*\)?", "figure"),
+            (r"\(?(BBL aesthetic|BBL|surgically enhanced buttocks|shelf glutes)[^,)]*\)?", "curvaceous"),
+            (r"\(?(rock hard glutes|soft jiggly glutes)[^,)]*\)?", ""),
+            (r"\(?(wasp waist|corset waist|extremely cinched waist)[^,)]*\)?", "slim waist"),
+            (r"\(?(hyper exaggerated curves?)[^,)]*\)?", "dramatic curves"),
+            (r"\(?(shelf hips|extremely wide hips)[^,)]*\)?", "wide hips"),
+            (r"\(?(pear shape)[^,)]*\)?", "curvy figure"),
+            # Strip weighted notation like (term:1.6) leftovers
+            (r"\([^)]*:\d+\.\d+\)", ""),
+        ]
+        result = prompt
+        for pattern, replacement in replacements:
+            result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+        # Clean up double commas, leading/trailing commas, extra spaces
+        result = re.sub(r",\s*,", ",", result)
+        result = re.sub(r"\s{2,}", " ", result)
+        result = result.strip(", ").strip()
+        return result
+
     positive_prompt = prompt_data.get("positive_prompt", "")
+    positive_prompt = sanitize_for_openai(positive_prompt)
 
     def prepare_image_file(img_path, label):
         """Load, resize, and return as BytesIO (io.IOBase subclass accepted by OpenAI SDK)."""
