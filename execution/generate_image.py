@@ -600,8 +600,7 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
             prompt=full_prompt,
             size=size,
             quality="high",
-            n=1,
-            response_format="b64_json"
+            n=1
         )
 
         for f in ref_files:
