@@ -54,6 +54,15 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             
         st.divider()
         
+        st.markdown("**AI Engine**")
+        selected_engine = st.selectbox(
+            "Select Model", 
+            ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
+            help="Both models now fully support face, outfit, and location image references!"
+        )
+        engine_val = "openai" if "OpenAI" in selected_engine else "gemini"
+        
+        st.divider()
         
         with st.form("character_creator_form"):
             # 1. Reference Images (Multi-Upload)
@@ -586,7 +595,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                              "model_type": "nano",
                              "assets": assets
                         },
-                        settings={"batch_count": 1},
+                        settings={"batch_count": 1, "engine": engine_val},
                         output_folder=get_user_out_dir_func("Characters/Concepts"),
                         char_path=st.session_state.get("lock_identity_path")
                      )
@@ -645,7 +654,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                                             "model_type": "nano",
                                             "assets": current_assets
                                         }
-                                        res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
+                                        res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"), engine=engine_val)
                                         if res["status"] == "success":
                                             st.session_state['char_batch_results'].append({
                                                 "angle": angle,
@@ -693,7 +702,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                                      "assets": assets
                                  }
                                  
-                                 res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
+                                 res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"), engine=engine_val)
                                  
                                  if res["status"] == "success":
                                      st.session_state['char_preview'] = res['image_path']
@@ -733,7 +742,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                         user = st.session_state.current_user.get("username") if 'current_user' in st.session_state and st.session_state.current_user else "guest"
                         if auth_mgr.deduct_credits(user, 1):
                             with st.spinner(f"🔄 Re-generating {first['angle']}..."):
-                                res = generate_image_from_prompt(stored_payload, get_user_out_dir_func("Characters/Concepts"))
+                                res = generate_image_from_prompt(stored_payload, get_user_out_dir_func("Characters/Concepts"), engine=engine_val)
                                 if res["status"] == "success":
                                     # Overwrite path in session state
                                     st.session_state['char_batch_results'][0]['path'] = res['image_path']
@@ -773,7 +782,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                                      user = st.session_state.current_user.get("username") if 'current_user' in st.session_state and st.session_state.current_user else "guest"
                                      if auth_mgr.deduct_credits(user, 1):
                                          with st.spinner(f"🔄 Re-generating {item['angle']}..."):
-                                             res = generate_image_from_prompt(stored_payload, get_user_out_dir_func("Characters/Concepts"))
+                                             res = generate_image_from_prompt(stored_payload, get_user_out_dir_func("Characters/Concepts"), engine=engine_val)
                                              if res["status"] == "success":
                                                  # Overwrite path in session state
                                                  st.session_state['char_batch_results'][actual_idx]['path'] = res['image_path']
