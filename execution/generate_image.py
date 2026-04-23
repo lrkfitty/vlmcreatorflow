@@ -617,10 +617,8 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
             input=final_input,
             tools=[{
                 "type": "image_generation",
-                "parameters": {
-                    "size": size,
-                    "quality": "high"
-                }
+                "size": size,
+                "quality": "high"
             }]
         )
         
