@@ -523,6 +523,11 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
             result = re.sub(re.escape(word), placeholder, result, flags=re.IGNORECASE)
 
         replacements = [
+            # Sexually suggestive tone/mood words
+            (r"\b(sexy|sexily|sexual|sexualized|seductive|seductively|seduction|sultry|provocative|provocatively|erotic|erotically|suggestive|suggestively|lustful|lusty|sensual(?:ly)?|titillating|alluring(?:ly)?)\b", "confident"),
+            (r"\b(nsfw|explicit|lewd|obscene|adult content|mature content)\b", ""),
+            (r"\b(nude|naked|topless|undressed|undressing|bare skin|bare body|exposed skin|bare(?:ly dressed)?)\b", ""),
+            (r"\b(revealing outfit|revealing dress|revealing clothing|skimpy outfit|skimpy dress|barely there)\b", "stylish outfit"),
             # Explicit body part terms
             (r"\(?(hyper huge bust|huge breasts|massive breasts|heavy cleavage|extreme cleavage)[^,)]*\)?", "full figure"),
             (r"\(?(voluptuous bust|large breasts|full bust)[^,)]*\)?", "curvy silhouette"),
@@ -558,6 +563,7 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
 
     positive_prompt = prompt_data.get("positive_prompt", "")
     positive_prompt = sanitize_for_openai(positive_prompt)
+    logs.append(f"Sanitized prompt (first 300 chars): {positive_prompt[:300]}")
 
     def prepare_image_file(img_path, label):
         """Load, resize, and return as BytesIO (io.IOBase subclass accepted by OpenAI SDK)."""
