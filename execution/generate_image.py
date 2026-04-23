@@ -502,12 +502,11 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
     from io import BytesIO
     from PIL import Image
     import requests
-    import tempfile
 
     positive_prompt = prompt_data.get("positive_prompt", "")
 
     def prepare_image_file(img_path, label):
-        """Load, resize, and write to a named temp PNG file. Returns open file handle."""
+        """Load, resize, and return as BytesIO (io.IOBase subclass accepted by OpenAI SDK)."""
         try:
             if img_path.startswith(('http://', 'https://')):
                 resp = requests.get(img_path, timeout=30)
@@ -518,11 +517,10 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
             if img.mode not in ('RGB', 'RGBA'):
                 img = img.convert('RGBA')
             img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
-            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
-            img.save(tmp, format="PNG")
-            tmp.flush()
-            tmp.seek(0)
-            return tmp
+            buf = BytesIO()
+            img.save(buf, format="PNG")
+            buf.seek(0)
+            return buf
         except Exception as e:
             logs.append(f"⚠️ Could not load {label}: {e}")
             return None
