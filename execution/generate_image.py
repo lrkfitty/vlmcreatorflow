@@ -591,27 +591,18 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
         if f:
             ref_files.append(f)
 
-    logs.append(f"Payload built with {len(ref_files)} image references. Sending to OpenAI...")
+    logs.append(f"Payload built with {len(ref_files)} reference image(s) embedded in prompt. Sending to OpenAI...")
 
     try:
-        if ref_files:
-            response = client.images.edit(
-                model="gpt-image-2",
-                image=ref_files,
-                prompt=full_prompt,
-                size=size,
-                n=1,
-                response_format="b64_json"
-            )
-        else:
-            response = client.images.generate(
-                model="gpt-image-2",
-                prompt=full_prompt,
-                size=size,
-                quality="high",
-                n=1,
-                response_format="b64_json"
-            )
+        # gpt-image-2 uses images.generate() — images.edit() only supports dall-e-2
+        response = client.images.generate(
+            model="gpt-image-2",
+            prompt=full_prompt,
+            size=size,
+            quality="high",
+            n=1,
+            response_format="b64_json"
+        )
 
         for f in ref_files:
             try:

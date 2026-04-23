@@ -1,6 +1,6 @@
 streamlit==1.50.0
 extra-streamlit-components
-openai
+openai>=1.75.0
 google-generativeai
 boto3
 requests
@@ -9,3 +9,5 @@ Pillow
 watchdog
 PyJWT
 replicate
+bcrypt
+stripe
