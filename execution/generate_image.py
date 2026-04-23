@@ -660,10 +660,10 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
                 "model": "gpt-image-2",
                 "prompt": full_prompt,
                 "size": size,
-                "quality": "high",
+                "quality": "medium",
                 "n": 1
             },
-            timeout=120
+            timeout=httpx.Timeout(connect=15.0, read=300.0, write=30.0, pool=15.0)
         )
         if resp.status_code != 200:
             raise Exception(f"OpenAI API error {resp.status_code}: {resp.text}")
