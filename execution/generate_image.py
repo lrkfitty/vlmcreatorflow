@@ -506,6 +506,22 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
 
     def sanitize_for_openai(prompt: str) -> str:
         """Remove/replace terms that trigger OpenAI moderation while keeping fashion/style intent."""
+        # Protect clothing items from being caught by body-part patterns below
+        clothing_placeholders = [
+            ("sports bra", "__SPORTS_BRA__"),
+            ("bra top", "__BRA_TOP__"),
+            ("crop top", "__CROP_TOP__"),
+            ("tube top", "__TUBE_TOP__"),
+            ("tank top", "__TANK_TOP__"),
+            ("leggings", "__LEGGINGS__"),
+            ("shorts", "__SHORTS__"),
+            ("skirt", "__SKIRT__"),
+            ("bodysuit", "__BODYSUIT__"),
+        ]
+        result = prompt
+        for word, placeholder in clothing_placeholders:
+            result = re.sub(re.escape(word), placeholder, result, flags=re.IGNORECASE)
+
         replacements = [
             # Explicit body part terms
             (r"\(?(hyper huge bust|huge breasts|massive breasts|heavy cleavage|extreme cleavage)[^,)]*\)?", "full figure"),
@@ -527,9 +543,13 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
             # Strip weighted notation like (term:1.6) leftovers
             (r"\([^)]*:\d+\.\d+\)", ""),
         ]
-        result = prompt
         for pattern, replacement in replacements:
             result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+
+        # Restore protected clothing items
+        for word, placeholder in clothing_placeholders:
+            result = result.replace(placeholder, word)
+
         # Clean up double commas, leading/trailing commas, extra spaces
         result = re.sub(r",\s*,", ",", result)
         result = re.sub(r"\s{2,}", " ", result)

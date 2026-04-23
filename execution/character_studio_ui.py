@@ -29,15 +29,35 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
         user = st.session_state.current_user.get("username") if st.session_state.get("current_user") else "guest"
 
         st.markdown("#### Design Specs")
-        
+
+        st.markdown("**AI Engine**")
+        selected_engine = st.selectbox(
+            "Select Model",
+            ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
+            help="Both models now fully support face, outfit, and location image references!"
+        )
+        engine_val = "openai" if "OpenAI" in selected_engine else "gemini"
+
+        st.divider()
+
+        # Individual Shots (Batch) requires cascade reference images — not supported by gpt-image-2
+        if engine_val == "openai":
+            available_modes = [
+                "Concept Portrait (Vertical)",
+                "Character Sheet (5 Angles - Vertical)",
+            ]
+            st.info("💡 Individual Shots (Batch) is unavailable with OpenAI — gpt-image-2 can't accept reference images for cascade consistency. Use Character Sheet instead.", icon="ℹ️")
+        else:
+            available_modes = [
+                "Concept Portrait (Vertical)",
+                "Character Sheet (5 Angles - Vertical)",
+                "Individual Shots (Batch)"
+            ]
+
         # 2. Output Mode (Outside Form for Instant Reactivity)
         st.markdown("**Output Format**")
-        output_mode = st.selectbox("Generation Mode", [
-            "Concept Portrait (Vertical)", 
-            "Character Sheet (5 Angles - Vertical)",
-            "Individual Shots (Batch)"
-        ])
-        
+        output_mode = st.selectbox("Generation Mode", available_modes)
+
         selected_angles = []
         if output_mode == "Individual Shots (Batch)":
             angle_opts = [
@@ -51,17 +71,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 angle_opts,
                 default=["Front View", "Side View (Left)", "3/4 View (Left)", "Back View"]
             )
-            
-        st.divider()
-        
-        st.markdown("**AI Engine**")
-        selected_engine = st.selectbox(
-            "Select Model", 
-            ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
-            help="Both models now fully support face, outfit, and location image references!"
-        )
-        engine_val = "openai" if "OpenAI" in selected_engine else "gemini"
-        
+
         st.divider()
         
         with st.form("character_creator_form"):
