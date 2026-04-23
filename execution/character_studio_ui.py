@@ -872,7 +872,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                             "model_type": "nano",
                             "assets": assets
                         }
-                    res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
+                    res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"), engine=engine_val)
                     if res["status"] == "success":
                         st.session_state['char_preview'] = res['image_path']
                         st.session_state['char_final_prompt'] = full_prompt
