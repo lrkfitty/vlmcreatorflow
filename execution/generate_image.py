@@ -594,14 +594,25 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
     logs.append(f"Payload built with {len(ref_files)} reference image(s) embedded in prompt. Sending to OpenAI...")
 
     try:
-        # gpt-image-2 uses images.generate() — images.edit() only supports dall-e-2
-        response = client.images.generate(
-            model="gpt-image-2",
-            prompt=full_prompt,
-            size=size,
-            quality="high",
-            n=1
+        # Use raw HTTP to avoid the SDK injecting unsupported params (e.g. response_format)
+        import httpx
+        resp = httpx.post(
+            "https://api.openai.com/v1/images/generations",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "gpt-image-2",
+                "prompt": full_prompt,
+                "size": size,
+                "quality": "high",
+                "n": 1
+            },
+            timeout=120
         )
+        resp.raise_for_status()
+        resp_data = resp.json()
 
         for f in ref_files:
             try:
@@ -609,9 +620,17 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
             except Exception:
                 pass
 
-        image_base64 = response.data[0].b64_json
+        item = resp_data.get("data", [{}])[0]
+        image_base64 = item.get("b64_json")
         if not image_base64:
-            raise Exception("No image data returned from API.")
+            # Some responses return a URL instead — download it
+            url = item.get("url")
+            if url:
+                img_resp = requests.get(url, timeout=60)
+                img_resp.raise_for_status()
+                image_base64 = base64.b64encode(img_resp.content).decode("utf-8")
+        if not image_base64:
+            raise Exception(f"No image data in response: {resp_data}")
 
         timestamp = int(time.time())
         filename = f"gen_dalle_{timestamp}_{str(os.urandom(4).hex())}.jpg"
