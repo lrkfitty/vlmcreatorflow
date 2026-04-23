@@ -477,11 +477,11 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
 
 def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, outfit_path=None, vibe_path=None):
     """
-    Generates using OpenAI gpt-image-2 via the Responses API (Multimodal).
+    Generates using OpenAI gpt-image-1 via the Responses API (Multimodal).
     """
     load_dotenv(override=True)
     api_key = os.getenv("OPENAI_API_KEY")
-    logs = ["--- Attempting Generation with OpenAI gpt-image-2 (Responses API) ---"]
+    logs = ["--- Attempting Generation with OpenAI gpt-image-1 (Responses API) ---"]
     
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
@@ -491,7 +491,7 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
         return {
             "status": "failed",
             "image_path": None,
-            "model_used": "gpt-image-2",
+            "model_used": "gpt-image-1",
             "logs": "\n".join(logs)
         }
 
@@ -503,7 +503,7 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
         return {
             "status": "failed",
             "image_path": None,
-            "model_used": "gpt-image-2",
+            "model_used": "gpt-image-1",
             "logs": "\n".join(logs)
         }
 
@@ -613,7 +613,7 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
 
     try:
         response = client.responses.create(
-            model="gpt-image-2",
+            model="gpt-image-1",
             input=final_input,
             tools=[{
                 "type": "image_generation",
@@ -691,7 +691,7 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
             "status": "success",
             "image_path": filepath,
             "s3_url": s3_url,
-            "model_used": "gpt-image-2",
+            "model_used": "gpt-image-1",
             "logs": "\n".join(logs)
         }
 
@@ -700,6 +700,6 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
         return {
             "status": "failed",
             "image_path": None,
-            "model_used": "gpt-image-2",
+            "model_used": "gpt-image-1",
             "logs": "\n".join(logs)
         }
