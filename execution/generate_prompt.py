@@ -222,8 +222,15 @@ def generate_prompt_content(vibe, outfit, character,
             load_dotenv(override=True)
             google_key = os.getenv("GOOGLE_API_KEY")
             if not google_key: return {"positive_prompt": "Error: GOOGLE_API_KEY missing", "aspect_ratio": "9:16"}
-            
+
             genai.configure(api_key=google_key)
+            # Fallback chain: if primary model is quota-limited, try the next one
+            model_fallback_chain = [model_engine]
+            if model_engine == "gemini-2.0-flash":
+                model_fallback_chain += ["gemini-1.5-flash", "gemini-1.5-flash-8b"]
+            elif model_engine == "gemini-1.5-flash":
+                model_fallback_chain += ["gemini-1.5-flash-8b"]
+
             model = genai.GenerativeModel(model_engine)
             
             # Prepare Content List
@@ -316,23 +323,35 @@ def generate_prompt_content(vibe, outfit, character,
                         gemini_content.append(f"ADDITIONAL REFERENCE ({lbl} - DESCRIBE EXACTLY AS SHOWN):")
                         gemini_content.append(img_obj)
                 
-            # Exponential backoff for Gemini 429 / Resource exhausted
-            max_retries = 5
-            backoff_delays = [5, 15, 30, 60, 120]
+            # Exponential backoff + model fallback for Gemini 429 / Resource exhausted
+            backoff_delays = [5, 15, 30]
+            response = None
 
-            for attempt in range(max_retries):
-                try:
-                    response = model.generate_content(gemini_content)
+            for model_name in model_fallback_chain:
+                active_model = genai.GenerativeModel(model_name)
+                succeeded = False
+                for attempt, wait in enumerate(backoff_delays + [None]):
+                    try:
+                        response = active_model.generate_content(gemini_content)
+                        succeeded = True
+                        if model_name != model_engine:
+                            print(f"✅ Fell back to {model_name} after quota limit on {model_engine}")
+                        break
+                    except Exception as e:
+                        is_rate_limit = "429" in str(e) or "Resource exhausted" in str(e) or "quota" in str(e).lower()
+                        if is_rate_limit and wait is not None:
+                            print(f"Gemini 429 on {model_name} (attempt {attempt+1}), waiting {wait}s...")
+                            time.sleep(wait)
+                        else:
+                            if is_rate_limit:
+                                print(f"Quota exhausted on {model_name}, trying next model...")
+                            else:
+                                raise e
+                            break
+                if succeeded:
                     break
-                except Exception as e:
-                    is_rate_limit = "429" in str(e) or "Resource exhausted" in str(e) or "quota" in str(e).lower()
-                    if is_rate_limit and attempt < max_retries - 1:
-                        wait = backoff_delays[attempt]
-                        print(f"Gemini 429 rate limit (attempt {attempt+1}/{max_retries}), waiting {wait}s...")
-                        time.sleep(wait)
-                        continue
-                    else:
-                        raise e
+            if response is None:
+                raise Exception("All Gemini models quota-limited. Try again later.")
             
             # Parse JSON
             raw_text = response.text
