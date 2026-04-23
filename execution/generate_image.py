@@ -477,47 +477,37 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
 
 def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, outfit_path=None, vibe_path=None):
     """
-    Generates using OpenAI gpt-image-1 via the Responses API (Multimodal).
+    Generates using OpenAI gpt-image-2 via the Images API.
+    Uses images.edit() when reference images are provided, images.generate() otherwise.
     """
     load_dotenv(override=True)
     api_key = os.getenv("OPENAI_API_KEY")
-    logs = ["--- Attempting Generation with OpenAI gpt-image-1 (Responses API) ---"]
-    
+    logs = ["--- Attempting Generation with OpenAI gpt-image-2 (Images API) ---"]
+
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
 
     if not api_key:
         logs.append("❌ Missing OPENAI_API_KEY in .env")
-        return {
-            "status": "failed",
-            "image_path": None,
-            "model_used": "gpt-image-1",
-            "logs": "\n".join(logs)
-        }
+        return {"status": "failed", "image_path": None, "model_used": "gpt-image-2", "logs": "\n".join(logs)}
 
     try:
         from openai import OpenAI
         client = OpenAI(api_key=api_key)
     except ImportError:
-        logs.append("❌ OpenAI package not installed. Run 'pip install openai'")
-        return {
-            "status": "failed",
-            "image_path": None,
-            "model_used": "gpt-image-1",
-            "logs": "\n".join(logs)
-        }
+        logs.append("❌ OpenAI package not installed. Run: pip install openai")
+        return {"status": "failed", "image_path": None, "model_used": "gpt-image-2", "logs": "\n".join(logs)}
 
-    positive_prompt = prompt_data.get("positive_prompt", "")
-    
-    # 1. Build input payload for Responses API
-    input_payload = []
-    
     import base64
     from io import BytesIO
     from PIL import Image
     import requests
-    
-    def encode_image_asset(img_path, label):
+    import tempfile
+
+    positive_prompt = prompt_data.get("positive_prompt", "")
+
+    def prepare_image_file(img_path, label):
+        """Load, resize, and write to a named temp PNG file. Returns open file handle."""
         try:
             if img_path.startswith(('http://', 'https://')):
                 resp = requests.get(img_path, timeout=30)
@@ -525,40 +515,37 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
                 img = Image.open(BytesIO(resp.content))
             else:
                 img = Image.open(img_path)
-                
-            if img.mode in ('RGBA', 'P'): img = img.convert('RGB')
-            # Resize slightly to save tokens
+            if img.mode not in ('RGB', 'RGBA'):
+                img = img.convert('RGBA')
             img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
-            buffer = BytesIO()
-            img.save(buffer, format="JPEG", quality=85)
-            b64_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
-            return f"data:image/jpeg;base64,{b64_str}"
+            tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".png")
+            img.save(tmp, format="PNG")
+            tmp.flush()
+            tmp.seek(0)
+            return tmp
         except Exception as e:
-            logs.append(f"⚠️ Failed to encode {label}: {e}")
+            logs.append(f"⚠️ Could not load {label}: {e}")
             return None
 
-    # Collect assets and text context
+    # Collect reference assets
     text_context = []
-    
-    # Check for legacy paths
     all_cast_members = []
     all_outfits = []
     location_ref = None
-    
+
     if "assets" in prompt_data:
         for a in prompt_data["assets"]:
             label = a.get("label", "")
             p = a.get("path")
             if p:
-                if "Main Character" in label or "Reference Character" in label or "Cast:" in label or "Main Subject" in label or "IdentityLock" in label:
+                if any(k in label for k in ("Main Character", "Reference Character", "Cast:", "Main Subject", "IdentityLock")):
                     all_cast_members.append({"path": p, "label": label})
                 elif "Outfit" in label:
                     all_outfits.append({"path": p, "label": label})
-                elif "Vibe" in label or "Location" in label or "Style" in label:
+                elif any(k in label for k in ("Vibe", "Location", "Style")):
                     location_ref = p
-                    
             if a.get("celebrity_desc"):
-                text_context.append(f"Subject '{label}' Description: {a.get('celebrity_desc')}")
+                text_context.append(f"Subject '{label}': {a.get('celebrity_desc')}")
             elif not p and "Outfit for" in label:
                 text_context.append(f"Outfit Context: {label}")
 
@@ -569,95 +556,98 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
     if vibe_path and not location_ref:
         location_ref = vibe_path
 
-    # Inject visual references
-    for cast in all_cast_members:
-        b64_img = encode_image_asset(cast['path'], cast['label'])
-        if b64_img:
-            input_payload.append({"type": "input_text", "text": f"[VISUAL ID: {cast['label']} (FACE & IDENTITY SOURCE - MATCH EXACTLY)]"})
-            input_payload.append({"type": "input_image", "image_url": b64_img})
-            
-    for outfit in all_outfits:
-        b64_img = encode_image_asset(outfit['path'], outfit['label'])
-        if b64_img:
-            input_payload.append({"type": "input_text", "text": f"⚠️ CRITICAL: THE CHARACTER MUST WEAR THIS EXACT OUTFIT:"})
-            input_payload.append({"type": "input_image", "image_url": b64_img})
-            
+    # Build enhanced prompt describing each reference image's role
+    full_prompt = positive_prompt
+    if all_cast_members:
+        labels = ", ".join(c["label"] for c in all_cast_members)
+        full_prompt = f"[Reference images provided for: {labels} — reproduce the face and identity exactly]\n\n{full_prompt}"
+    if all_outfits:
+        labels = ", ".join(o["label"] for o in all_outfits)
+        full_prompt += f"\n\n⚠️ OUTFIT REFERENCE PROVIDED ({labels}) — character MUST wear this exact outfit."
     if location_ref:
-        b64_img = encode_image_asset(location_ref, "Scene Location")
-        if b64_img:
-            input_payload.append({"type": "input_text", "text": "Scene Location/Vibe reference:"})
-            input_payload.append({"type": "input_image", "image_url": b64_img})
-
+        full_prompt += "\n\n[Environment/vibe reference provided — match the location and atmosphere closely.]"
     if text_context:
-        positive_prompt += "\n\nAdditional Visual Constraints:\n" + "\n".join(text_context)
+        full_prompt += "\n\nAdditional Visual Constraints:\n" + "\n".join(text_context)
 
-    # Finally, append the main text prompt
-    input_payload.append({"type": "input_text", "text": positive_prompt})
+    # Size mapping
+    aspect_ratio = prompt_data.get("aspect_ratio", "")
+    if "16:9" in aspect_ratio or "landscape" in aspect_ratio.lower():
+        size = "1536x1024"
+    elif any(r in aspect_ratio for r in ("9:16", "4:5")) or "portrait" in aspect_ratio.lower():
+        size = "1024x1536"
+    else:
+        size = "1024x1024"
 
-    # Wrap the payload in a message item
-    final_input = [{
-        "type": "message",
-        "role": "user",
-        "content": input_payload
-    }]
+    # Open reference image files
+    ref_files = []
+    for cast in all_cast_members:
+        f = prepare_image_file(cast['path'], cast['label'])
+        if f:
+            ref_files.append(f)
+    for outfit in all_outfits:
+        f = prepare_image_file(outfit['path'], outfit['label'])
+        if f:
+            ref_files.append(f)
+    if location_ref:
+        f = prepare_image_file(location_ref, "Scene Location")
+        if f:
+            ref_files.append(f)
 
-    logs.append(f"Payload built with {len(input_payload)} parts. Sending to OpenAI...")
-
-    aspect_ratio = prompt_data.get("aspect_ratio")
-    size = "1024x1024"
-    if aspect_ratio:
-        if "16:9" in aspect_ratio or "landscape" in aspect_ratio.lower():
-            size = "1792x1024"
-        elif "9:16" in aspect_ratio or "portrait" in aspect_ratio.lower():
-            size = "1024x1792"
+    logs.append(f"Payload built with {len(ref_files)} image references. Sending to OpenAI...")
 
     try:
-        response = client.responses.create(
-            model="gpt-image-1",
-            input=final_input,
-            tools=[{
-                "type": "image_generation",
-                "size": size,
-                "quality": "high"
-            }]
-        )
-        
-        # Extract base64 image from responses
-        image_base64 = None
-        for output in getattr(response, 'output', []):
-            if getattr(output, 'type', None) == "image_generation_call":
-                image_base64 = getattr(output, 'result', None)
-                break
-                
+        if ref_files:
+            response = client.images.edit(
+                model="gpt-image-2",
+                image=ref_files,
+                prompt=full_prompt,
+                size=size,
+                n=1,
+                response_format="b64_json"
+            )
+        else:
+            response = client.images.generate(
+                model="gpt-image-2",
+                prompt=full_prompt,
+                size=size,
+                quality="high",
+                n=1,
+                response_format="b64_json"
+            )
+
+        for f in ref_files:
+            try:
+                f.close()
+            except Exception:
+                pass
+
+        image_base64 = response.data[0].b64_json
         if not image_base64:
-             logs.append("⚠️ API responded but no image was generated. Raw response: " + str(response))
-             raise Exception("No image generated by the API.")
-        
+            raise Exception("No image data returned from API.")
+
         timestamp = int(time.time())
         filename = f"gen_dalle_{timestamp}_{str(os.urandom(4).hex())}.jpg"
         filepath = os.path.join(output_folder, filename)
-        
-        # Decode base64
-        import base64
+
         image_bytes = base64.b64decode(image_base64)
         img = Image.open(BytesIO(image_bytes))
-        if img.mode in ('RGBA', 'P'): img = img.convert('RGB')
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
         img.save(filepath, format="JPEG", quality=90)
-        
+
         logs.append(f"✅ Generation Successful. Saved: {filename}")
-        
-        # Create thumbnail
+
+        # Thumbnail
         thumb_filepath = None
         thumb_filename = None
         try:
             thumb_filename = filename.rsplit('.', 1)[0] + "_thumb.jpg"
             thumb_filepath = os.path.join(output_folder, thumb_filename)
-            img_for_thumb = img.copy()
-            img_for_thumb.thumbnail((512, 512), Image.Resampling.LANCZOS)
-            img_for_thumb.save(thumb_filepath, format="JPEG", quality=80)
-            logs.append(f"✅ Created thumbnail: {thumb_filename}")
+            img_thumb = img.copy()
+            img_thumb.thumbnail((512, 512), Image.Resampling.LANCZOS)
+            img_thumb.save(thumb_filepath, format="JPEG", quality=80)
         except Exception as e:
-            logs.append(f"⚠️ Failed to create thumbnail: {e}")
+            logs.append(f"⚠️ Thumbnail failed: {e}")
             thumb_filepath = None
             thumb_filename = None
 
@@ -669,37 +659,37 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
                 if "users" in output_folder:
                     relative_path = output_folder.replace("output/", "").replace("output\\", "")
                     s3_key = f"{relative_path}/{filename}"
-                    if thumb_filename:
-                        thumb_s3_key = f"{relative_path}/{thumb_filename}"
+                    thumb_s3_key = f"{relative_path}/{thumb_filename}" if thumb_filename else None
                 else:
                     s3_key = f"generated/{filename}"
-                    if thumb_filename:
-                        thumb_s3_key = f"generated/{thumb_filename}"
-                        
+                    thumb_s3_key = f"generated/{thumb_filename}" if thumb_filename else None
                 with open(filepath, "rb") as f_up:
                     s3_url = upload_file_obj(f_up, object_name=s3_key)
-                    
-                if thumb_filepath:
+                if thumb_filepath and thumb_s3_key:
                     with open(thumb_filepath, "rb") as f_up_thumb:
                         upload_file_obj(f_up_thumb, object_name=thumb_s3_key)
-                        
-                logs.append(f"☁️ Uploaded to S3: {s3_key} (and thumbnail)")
+                logs.append(f"☁️ Uploaded to S3: {s3_key}")
             except Exception as e:
                 logs.append(f"⚠️ S3 Upload Warning: {e}")
-                
+
         return {
             "status": "success",
             "image_path": filepath,
             "s3_url": s3_url,
-            "model_used": "gpt-image-1",
+            "model_used": "gpt-image-2",
             "logs": "\n".join(logs)
         }
 
     except Exception as e:
+        for f in ref_files:
+            try:
+                f.close()
+            except Exception:
+                pass
         logs.append(f"❌ Error during OpenAI generation: {e}")
         return {
             "status": "failed",
             "image_path": None,
-            "model_used": "gpt-image-1",
+            "model_used": "gpt-image-2",
             "logs": "\n".join(logs)
         }
