@@ -1052,6 +1052,17 @@ if selection == "Workflow Wizard":
 
         st.divider()
 
+        st.markdown("**AI Engine**")
+        wiz_engine_selected = st.selectbox(
+            "Select Model",
+            ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
+            help="Both models now fully support face, outfit, and location image references!",
+            key="wiz_engine_select"
+        )
+        wiz_engine_val = "openai" if "OpenAI" in wiz_engine_selected else "gemini"
+
+        st.divider()
+
         # V3.9: Wrapped in Form to Prevent Reload Loop
         with st.form(key="wizard_form"):
             # Expandable Camera Controls
@@ -1177,7 +1188,7 @@ if selection == "Workflow Wizard":
                     name=job_name,
                     description=f"Engine: {render_engine}",
                     prompt_data=prompt_data,
-                    settings={ "batch_count": campaign_batch },
+                    settings={"batch_count": campaign_batch, "engine": wiz_engine_val},
                     output_folder=get_user_out_dir("Campaign"),
                     char_path=char_path,
                     outfit_path=outfit_path,
@@ -1299,7 +1310,7 @@ if selection == "Workflow Wizard":
                     name=f"Wiz_{s_char}_{int(time.time())}",
                     description=f"Wizard: {s_char} in {s_outfit}",
                     prompt_data=final_prompt_data,
-                    settings={"batch_count": num_images},
+                    settings={"batch_count": num_images, "engine": wiz_engine_val},
                     output_folder=get_user_out_dir("Wizard"),
                     char_path=char_path,
                     outfit_path=outfit_path,
@@ -1342,7 +1353,7 @@ if selection == "Workflow Wizard":
                     
                     with ThreadPoolExecutor() as executor:
                         # CRITICAL: Pass the image paths so Generation Logic can see them
-                        futures = [executor.submit(generate_image_from_prompt, final_prompt_data, wiz_out_dir, char_path, outfit_path, vibe_path) for i in range(num_images)]
+                        futures = [executor.submit(generate_image_from_prompt, final_prompt_data, wiz_out_dir, char_path, outfit_path, vibe_path, wiz_engine_val) for i in range(num_images)]
                         for future in futures:
                             results.append(future.result())
                     
@@ -1891,6 +1902,13 @@ if selection == "World Builder":
                     sel_angle = st.selectbox("Camera Angle", ["Auto"] + knowledge_base.get("camera_angles", []), key="wb_angle")
                     sel_ar = st.selectbox("Aspect Ratio", ["Auto", "4:5", "16:9", "9:16", "1:1", "3:2"], index=0, key="wb_ar")
                     sel_res = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, key="wb_res", help="Higher = sharper but slower")
+                    wb_engine_selected = st.selectbox(
+                        "AI Engine",
+                        ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
+                        help="Both models now fully support face, outfit, and location image references!",
+                        key="wb_engine_select"
+                    )
+                    wb_engine_val = "openai" if "OpenAI" in wb_engine_selected else "gemini"
                     sel_lighting = st.selectbox("Lighting", ["Auto"] + knowledge_base.get("lighting", []), key="wb_lighting")
     
                 with col_mood:
@@ -2272,7 +2290,7 @@ Write an immersive, detailed prompt now:"""
                         "model_type": "nano",
                         "assets": assets_to_inject
                     },
-                    settings={"batch_count": 1},
+                    settings={"batch_count": 1, "engine": wb_engine_val},
                     output_folder=get_user_out_dir("World"),
                     char_path=main_char_path
                  )
@@ -2304,10 +2322,10 @@ Write an immersive, detailed prompt now:"""
                          "model_type": "nano", 
                          "assets": assets_to_inject
                      }
-                     res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"))
-                     
+                     res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"), engine=wb_engine_val)
+
                      prog_ph.empty() # Clear Progress
-                     
+
                      with st.expander("Generation Logs", expanded=False):
                          st.code(res.get("logs", "No logs"))
                          
@@ -2442,7 +2460,7 @@ Write an immersive, detailed prompt now:"""
                                          "model_type": "nano", 
                                          "assets": assets_to_inject
                                      }
-                                 res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"))
+                                 res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"), engine=wb_engine_val)
                                  if res["status"] == "success":
                                      st.toast(f"Shot {i+1} Generated! (-1 Credit)")
                                      st.session_state[f"sb_img_{i}"] = res["image_path"] # Saved!
@@ -2483,7 +2501,7 @@ Write an immersive, detailed prompt now:"""
                                          "model_type": "nano", 
                                          "assets": assets_to_inject
                                      }
-                                    res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"))
+                                    res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"), engine=wb_engine_val)
                                     with st.expander(f"Logs Shot {i+1}", expanded=False):
                                          st.code(res.get("logs", "No logs"))
                                          
@@ -2573,9 +2591,9 @@ Write an immersive, detailed prompt now:"""
                      "assets": assets_to_inject # New Field
                  }
                  
-                 res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"))
+                 res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"), engine=wb_engine_val)
                  prog_ph.empty()
-                 
+
                  if res["status"] == "success":
                      st.image(res["image_path"], caption="World Build Result")
                  else:
@@ -3041,6 +3059,15 @@ if selection == "Art Director":
                 key="ad_notes"
             )
 
+            st.markdown("**AI Engine**")
+            ad_engine_selected = st.selectbox(
+                "Select Model",
+                ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
+                help="Both models now fully support face, outfit, and location image references!",
+                key="ad_engine_select"
+            )
+            ad_engine_val = "openai" if "OpenAI" in ad_engine_selected else "gemini"
+
             st.divider()
             ad_gen_btn = st.button("🎬 Generate Image", type="primary", key="ad_gen_btn", use_container_width=True)
 
@@ -3092,7 +3119,8 @@ if selection == "Art Director":
                         result = generate_image_from_prompt(
                             prompt_data,
                             output_folder=out_dir_ad,
-                            reference_image_path=pchar_path
+                            reference_image_path=pchar_path,
+                            engine=ad_engine_val
                         )
 
                         if result.get("status") == "success":
