@@ -608,20 +608,19 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
     if vibe_path and not location_ref:
         location_ref = vibe_path
 
-    # Build enhanced prompt describing each reference image's role
+    # Build enhanced prompt with clear role labels for each reference
     full_prompt = positive_prompt
     if all_cast_members:
-        labels = ", ".join(c["label"] for c in all_cast_members)
-        full_prompt = f"[Reference images provided for: {labels} — reproduce the face and identity exactly]\n\n{full_prompt}"
+        full_prompt = "USE THE PROVIDED REFERENCE IMAGE(S) TO REPRODUCE THIS PERSON'S FACE AND IDENTITY EXACTLY.\n\n" + full_prompt
     if all_outfits:
         labels = ", ".join(o["label"] for o in all_outfits)
-        full_prompt += f"\n\n⚠️ OUTFIT REFERENCE PROVIDED ({labels}) — character MUST wear this exact outfit."
+        full_prompt += f"\n\nOUTFIT REFERENCE PROVIDED ({labels}): character MUST wear this exact outfit — match every detail."
     if location_ref:
-        full_prompt += "\n\n[Environment/vibe reference provided — match the location and atmosphere closely.]"
+        full_prompt += "\n\nLOCATION/ENVIRONMENT REFERENCE PROVIDED: match the setting and atmosphere closely."
     if text_context:
         full_prompt += "\n\nAdditional Visual Constraints:\n" + "\n".join(text_context)
 
-    # Size mapping
+    # Size mapping (used for text-only generations; edits infer size from input)
     aspect_ratio = prompt_data.get("aspect_ratio", "")
     if "16:9" in aspect_ratio or "landscape" in aspect_ratio.lower():
         size = "1536x1024"
@@ -630,46 +629,54 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
     else:
         size = "1024x1024"
 
-    # Open reference image files
+    # Build ordered list of reference image BytesIO objects
     ref_files = []
     for cast in all_cast_members:
         f = prepare_image_file(cast['path'], cast['label'])
         if f:
-            ref_files.append(f)
+            ref_files.append((cast['label'], f))
     for outfit in all_outfits:
         f = prepare_image_file(outfit['path'], outfit['label'])
         if f:
-            ref_files.append(f)
+            ref_files.append((outfit['label'], f))
     if location_ref:
         f = prepare_image_file(location_ref, "Scene Location")
         if f:
-            ref_files.append(f)
+            ref_files.append(("Scene Location", f))
 
-    logs.append(f"Payload built with {len(ref_files)} reference image(s) embedded in prompt. Sending to OpenAI...")
+    logs.append(f"Routing to {'images/edits' if ref_files else 'images/generations'} with {len(ref_files)} reference image(s)...")
 
     try:
-        # Use raw HTTP to avoid the SDK injecting unsupported params (e.g. response_format)
         import httpx
-        resp = httpx.post(
-            "https://api.openai.com/v1/images/generations",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "gpt-image-2",
-                "prompt": full_prompt,
-                "size": size,
-                "quality": "medium",
-                "n": 1
-            },
-            timeout=httpx.Timeout(connect=15.0, read=300.0, write=30.0, pool=15.0)
-        )
+        timeout = httpx.Timeout(connect=15.0, read=300.0, write=60.0, pool=15.0)
+
+        if ref_files:
+            # images/edits supports gpt-image-2 with up to 16 reference images via multipart
+            multipart_files = [
+                ("image[]", (f"{label}.png", buf, "image/png"))
+                for label, buf in ref_files
+            ]
+            resp = httpx.post(
+                "https://api.openai.com/v1/images/edits",
+                headers={"Authorization": f"Bearer {api_key}"},
+                files=multipart_files,
+                data={"model": "gpt-image-2", "prompt": full_prompt, "quality": "medium", "n": "1"},
+                timeout=timeout
+            )
+        else:
+            # No reference images — text-only generations endpoint
+            resp = httpx.post(
+                "https://api.openai.com/v1/images/generations",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={"model": "gpt-image-2", "prompt": full_prompt, "size": size, "quality": "medium", "n": 1},
+                timeout=timeout
+            )
+
         if resp.status_code != 200:
             raise Exception(f"OpenAI API error {resp.status_code}: {resp.text}")
         resp_data = resp.json()
 
-        for f in ref_files:
+        for _, f in ref_files:
             try:
                 f.close()
             except Exception:
@@ -678,7 +685,6 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
         item = resp_data.get("data", [{}])[0]
         image_base64 = item.get("b64_json")
         if not image_base64:
-            # Some responses return a URL instead — download it
             url = item.get("url")
             if url:
                 img_resp = requests.get(url, timeout=60)
