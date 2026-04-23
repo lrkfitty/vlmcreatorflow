@@ -562,7 +562,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 base_prompt = build_character_prompt(attrs)
                 
                 if output_mode == "Character Sheet (5 Angles - Vertical)":
-                    full_prompt = get_character_sheet_prompt(base_prompt)
+                    full_prompt = get_character_sheet_prompt(base_prompt, engine=engine_val)
                     ar = "4:5" # User requested 4:5 for all Studio generations
                     target_w, target_h = 896, 1152
                 else:
@@ -859,7 +859,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             if attrs and lock_path:
                 # Re-import not needed as we imported at top
                     base_prompt = build_character_prompt(attrs)
-                    full_prompt = get_character_sheet_prompt(base_prompt)
+                    full_prompt = get_character_sheet_prompt(base_prompt, engine=engine_val)
                     target_w, target_h = 896, 1152  # 4:5 vertical
                     
                     user = st.session_state.current_user.get("username")
