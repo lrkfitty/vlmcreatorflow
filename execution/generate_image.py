@@ -611,7 +611,8 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
             },
             timeout=120
         )
-        resp.raise_for_status()
+        if resp.status_code != 200:
+            raise Exception(f"OpenAI API error {resp.status_code}: {resp.text}")
         resp_data = resp.json()
 
         for f in ref_files:
