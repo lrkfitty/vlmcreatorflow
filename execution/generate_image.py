@@ -573,26 +573,26 @@ def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, 
     for cast in all_cast_members:
         b64_img = encode_image_asset(cast['path'], cast['label'])
         if b64_img:
-            input_payload.append({"type": "text", "text": f"[VISUAL ID: {cast['label']} (FACE & IDENTITY SOURCE - MATCH EXACTLY)]"})
-            input_payload.append({"type": "image_url", "image_url": {"url": b64_img}})
+            input_payload.append({"type": "input_text", "text": f"[VISUAL ID: {cast['label']} (FACE & IDENTITY SOURCE - MATCH EXACTLY)]"})
+            input_payload.append({"type": "input_image", "image_url": b64_img})
             
     for outfit in all_outfits:
         b64_img = encode_image_asset(outfit['path'], outfit['label'])
         if b64_img:
-            input_payload.append({"type": "text", "text": f"⚠️ CRITICAL: THE CHARACTER MUST WEAR THIS EXACT OUTFIT:"})
-            input_payload.append({"type": "image_url", "image_url": {"url": b64_img}})
+            input_payload.append({"type": "input_text", "text": f"⚠️ CRITICAL: THE CHARACTER MUST WEAR THIS EXACT OUTFIT:"})
+            input_payload.append({"type": "input_image", "image_url": b64_img})
             
     if location_ref:
         b64_img = encode_image_asset(location_ref, "Scene Location")
         if b64_img:
-            input_payload.append({"type": "text", "text": "Scene Location/Vibe reference:"})
-            input_payload.append({"type": "image_url", "image_url": {"url": b64_img}})
+            input_payload.append({"type": "input_text", "text": "Scene Location/Vibe reference:"})
+            input_payload.append({"type": "input_image", "image_url": b64_img})
 
     if text_context:
         positive_prompt += "\n\nAdditional Visual Constraints:\n" + "\n".join(text_context)
 
     # Finally, append the main text prompt
-    input_payload.append({"type": "text", "text": positive_prompt})
+    input_payload.append({"type": "input_text", "text": positive_prompt})
 
     # Wrap the payload in a message item
     final_input = [{
