@@ -9,12 +9,15 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-def generate_image_from_prompt(prompt_data, output_folder="output", reference_image_path=None, outfit_path=None, vibe_path=None):
+def generate_image_from_prompt(prompt_data, output_folder="output", reference_image_path=None, outfit_path=None, vibe_path=None, engine="gemini"):
     """
     Main Entry Point. Dispatches to the correct model engine.
     Returns: dict {"status": "success"|"failed", "image_path": str|None, "logs": str}
     """
     
+    if engine.lower() in ["dalle", "openai"]:
+        return generate_image_dalle(prompt_data, output_folder, reference_image_path, outfit_path, vibe_path)
+
     # 1. Dispatch (Strictly Cloud)
     # Default to Nano Banana 2
     return generate_image_nano(prompt_data, output_folder, reference_image_path, outfit_path, vibe_path)
@@ -472,6 +475,233 @@ def generate_image_nano(prompt_data, output_folder, reference_image_path, outfit
             "logs": "\n".join(logs)
         }
 
-# DALL-E Fallback (Unused but preserved if needed later)
-def generate_image_dalle(prompt_data, output_folder):
-    pass
+def generate_image_dalle(prompt_data, output_folder, reference_image_path=None, outfit_path=None, vibe_path=None):
+    """
+    Generates using OpenAI gpt-image-2 via the Responses API (Multimodal).
+    """
+    load_dotenv(override=True)
+    api_key = os.getenv("OPENAI_API_KEY")
+    logs = ["--- Attempting Generation with OpenAI gpt-image-2 (Responses API) ---"]
+    
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)
+
+    if not api_key:
+        logs.append("❌ Missing OPENAI_API_KEY in .env")
+        return {
+            "status": "failed",
+            "image_path": None,
+            "model_used": "gpt-image-2",
+            "logs": "\n".join(logs)
+        }
+
+    try:
+        from openai import OpenAI
+        client = OpenAI(api_key=api_key)
+    except ImportError:
+        logs.append("❌ OpenAI package not installed. Run 'pip install openai'")
+        return {
+            "status": "failed",
+            "image_path": None,
+            "model_used": "gpt-image-2",
+            "logs": "\n".join(logs)
+        }
+
+    positive_prompt = prompt_data.get("positive_prompt", "")
+    
+    # 1. Build input payload for Responses API
+    input_payload = []
+    
+    import base64
+    from io import BytesIO
+    from PIL import Image
+    import requests
+    
+    def encode_image_asset(img_path, label):
+        try:
+            if img_path.startswith(('http://', 'https://')):
+                resp = requests.get(img_path, timeout=30)
+                resp.raise_for_status()
+                img = Image.open(BytesIO(resp.content))
+            else:
+                img = Image.open(img_path)
+                
+            if img.mode in ('RGBA', 'P'): img = img.convert('RGB')
+            # Resize slightly to save tokens
+            img.thumbnail((1024, 1024), Image.Resampling.LANCZOS)
+            buffer = BytesIO()
+            img.save(buffer, format="JPEG", quality=85)
+            b64_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            return f"data:image/jpeg;base64,{b64_str}"
+        except Exception as e:
+            logs.append(f"⚠️ Failed to encode {label}: {e}")
+            return None
+
+    # Collect assets and text context
+    text_context = []
+    
+    # Check for legacy paths
+    all_cast_members = []
+    all_outfits = []
+    location_ref = None
+    
+    if "assets" in prompt_data:
+        for a in prompt_data["assets"]:
+            label = a.get("label", "")
+            p = a.get("path")
+            if p:
+                if "Main Character" in label or "Reference Character" in label or "Cast:" in label or "Main Subject" in label or "IdentityLock" in label:
+                    all_cast_members.append({"path": p, "label": label})
+                elif "Outfit" in label:
+                    all_outfits.append({"path": p, "label": label})
+                elif "Vibe" in label or "Location" in label or "Style" in label:
+                    location_ref = p
+                    
+            if a.get("celebrity_desc"):
+                text_context.append(f"Subject '{label}' Description: {a.get('celebrity_desc')}")
+            elif not p and "Outfit for" in label:
+                text_context.append(f"Outfit Context: {label}")
+
+    if reference_image_path and not all_cast_members:
+        all_cast_members.append({"path": reference_image_path, "label": "Main Character"})
+    if outfit_path and not all_outfits:
+        all_outfits.append({"path": outfit_path, "label": "Outfit: Primary"})
+    if vibe_path and not location_ref:
+        location_ref = vibe_path
+
+    # Inject visual references
+    for cast in all_cast_members:
+        b64_img = encode_image_asset(cast['path'], cast['label'])
+        if b64_img:
+            input_payload.append({"type": "text", "text": f"[VISUAL ID: {cast['label']} (FACE & IDENTITY SOURCE - MATCH EXACTLY)]"})
+            input_payload.append({"type": "image_url", "image_url": {"url": b64_img}})
+            
+    for outfit in all_outfits:
+        b64_img = encode_image_asset(outfit['path'], outfit['label'])
+        if b64_img:
+            input_payload.append({"type": "text", "text": f"⚠️ CRITICAL: THE CHARACTER MUST WEAR THIS EXACT OUTFIT:"})
+            input_payload.append({"type": "image_url", "image_url": {"url": b64_img}})
+            
+    if location_ref:
+        b64_img = encode_image_asset(location_ref, "Scene Location")
+        if b64_img:
+            input_payload.append({"type": "text", "text": "Scene Location/Vibe reference:"})
+            input_payload.append({"type": "image_url", "image_url": {"url": b64_img}})
+
+    if text_context:
+        positive_prompt += "\n\nAdditional Visual Constraints:\n" + "\n".join(text_context)
+
+    # Finally, append the main text prompt
+    input_payload.append({"type": "text", "text": positive_prompt})
+
+    # Wrap the payload in a message item
+    final_input = [{
+        "type": "message",
+        "role": "user",
+        "content": input_payload
+    }]
+
+    logs.append(f"Payload built with {len(input_payload)} parts. Sending to OpenAI...")
+
+    aspect_ratio = prompt_data.get("aspect_ratio")
+    size = "1024x1024"
+    if aspect_ratio:
+        if "16:9" in aspect_ratio or "landscape" in aspect_ratio.lower():
+            size = "1792x1024"
+        elif "9:16" in aspect_ratio or "portrait" in aspect_ratio.lower():
+            size = "1024x1792"
+
+    try:
+        response = client.responses.create(
+            model="gpt-image-2",
+            input=final_input,
+            tools=[{
+                "type": "image_generation",
+                "parameters": {
+                    "size": size,
+                    "quality": "high"
+                }
+            }]
+        )
+        
+        # Extract base64 image from responses
+        image_base64 = None
+        for output in getattr(response, 'output', []):
+            if getattr(output, 'type', None) == "image_generation_call":
+                image_base64 = getattr(output, 'result', None)
+                break
+                
+        if not image_base64:
+             logs.append("⚠️ API responded but no image was generated. Raw response: " + str(response))
+             raise Exception("No image generated by the API.")
+        
+        timestamp = int(time.time())
+        filename = f"gen_dalle_{timestamp}_{str(os.urandom(4).hex())}.jpg"
+        filepath = os.path.join(output_folder, filename)
+        
+        # Decode base64
+        import base64
+        image_bytes = base64.b64decode(image_base64)
+        img = Image.open(BytesIO(image_bytes))
+        if img.mode in ('RGBA', 'P'): img = img.convert('RGB')
+        img.save(filepath, format="JPEG", quality=90)
+        
+        logs.append(f"✅ Generation Successful. Saved: {filename}")
+        
+        # Create thumbnail
+        thumb_filepath = None
+        thumb_filename = None
+        try:
+            thumb_filename = filename.rsplit('.', 1)[0] + "_thumb.jpg"
+            thumb_filepath = os.path.join(output_folder, thumb_filename)
+            img_for_thumb = img.copy()
+            img_for_thumb.thumbnail((512, 512), Image.Resampling.LANCZOS)
+            img_for_thumb.save(thumb_filepath, format="JPEG", quality=80)
+            logs.append(f"✅ Created thumbnail: {thumb_filename}")
+        except Exception as e:
+            logs.append(f"⚠️ Failed to create thumbnail: {e}")
+            thumb_filepath = None
+            thumb_filename = None
+
+        # S3 Upload
+        s3_url = None
+        if os.getenv("S3_BUCKET_NAME"):
+            try:
+                from execution.s3_uploader import upload_file_obj
+                if "users" in output_folder:
+                    relative_path = output_folder.replace("output/", "").replace("output\\", "")
+                    s3_key = f"{relative_path}/{filename}"
+                    if thumb_filename:
+                        thumb_s3_key = f"{relative_path}/{thumb_filename}"
+                else:
+                    s3_key = f"generated/{filename}"
+                    if thumb_filename:
+                        thumb_s3_key = f"generated/{thumb_filename}"
+                        
+                with open(filepath, "rb") as f_up:
+                    s3_url = upload_file_obj(f_up, object_name=s3_key)
+                    
+                if thumb_filepath:
+                    with open(thumb_filepath, "rb") as f_up_thumb:
+                        upload_file_obj(f_up_thumb, object_name=thumb_s3_key)
+                        
+                logs.append(f"☁️ Uploaded to S3: {s3_key} (and thumbnail)")
+            except Exception as e:
+                logs.append(f"⚠️ S3 Upload Warning: {e}")
+                
+        return {
+            "status": "success",
+            "image_path": filepath,
+            "s3_url": s3_url,
+            "model_used": "gpt-image-2",
+            "logs": "\n".join(logs)
+        }
+
+    except Exception as e:
+        logs.append(f"❌ Error during OpenAI generation: {e}")
+        return {
+            "status": "failed",
+            "image_path": None,
+            "model_used": "gpt-image-2",
+            "logs": "\n".join(logs)
+        }
