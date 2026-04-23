@@ -316,17 +316,20 @@ def generate_prompt_content(vibe, outfit, character,
                         gemini_content.append(f"ADDITIONAL REFERENCE ({lbl} - DESCRIBE EXACTLY AS SHOWN):")
                         gemini_content.append(img_obj)
                 
-            # RETRY LOGIC FOR 429 (RATE LIMIT)
-            max_retries = 3
-            retry_delay = 2
-            
+            # Exponential backoff for Gemini 429 / Resource exhausted
+            max_retries = 5
+            backoff_delays = [5, 15, 30, 60, 120]
+
             for attempt in range(max_retries):
                 try:
                     response = model.generate_content(gemini_content)
-                    break 
+                    break
                 except Exception as e:
-                    if "429" in str(e) and attempt < max_retries - 1:
-                        time.sleep(retry_delay * (attempt + 1))
+                    is_rate_limit = "429" in str(e) or "Resource exhausted" in str(e) or "quota" in str(e).lower()
+                    if is_rate_limit and attempt < max_retries - 1:
+                        wait = backoff_delays[attempt]
+                        print(f"Gemini 429 rate limit (attempt {attempt+1}/{max_retries}), waiting {wait}s...")
+                        time.sleep(wait)
                         continue
                     else:
                         raise e
