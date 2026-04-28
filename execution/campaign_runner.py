@@ -234,6 +234,10 @@ class CampaignManager:
                         if not any(a.get("path") == ei.get("path") for a in p_data["assets"]):
                             p_data["assets"].append(ei)
 
+                # Resolve engine from job settings (defaults to gemini)
+                job_engine = settings.get("engine", "gemini")
+                print(f"   🎨 Engine: {job_engine}")
+
                 for r in range(repeats):
                     print(f"   ... Batch {r+1}/{repeats}")
 
@@ -246,7 +250,8 @@ class CampaignManager:
                             output_folder=paths["output_folder"],
                             reference_image_path=paths["char_path"],
                             outfit_path=paths["outfit_path"],
-                            vibe_path=paths["vibe_path"]
+                            vibe_path=paths["vibe_path"],
+                            engine=job_engine
                         )
                         qc_attempt += 1
 

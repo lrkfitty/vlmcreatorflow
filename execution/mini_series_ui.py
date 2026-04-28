@@ -123,6 +123,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                     # Add Job
                     job_name = f"Ep{ep_title}_S{s_id}_Sh{sh_id}"
                     
+                    series_engine_val = "openai" if "OpenAI" in st.session_state.get('series_engine_select', 'Gemini') else "gemini"
                     campaign_mgr.add_job(
                         name=job_name,
                         description=f"Scene {s_id} Shot {sh_id}",
@@ -136,7 +137,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                             "image_size": st.session_state.get('series_res', '1K'),
                             "assets": assets_payload
                         },
-                        settings={"batch_count": 1},
+                        settings={"batch_count": 1, "engine": series_engine_val},
                         output_folder=full_out_dir,
                         # Pass paths technically redundant if in 'assets' payload but good for reference
                         char_path=None, 
@@ -326,6 +327,13 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                      s_aspect_ratio = st.selectbox("Aspect Ratio", ["16:9", "9:16", "4:5", "1:1"], index=0, key="series_ar")
                 with c_res_col:
                      s_resolution = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, key="series_res", help="Higher = sharper but slower + more expensive")
+                
+                series_engine_selected = st.selectbox(
+                    "AI Engine",
+                    ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
+                    help="Both models now fully support face, outfit, and location image references!",
+                    key="series_engine_select"
+                )
             
             s_transition_style = st.selectbox("Transition Pacing", ["Standard", "Fast / TikTok", "Slow / Cinematic", "Match Cut"])
             
@@ -626,6 +634,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                                                 "label": "Prior Shot (SCENE CONTINUITY - MATCH ENVIRONMENT & LIGHTING)"
                                             })
                                         
+                                        series_engine_val = "openai" if "OpenAI" in st.session_state.get('series_engine_select', 'Gemini') else "gemini"
                                         p_data = {
                                              "positive_prompt": final_shot_prompt,
                                              "model_type": "nano", 
@@ -634,7 +643,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                                              "image_size": st.session_state.get('series_res', '1K')
                                         }
                                         
-                                        res = generate_image_from_prompt(p_data, get_user_out_dir_func("Series"))
+                                        res = generate_image_from_prompt(p_data, get_user_out_dir_func("Series"), engine=series_engine_val)
                                         if res["status"] == "success":
                                             st.session_state[f"img_{key_base}"] = res["image_path"]
                                             st.success("Shot Captured!")

@@ -589,6 +589,18 @@ def render_multishot_ui(get_user_out_dir_func):
 
     st.divider()
 
+    # --- AI Engine Selector ---
+    st.markdown("**🎨 AI Engine**")
+    ms_engine_selected = st.selectbox(
+        "Select Model",
+        ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
+        help="Both models now fully support face, outfit, and location image references!",
+        key="ms_engine_select"
+    )
+    ms_engine_val = "openai" if "OpenAI" in ms_engine_selected else "gemini"
+
+    st.divider()
+
     # --- Generate Button (minimal form) ---
     with st.form("multishot_form"):
         col_q, col_gen = st.columns([1, 2])
@@ -704,7 +716,7 @@ def render_multishot_ui(get_user_out_dir_func):
                             "assets": assets
                         }
                         
-                        res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
+                        res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
                         
                         if res["status"] == "success":
                             st.session_state['multishot_result'] = res['image_path']
@@ -732,7 +744,7 @@ def render_multishot_ui(get_user_out_dir_func):
                             "assets": assets
                         }
                         
-                        res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
+                        res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
                         
                         if res["status"] == "success":
                             st.session_state['multishot_result'] = res['image_path']
@@ -767,7 +779,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                     "assets": assets
                                 }
                                 
-                                res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
+                                res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
                                 
                                 if res["status"] == "success":
                                     st.session_state['multishot_batch_results'].append({
@@ -802,7 +814,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                 "assets": assets
                             }
                             
-                            res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
+                            res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
                             
                             if res["status"] == "success":
                                 st.session_state['multishot_result'] = res['image_path']
@@ -871,7 +883,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                 "assets": assets
                             }
                             
-                            res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
+                            res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
                             
                             if res["status"] == "success":
                                 st.session_state['endframe_result'] = {
@@ -1042,7 +1054,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                     "assets": shot_assets
                                 }
                                 
-                                res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
+                                res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
                                 
                                 if res["status"] == "success":
                                     last_generated_path = res['image_path']  # Chain for next shot
@@ -1168,7 +1180,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                                 rerun_payload = dict(stored_payload)
                                                 rerun_payload["assets"] = rerun_assets
                                                 
-                                                res = generate_image_from_prompt(rerun_payload, get_user_out_dir_func("MultiShot"))
+                                                res = generate_image_from_prompt(rerun_payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
                                                 if res["status"] == "success":
                                                     cov_results[actual_idx]["path"] = res['image_path']
                                                     cov_results[actual_idx]["payload"] = rerun_payload
