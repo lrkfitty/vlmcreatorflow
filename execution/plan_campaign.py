@@ -101,7 +101,7 @@ def plan_campaign(
     num_posts: int = 10,
     character: str = None,
     world_db_path: str = "world_db.json",
-    model_engine: str = "gemini-2.0-flash",
+    model_engine: str = "gemini-3.5-flash",
 ) -> list:
     """
     Generate N campaign job plans from a high-level content brief.

@@ -51,7 +51,7 @@ def _load_asset_catalog(world_db_path: str = "world_db.json") -> dict:
 def parse_intent(
     brief: str,
     world_db_path: str = "world_db.json",
-    model_engine: str = "gemini-2.0-flash",
+    model_engine: str = "gemini-3.5-flash",
 ) -> dict:
     """
     Map a free-text creative brief to structured CreateFlow asset keys.

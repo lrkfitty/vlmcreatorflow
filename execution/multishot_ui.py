@@ -180,7 +180,7 @@ def render_multishot_ui(get_user_out_dir_func):
                             st.error("Missing GOOGLE_API_KEY for AI Director.")
                         else:
                             genai.configure(api_key=google_key)
-                            model = genai.GenerativeModel("gemini-2.0-flash")
+                            model = genai.GenerativeModel("gemini-3.5-flash")
                             
                             from PIL import Image
                             start_img = Image.open(temp_path)
@@ -329,7 +329,7 @@ def render_multishot_ui(get_user_out_dir_func):
                         st.error("Missing GOOGLE_API_KEY for AI Director.")
                     else:
                         genai.configure(api_key=google_key)
-                        model = genai.GenerativeModel("gemini-2.0-flash")
+                        model = genai.GenerativeModel("gemini-3.5-flash")
                         
                         # Build rich context from all inputs
                         context_parts = []

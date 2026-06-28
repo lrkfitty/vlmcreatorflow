@@ -1102,7 +1102,7 @@ if selection == "Workflow Wizard":
             with col_adv:
                 with st.expander("⚙️ Advanced Brain Settings"):
                      st.caption("Brain: Gemini 2.0 Flash (Optimized for Cost)")
-                     prompt_engine = "gemini-2.0-flash" 
+                     prompt_engine = "gemini-3.5-flash" 
                      render_engine = "nano" 
                      likeness = 0.5
                      st.sidebar.success("✅ Running in Low-Cost Mode (Flash 2.0)")
@@ -1634,7 +1634,7 @@ if selection == "World Builder":
             assets = st.session_state.global_assets
             temp_selections = {}
             temp_assets = []
-            prompt_engine = "gemini-2.0-flash" # Default for World Builder
+            prompt_engine = "gemini-3.5-flash" # Default for World Builder
             
             col_c1, col_c2 = st.columns(2)
             
@@ -2149,7 +2149,7 @@ Write an immersive, detailed prompt now:"""
                         
                         try:
                             import google.generativeai as genai
-                            model = genai.GenerativeModel("gemini-2.0-flash")
+                            model = genai.GenerativeModel("gemini-3.5-flash")
                             response = model.generate_content(director_prompt, generation_config={"temperature": sel_temperature})
                             generated_prompt = response.text.strip()
                             
@@ -2197,7 +2197,7 @@ Write an immersive, detailed prompt now:"""
                         
                         st.toast(f"Director AI Analyzing: {current_selections.get('PROTAGONIST', 'Character')} + {current_selections.get('OUTFIT', 'Outfit')}... [Cam: {sel_camera}, Act: {sel_action}]")
                     
-                        prompt_engine = "gemini-2.0-flash" # User requested specifically (Free Tier)
+                        prompt_engine = "gemini-3.5-flash" # User requested specifically (Free Tier)
                         # 2. Call Generator with full context
                         # We treat the current draft as 'additional_notes' context
                         enhanced_res = generate_prompt_content(

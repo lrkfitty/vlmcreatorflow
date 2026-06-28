@@ -5,6 +5,7 @@ import uuid
 import sqlite3
 import jwt
 import datetime
+import bcrypt
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -42,6 +43,16 @@ class AuthManager:
                 active INTEGER DEFAULT 1
             )
         ''')
+        # Transactions ledger for credits
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS transactions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL,
+                amount INTEGER NOT NULL,
+                action TEXT NOT NULL,
+                timestamp REAL NOT NULL
+            )
+        ''')
         conn.commit()
         conn.close()
 
@@ -55,22 +66,34 @@ class AuthManager:
         c.execute("SELECT username FROM users WHERE username=?", (env_user,))
         if not c.fetchone():
             print(f"Auth: Initializing default admin user: {env_user}")
-            pass_hash, salt = self._hash_password(env_pass)
+            pass_hash, salt = self._hash_password_bcrypt(env_pass)
             c.execute('''
                 INSERT INTO users (username, password_hash, salt, role, credits, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (env_user, pass_hash, salt, "admin", 1000, time.time()))
             conn.commit()
+            
+            # Log initial grant
+            c.execute('''
+                INSERT INTO transactions (username, amount, action, timestamp)
+                VALUES (?, ?, ?, ?)
+            ''', (env_user, 1000, "Initial admin creation", time.time()))
+            conn.commit()
+            
         conn.close()
 
-    def _hash_password(self, password, salt=None):
-        """Simple SHA256 hash with salt."""
+    def _hash_password_legacy(self, password, salt=None):
+        """Simple SHA256 hash with salt (for backwards compatibility)."""
         if not salt:
             salt = uuid.uuid4().hex
         
         # Hash = SHA256(salt + password)
         hash_obj = hashlib.sha256((salt + password).encode())
         return hash_obj.hexdigest(), salt
+
+    def _hash_password_bcrypt(self, password):
+        """Secure bcrypt hasher."""
+        return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode(), ""
 
     # --- ALLOWLIST LOGIC ---
     def is_email_allowed(self, email):
@@ -107,6 +130,25 @@ class AuthManager:
             conn.close()
             return False
 
+    # --- TRANSACTIONS LOGIC ---
+    def get_transactions(self, username, limit=20):
+        """Get recent transactions for a user."""
+        conn = self._get_conn()
+        c = conn.cursor()
+        c.execute("SELECT amount, action, timestamp FROM transactions WHERE username=? ORDER BY timestamp DESC LIMIT ?", (username, limit))
+        rows = c.fetchall()
+        conn.close()
+        
+        res = []
+        for r in rows:
+            res.append({
+                "amount": r[0],
+                "action": r[1],
+                "timestamp": r[2],
+                "date": datetime.datetime.fromtimestamp(r[2]).strftime('%Y-%m-%d %H:%M:%S')
+            })
+        return res
+
     # --- USER LOGIC ---
     def create_user(self, username, password, role="viewer"):
         """Register a new user."""
@@ -124,13 +166,19 @@ class AuthManager:
             conn.close()
             return False, "User already exists"
             
-        pass_hash, salt = self._hash_password(password)
+        pass_hash, salt = self._hash_password_bcrypt(password)
         
         try:
             c.execute('''
                 INSERT INTO users (username, password_hash, salt, role, credits, created_at)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (username, pass_hash, salt, role, 200, time.time())) # 200 Initial Credits
+            
+            c.execute('''
+                INSERT INTO transactions (username, amount, action, timestamp)
+                VALUES (?, ?, ?, ?)
+            ''', (username, 200, "Sign up bonus", time.time()))
+            
             conn.commit()
             conn.close()
             return True, "User created"
@@ -154,27 +202,38 @@ class AuthManager:
         real_username, stored_hash, salt, role, credits, last_reset = row
         
         # Verify
-        check_hash, _ = self._hash_password(password, salt)
-        if check_hash == stored_hash:
-            
+        is_valid = False
+        if stored_hash.startswith('$2b$'):
+            # Bcrypt hash
+            if bcrypt.checkpw(password.encode(), stored_hash.encode()):
+                is_valid = True
+        else:
+            # Legacy SHA256 hash
+            check_hash, _ = self._hash_password_legacy(password, salt)
+            if check_hash == stored_hash:
+                is_valid = True
+                # Upgrade hash automatically
+                new_hash, new_salt = self._hash_password_bcrypt(password)
+                c.execute("UPDATE users SET password_hash=?, salt=? WHERE username=?", (new_hash, new_salt, real_username))
+                conn.commit()
+
+        if is_valid:
             # --- CREDIT RESET LOGIC (MONTHLY) ---
             now = datetime.datetime.now()
             current_month_str = now.strftime("%Y-%m")
             
             final_credits = credits
             
-            # If never reset, or reset in previous month, trigger reset
-            # Admin accounts exempt from forced reset logic if desired, but let's apply to all for consistency unless specific override
-            # Actually admins usually have unlimited or manual, but let's just stick to the plan: 2000 users.
-            
             if last_reset != current_month_str:
                 target_allowance = 200 # Standard Monthly Allowance
-                # Only reset if not admin? Or everyone? Assuming everyone for now.
                 if role != 'admin': 
                     final_credits = target_allowance
                     c.execute("UPDATE users SET credits=?, last_reset_date=? WHERE username=?", (target_allowance, current_month_str, real_username))
+                    c.execute('''
+                        INSERT INTO transactions (username, amount, action, timestamp)
+                        VALUES (?, ?, ?, ?)
+                    ''', (real_username, target_allowance, "Monthly reset", time.time()))
                     conn.commit()
-                    # print(f"Auth: Monthly Credit Reset for {real_username}")
             
             conn.close()
 
@@ -200,7 +259,7 @@ class AuthManager:
         conn.close()
         return row[0] if row else 0
 
-    def deduct_credits(self, username, amount=1):
+    def deduct_credits(self, username, amount=1, reason="App Usage"):
         """Deducts credits if sufficient balance. Returns True/False."""
         conn = self._get_conn()
         c = conn.cursor()
@@ -215,6 +274,11 @@ class AuthManager:
         current = row[0]
         if current >= amount:
             c.execute("UPDATE users SET credits=? WHERE username=?", (current - amount, username))
+            c.execute('''
+                INSERT INTO transactions (username, amount, action, timestamp)
+                VALUES (?, ?, ?, ?)
+            ''', (username, -amount, reason, time.time()))
+            
             conn.commit()
             conn.close()
             return True
@@ -222,11 +286,16 @@ class AuthManager:
         conn.close()
         return False
         
-    def add_credits(self, username, amount):
+    def add_credits(self, username, amount, reason="Admin Grant"):
         """Adds credits to user."""
         conn = self._get_conn()
         c = conn.cursor()
         c.execute("UPDATE users SET credits = credits + ? WHERE username=?", (amount, username))
+        c.execute('''
+            INSERT INTO transactions (username, amount, action, timestamp)
+            VALUES (?, ?, ?, ?)
+        ''', (username, amount, reason, time.time()))
+        
         conn.commit()
         conn.close()
         return True
@@ -263,7 +332,7 @@ class AuthManager:
 
     def reset_user_password(self, username, new_password):
         """Admin force reset."""
-        pass_hash, salt = self._hash_password(new_password)
+        pass_hash, salt = self._hash_password_bcrypt(new_password)
         conn = self._get_conn()
         c = conn.cursor()
         c.execute("UPDATE users SET password_hash=?, salt=? WHERE username=?", (pass_hash, salt, username))
@@ -272,12 +341,6 @@ class AuthManager:
         return True
 
     def toggle_allowlist_enforcement(self, status: bool):
-        """Sets env var for runtime toggle (Persistence requires .env write, logic assumes runtime)."""
-        # For simplicity, we can store this effectively in the allowlist table or separate metadata table
-        # But per plan, let's use a special key in allowlist table itself or just use Env.
-        # Env vars don't persist across reloads easily in all envs.
-        # Let's create a 'system_config' table if we want persistence or just cheat and use a file.
-        # Plan said: ENV VAR.
         os.environ["ENFORCE_ALLOWLIST"] = str(status)
         return True
 

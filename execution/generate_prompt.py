@@ -15,7 +15,7 @@ def generate_prompt_content(vibe, outfit, character,
                             film_stock=None, filter_look=None, # New Inputs
                             aspect_ratio="9:16", # Default
                             extra_images=None, # New: List of {path, label} types
-                            model_engine="gemini-2.0-flash"): # Standard: Gemini 2.0 Flash (Free & Fast)
+                            model_engine="gemini-3.5-flash"): # Standard: Gemini 2.0 Flash (Free & Fast)
     """
     Generates a detailed image prompt using Google Gemini.
     CRITICAL: Visual references take ABSOLUTE priority over text descriptions.
@@ -226,7 +226,7 @@ def generate_prompt_content(vibe, outfit, character,
             genai.configure(api_key=google_key)
             # Fallback chain: if primary model is quota-limited, try the next one
             model_fallback_chain = [model_engine]
-            if model_engine == "gemini-2.0-flash":
+            if model_engine == "gemini-3.5-flash":
                 model_fallback_chain += ["gemini-1.5-flash", "gemini-1.5-flash-8b"]
             elif model_engine == "gemini-1.5-flash":
                 model_fallback_chain += ["gemini-1.5-flash-8b"]

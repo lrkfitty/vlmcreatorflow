@@ -122,7 +122,7 @@ def generate_script(context: str, account: str = "ty", style: str = "hook") -> s
     prompt = prompt_template.replace("{context}", context)
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-2.0-flash")
+    model = genai.GenerativeModel("gemini-3.5-flash")
     response = model.generate_content(prompt)
     script = response.text.strip().strip('"').strip("'")
     return script
