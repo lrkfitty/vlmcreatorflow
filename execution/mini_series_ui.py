@@ -10,6 +10,7 @@ from execution.load_assets import get_assets_by_category
 from execution.kling_client import KlingClient
 from execution.sora_client import SoraClient
 from execution.s3_uploader import upload_file_obj
+from execution.series_cache_manager import cache_asset_locally, save_series_project_session, load_series_project_session
 
 
 def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_base, auth_mgr, get_user_out_dir_func, campaign_mgr=None):
@@ -93,16 +94,17 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                         if c_path:
                             assets_payload.append({"path": c_path, "label": f"Cast: {c_name}"})
                             
-                            # Outfit
-                            w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                            # Try simple key then full
-                            outfit_name = w_snapshot.get(c_key) or w_snapshot.get(c_name, "Default")
+                            # Outfit (Check per-shot override first, then fallback to Series Bible)
+                            shot_w = shot.get('wardrobe', {})
+                            outfit_name = shot_w.get(c_key) or shot_w.get(c_name)
+                            if not outfit_name:
+                                w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                                outfit_name = w_snapshot.get(c_key) or w_snapshot.get(c_name, "Default Outfit")
                             
-                            if outfit_name and outfit_name != "Default":
+                            if outfit_name and outfit_name != "Default Outfit" and outfit_name != "Default":
                                 o_path = outfits_data.get(outfit_name)
                                 if isinstance(o_path, dict): o_path = o_path.get('default_img')
                                 if o_path:
-                                    # Use "Outfit for {character}" format for explicit pairing
                                     assets_payload.append({"path": o_path, "label": f"Outfit for {c_name}"})
 
                     # Prompt Construction — Structured Camera Direction + Scene Still
@@ -123,7 +125,6 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                     # Add Job
                     job_name = f"Ep{ep_title}_S{s_id}_Sh{sh_id}"
                     
-                    series_engine_val = "openai" if "OpenAI" in st.session_state.get('series_engine_select', 'Gemini') else "gemini"
                     campaign_mgr.add_job(
                         name=job_name,
                         description=f"Scene {s_id} Shot {sh_id}",
@@ -137,7 +138,7 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                             "image_size": st.session_state.get('series_res', '1K'),
                             "assets": assets_payload
                         },
-                        settings={"batch_count": 1, "engine": series_engine_val},
+                        settings={"batch_count": 1},
                         output_folder=full_out_dir,
                         # Pass paths technically redundant if in 'assets' payload but good for reference
                         char_path=None, 
@@ -159,182 +160,355 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
         st.session_state.series_storyboard = None
 
     # --- STEP 1: SERIES BIBLE ---
-    with st.expander("📖 Step 1: Series Bible", expanded=True):
-        col_sb1, col_sb2 = st.columns([1, 1])
+    with st.expander("📖 Step 1: Series Bible & Production Blueprint", expanded=True):
+        col_sb1, col_sb2 = st.columns([1.1, 0.9])
         
         with col_sb1:
-            series_title = st.text_input("Series Title", placeholder="The Influencer Life")
+            series_title = st.text_input("🎬 Series Title", placeholder="The Influencer Life")
+            series_logline = st.text_area("📝 Series Logline & High-Concept Premise", placeholder="A high-stakes drama following rival creators maneuvering through Miami's elite scene...", height=80)
             
-            # IDENTITY (New V2 Fields)
-            st.markdown("#### 🆔 Identity & Tone")
+            st.markdown("#### 🆔 Identity, Tone & Format")
             c_gen, c_tone = st.columns(2)
             with c_gen:
-                s_genre = st.selectbox("Genre", ["General", "Rom-com", "Drama", "Crime", "Thriller", "Horror", "Slice of Life"])
+                s_genre = st.selectbox("Genre", [
+                    "General / Drama", 
+                    "A24 Psychological Drama", 
+                    "Cyberpunk / Sci-Fi", 
+                    "Neo-Noir Crime / Thriller", 
+                    "High-Fashion / Luxury", 
+                    "Rom-Com / Romance", 
+                    "Horror / Supernatural", 
+                    "Slice of Life / Realism"
+                ])
             with c_tone:
-                s_tone = st.selectbox("Tone", ["Neutral", "Luxury", "Gritty", "Dark", "Soft / Romantic", "Comedic"])
+                s_tone = st.selectbox("Tone & Mood", [
+                    "A24 Moody & Atmospheric", 
+                    "Hyper-Luxury Gloss", 
+                    "Gritty Cinematic", 
+                    "Dark & Suspenseful", 
+                    "Warm Golden Nostalgia", 
+                    "Documentary / Raw", 
+                    "Comedic & Energetic"
+                ])
             
-            s_len = st.radio("Episode Length", ["30 Seconds", "45 Seconds"], horizontal=True)
+            c_wb, c_len = st.columns(2)
+            with c_wb:
+                s_wb_lighting = st.selectbox("Lighting & White Balance Mood", [
+                    "5600K Natural Daylight (Clean & Crisp)",
+                    "3200K Tungsten Warmth (Golden Hour / Interior)",
+                    "4000K Neutral Studio Flash",
+                    "Neon Cyberpunk (Pink & Cyan Spill)",
+                    "8500K Cold Blue Haze (Suspense & Rain)",
+                    "High-Contrast Chiaroscuro (Deep Shadows)"
+                ])
+            with c_len:
+                s_len = st.selectbox("Target Episode Format", [
+                    "30 Seconds (Commercial / Short — 8-10 Shots)",
+                    "15 Seconds (TikTok / Reel — 4-6 Shots)",
+                    "45 Seconds (Dramatic Short — 12-14 Shots)",
+                    "60 Seconds (Mini Episode — 16-18 Shots)"
+                ])
 
-            # Cast Selection (Characters + Friends)
-            st.markdown("#### 🎭 Cast Selection")
+            # CINEMATOGRAPHY SETTINGS (Selected FIRST so it influences Environment Generation!)
+            st.markdown("#### 🎥 Cinematography & Lens Package")
+            c_cam, c_lens = st.columns(2)
+            with c_cam:
+                 cam_opts = [
+                     "Auto", 
+                     "Arri Alexa 65 (Large Format)", "Arri Alexa Mini LF", "Sony Venice 2 (8K)", 
+                     "RED V-Raptor [VV]", "Panavision Millennium DXL2", 
+                     "IMAX 15/70mm Film", "Kodak Vision3 35mm Film", "16mm Bolex", "Super 8mm",
+                     "iPhone 15 Pro Max (ProRes)", "VHS Camcorder (90s)", "CCTV Security Cam"
+                 ]
+                 s_camera = st.selectbox("Camera Body", cam_opts, key="s_camera")
+                 
+                 stock_opts = [
+                     "Auto", 
+                     "Kodak Portra 400", "Kodak Portra 800", "Fujifilm Velvia 100", 
+                     "Cinestill 800T (Halation)", "Kodak Tri-X 400 (B&W)", "Ilford HP5 (Grainy B&W)",
+                     "Technicolor (3-Strip)", "Bleach Bypass (Gritty)"
+                 ]
+                 s_film_stock = st.selectbox("Film Stock / LUT", stock_opts, key="s_film_stock")
+
+            with c_lens:
+                 lens_opts = [
+                     "Auto", 
+                     "Arri Signature Prime", "Cooke S4/i Prime", "Panavision Primo 70", "Canon K-35 Vintage",
+                     "Atlas Orion Anamorphic", "Laowa Probe Lens",
+                     "14mm Ultra Wide", "24mm Wide", "35mm Standard", "50mm Standard", 
+                     "85mm Portrait", "105mm Macro", "200mm Telephoto", "600mm Sniper"
+                 ]
+                 s_lens = st.selectbox("Lens Glass", lens_opts, key="s_lens")
+
+                 grade_opts = ["Auto", "Teal & Orange (Blockbuster)", "Vintage Warmth", "Cool Blue", "Noir B&W", "Matrix Green", "Euphoria Purple"]
+                 s_filter_look = st.selectbox("Color Grade", grade_opts, key="s_filter_look")
             
-            # Use Unified Asset Loader
+            c_light, c_style = st.columns(2)
+            with c_light:
+                 light_opts = ["Auto", "Golden Hour", "Studio Softbox", "Rembrandt", "Neon Cyberpunk", "Natural Diffused", "Hard Flash", "Silhouette", "God Rays"]
+                 s_lighting = st.selectbox("Lighting", light_opts, key="s_lighting")
+            with c_style:
+                 style_opts = [
+                     "Auto", 
+                     "Wes Anderson (Symmetrical/Pastel)", "Christopher Nolan (IMAX/Cold)", "Denis Villeneuve (Brutalist)",
+                     "Wong Kar-wai (Step Printing)", "Quentin Tarantino (Low Angle)", 
+                     "Euphoria (Glitter/A24)", "Cyberpunk (Neon)", "1950s Technicolor", "1990s Sitcom"
+                 ]
+                 s_movie_style = st.selectbox("Style Reference", style_opts, key="s_movie_style")
+            
+            c_ar_col, c_res_col = st.columns(2)
+            with c_ar_col:
+                 s_aspect_ratio = st.selectbox("Aspect Ratio", ["16:9", "9:16", "4:5", "1:1"], index=0, key="series_ar")
+            with c_res_col:
+                 s_resolution = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, key="series_res", help="Higher = sharper but slower + more expensive")
+
+        with col_sb2:
+            st.markdown("#### 🎭 Cast Engine & Character Chemistry")
+            
             char_opts = get_assets_by_category("characters", user_asset_path)
             rel_opts = get_assets_by_category("relations", user_asset_path)
-            # Merge for selection
             all_cast_opts = {**char_opts, **rel_opts}
             
-            # Unified Cast List
-            cast_selection = st.multiselect("Select Cast Members", list(all_cast_opts.keys()))
+            cast_selection = st.multiselect("Select Cast Members for Episode", list(all_cast_opts.keys()))
             
-            # Wardrobe & Role Mapping (V2)
             cast_wardrobe_map = {}
             cast_role_map = {}
+            cast_acting_profile_map = {}
             
             if cast_selection:
-                st.caption("Assign Roles & Wardrobe:")
+                st.caption("Configure Roles, Wardrobe & Micro-Expression Acting Profiles:")
                 for member in cast_selection:
                     st.divider()
-                    c_img, c_info = st.columns([1, 4])
+                    c_img, c_info = st.columns([1, 3.5])
                     
-                    # Resolve Data & Path (Robust Logic)
                     c_data = all_cast_opts.get(member)
-                    c_path = None
-                    if isinstance(c_data, dict):
-                        c_path = c_data.get('default_img')
-                    else:
-                        c_path = c_data
+                    c_path = c_data.get('default_img') if isinstance(c_data, dict) else c_data
+                    member_basename = member.split('/')[-1].replace('.png','').replace('.jpg','').strip()
 
-                    # Show Thumbnail
                     with c_img:
                         if c_path:
                             try:
                                 st.image(c_path, use_container_width=True)
                             except Exception as e:
-                                st.warning("Image Error")
-                                st.caption(f"{e}")
+                                st.warning("IMG Error")
                         else:
-                             st.warning("No IMG Data")
+                            st.warning("No Image")
 
                     with c_info:
-                        st.write(f"**{member.split('/')[-1]}**")
+                        st.markdown(f"**{member_basename}**")
                         c1, c2 = st.columns(2)
-                        
                         with c1:
-                             # Role Select
-                             role = st.selectbox(f"Role", ["Main Character", "Love Interest", "Antagonist", "Friend", "Background"], key=f"role_{member}")
-                             cast_role_map[member] = role
+                            role = st.selectbox(f"Role", ["Protagonist / Lead", "Co-Lead / Love Interest", "Antagonist / Rival", "Confidant / Best Friend", "Supporting Lead"], key=f"role_{member}")
+                            cast_role_map[member] = role
 
                         with c2:
-                             # Outfit Select
-                             outfit_opts = list(outfits_data.keys())
-                             sel_fit = st.selectbox(f"Outfit", ["Default"] + outfit_opts, key=f"series_fit_{member}")
-                             cast_wardrobe_map[member] = sel_fit
-                             
-                             # Show Outfit Preview
-                             if sel_fit != "Default":
-                                 o_path = outfits_data.get(sel_fit)
-                                 if isinstance(o_path, dict): o_path = o_path.get('default_img')
-                                 if o_path:
-                                     st.image(o_path, width=80)
-                                         
-                with st.expander("🛠️ Debug: Wardrobe Selections (Raw)", expanded=False):
-                    st.write(cast_wardrobe_map)
+                            outfit_opts = list(outfits_data.keys())
+                            sel_fit = st.selectbox(f"Wardrobe", ["Default Outfit"] + outfit_opts, key=f"series_fit_{member}")
+                            cast_wardrobe_map[member] = sel_fit
+                            if sel_fit != "Default Outfit":
+                                o_path = outfits_data.get(sel_fit)
+                                if isinstance(o_path, dict): o_path = o_path.get('default_img')
+                                if o_path and os.path.exists(o_path):
+                                    st.image(o_path, width=70)
+                                    
+                        act_profile = st.text_input(
+                            f"Micro-Expression Profile",
+                            value="Eyes locked, jaw tightens, subtle breathing pattern",
+                            key=f"act_{member}",
+                            help="Higgsfield Seedance V2 muscle-movement performance description."
+                        )
+                        cast_acting_profile_map[member_basename] = act_profile
 
-        with col_sb2:
-            st.markdown("#### 🌍 Series Environments")
-            # Combine Vibes and Locations
-            all_locs = list(vibes_data.keys()) + list(assets.get('locations', {}).keys())
+                # Build & Permanently Cache Cast Lookup Map
+                user_out_dir = get_user_out_dir_func("Series")
+                cast_lookup_map = {}
+                for member in cast_selection:
+                    c_data = all_cast_opts.get(member)
+                    c_path = c_data.get('default_img') if isinstance(c_data, dict) else c_data
+                    member_basename = member.split('/')[-1].replace('.png','').replace('.jpg','').strip()
+                    
+                    cached_c_path = cache_asset_locally(c_path, user_out_dir, prefix=f"cast_{member_basename}") or c_path
+                    cast_lookup_map[member] = cached_c_path
+                    cast_lookup_map[member_basename] = cached_c_path
+                    cast_lookup_map[member_basename.replace('_', ' ').split(' ')[0]] = cached_c_path
+                    
+                    sel_fit = cast_wardrobe_map.get(member)
+                    if sel_fit and sel_fit != "Default Outfit":
+                        o_path = outfits_data.get(sel_fit)
+                        if isinstance(o_path, dict): o_path = o_path.get('default_img')
+                        if o_path:
+                            cache_asset_locally(o_path, user_out_dir, prefix=f"wardrobe_{sel_fit}")
+
+                st.session_state["cast_lookup_map"] = cast_lookup_map
+                st.session_state["cast_wardrobe_map_snapshot"] = cast_wardrobe_map
+    st.markdown("---")
+    with st.expander("🌄 Step 2: Higgsfield AI Environment Master Studio", expanded=True):
+        st.markdown("Generate 8K Environment Master Stills with **Cascading Knowledge Continuity** & multi-model comparison before writing the script.")
+        
+        all_locs = list(vibes_data.keys()) + list(assets.get('locations', {}).keys())
+        
+        e_col1, e_col2 = st.columns(2)
+        with e_col1:
+            st.write("**Primary Location** (Main Action Set)")
+            series_env = st.selectbox("Choose Preset Location (Optional)", ["None"] + all_locs, key="series_env_sel")
+            custom_env_title = st.text_input("Custom Location / Set Name", placeholder="e.g. Luxury Beverly Hills Penthouse", key="custom_env_title")
             
-            st.write("**Primary Location** (Main Action)")
-            series_env = st.selectbox("Choose Primary", ["None"] + all_locs)
-            
+            target_env_name = custom_env_title if custom_env_title else (series_env if series_env != "None" else "Main Production Environment")
+
             if series_env and series_env != "None":
-                # Preview
                 path = vibes_data.get(series_env) or assets.get('locations', {}).get(series_env)
                 if path:
                     if isinstance(path, dict): path = path.get('default_img')
-                    st.image(path, caption="Primary Environment")
-            
-            st.write("**Secondary Location** (B-Roll / Cutaways)")
-            sec_env = st.selectbox("Choose B-Roll Vibe", ["None"] + all_locs, key="sec_env")
+                    st.image(path, caption="Preset Location Reference", width=220)
+
+        with e_col2:
+            st.write("**Secondary Location** (B-Roll / Cutaway Set)")
+            sec_env = st.selectbox("Choose B-Roll Set", ["None"] + all_locs, key="sec_env")
             
             if sec_env and sec_env != "None":
-                # Preview Secondary
                 path_sec = vibes_data.get(sec_env) or assets.get('locations', {}).get(sec_env)
                 if path_sec:
                     if isinstance(path_sec, dict): path_sec = path_sec.get('default_img')
-                    st.image(path_sec, caption="Secondary Environment")
+                    st.image(path_sec, caption="Secondary B-Roll Environment", width=220)
 
-    # --- STEP 2: WRITER'S ROOM ---
+        st.markdown("---")
+        st.markdown("##### ⚙️ Environment Still Generator & Model Options")
+        
+        m_col1, m_col2, m_col3 = st.columns([2, 1, 2])
+        with m_col1:
+            env_model_choice = st.selectbox(
+                "Image Model Engine",
+                [
+                    "Google Nano Banana 2 (Recommended / Multi-Ref)",
+                    "SeaDream 5.0 (ByteDance / Ultra Photorealistic)",
+                    "Flux 1.1 Pro (Black Forest Labs)",
+                    "Ideogram 2.0 (High Contrast)",
+                    "DALL-E 3 / GPT Image 2.0"
+                ],
+                key="env_model_choice"
+            )
+        with m_col2:
+            env_still_count = st.slider("Stills to Generate", 1, 4, 3, key="env_still_count", help="Cascading stills: each generated still references the previous for 100% architectural continuity!")
+        with m_col3:
+            env_custom_notes = st.text_input(
+                "Environmental Textures & Details",
+                placeholder="Wet asphalt, rain reflections, volumetric fog 30%, neon sign flickering",
+                key="env_notes"
+            )
+
+        if st.button("✨ Generate Cascading Real 35mm Cinematic Environment Stills", type="primary", key="gen_env_btn", use_container_width=True):
+            with st.spinner(f"⚡ AI Generating {env_still_count} Real 35mm Film Environment Stills for '{target_env_name}'..."):
+                from execution.series_processor import generate_environment_master_prompt
+                
+                angles = [
+                    "Master Establishing Wide View (107° FOV)",
+                    "Reverse Angle Depth View (84° FOV)",
+                    "Medium Focal Action Space (63° FOV)",
+                    "Macro Architectural Texture Detail (29° FOV)"
+                ]
+                
+                generated_stills = []
+                logs_all = []
+                
+                for idx in range(env_still_count):
+                    angle_label = angles[idx if idx < len(angles) else 0]
+                    st.toast(f"⚡ Rendering Still {idx+1}/{env_still_count}: {angle_label}")
+                    
+                    env_data = generate_environment_master_prompt(
+                        location_name=f"{target_env_name}. {env_custom_notes}" if env_custom_notes else target_env_name,
+                        genre=s_genre,
+                        tone=f"{s_tone}. Lighting: {s_lighting}. Camera: {s_camera}, {s_lens}. LUT: {s_film_stock}, Grade: {s_filter_look}, Style: {s_movie_style}",
+                        shot_angle_type=angle_label
+                    )
+                    env_p = env_data.get("environment_prompt")
+                    
+                    # Cascading Knowledge Continuity: Pass prior generated still as reference
+                    payload_assets = []
+                    if generated_stills and os.path.exists(generated_stills[-1]):
+                        payload_assets.append({
+                            "path": generated_stills[-1],
+                            "label": f"Prior Environment Reference Still #{len(generated_stills)} (MATCH ARCHITECTURE, COLORS & LIGHTING)"
+                        })
+                    
+                    p_data = {
+                        "positive_prompt": env_p,
+                        "model_type": env_model_choice,
+                        "is_environment_still": True,
+                        "assets": payload_assets,
+                        "aspect_ratio": st.session_state.get('series_ar', '16:9'),
+                        "image_size": "2K"
+                    }
+                    
+                    res_env = generate_image_from_prompt(p_data, get_user_out_dir_func("Series/Environments"))
+                    if res_env.get("status") == "success":
+                        generated_stills.append(res_env["image_path"])
+                    else:
+                        st.error(f"Still #{idx+1} Generation Failed: {res_env.get('logs')}")
+                        break
+                
+                if generated_stills:
+                    st.session_state["env_stills_list"] = generated_stills
+                    st.session_state["selected_env_stills"] = list(generated_stills)
+                    st.session_state["primary_env_img"] = generated_stills[0]
+                    st.toast(f"✅ Generated {len(generated_stills)} Real 35mm Environment Stills (Full Scene Coverage Attached)!")
+                    st.rerun()
+
+        # Display Cascading Gallery & Full Coverage References Selector
+        if "env_stills_list" in st.session_state and st.session_state["env_stills_list"]:
+            st.markdown("##### 🖼️ Cascading Environment Gallery & Full Coverage References")
+            st.caption("All generated stills build full 360° coverage of your scene. Select which stills to include as location references for Seedance 2.0 & Director AI:")
+            
+            stills = [s for s in st.session_state["env_stills_list"] if os.path.exists(s)]
+            if stills:
+                if "selected_env_stills" not in st.session_state:
+                    st.session_state["selected_env_stills"] = list(stills)
+                    
+                sel_cols1, sel_cols2 = st.columns([1.5, 3])
+                with sel_cols1:
+                    if st.button("✅ Select All for Full Coverage", key="select_all_env_stills", use_container_width=True):
+                        st.session_state["selected_env_stills"] = list(stills)
+                        st.toast("✅ Selected All Environment Stills for Full Coverage!")
+                        st.rerun()
+                with sel_cols2:
+                    st.caption(f"**{len(st.session_state.get('selected_env_stills', []))} / {len(stills)} Environment Stills Attached** as Location References to Seedance 2.0 & Director AI.")
+
+                cols = st.columns(len(stills))
+                for i, s_path in enumerate(stills):
+                    with cols[i]:
+                        st.image(s_path, caption=f"Still #{i+1} (Angle {i+1})", use_container_width=True)
+                        
+                        is_selected = s_path in st.session_state.get("selected_env_stills", [])
+                        chk = st.checkbox(f"Include Still #{i+1} in Coverage", value=is_selected, key=f"chk_env_still_{i}")
+                        if chk != is_selected:
+                            if "selected_env_stills" not in st.session_state:
+                                st.session_state["selected_env_stills"] = []
+                            if chk and s_path not in st.session_state["selected_env_stills"]:
+                                st.session_state["selected_env_stills"].append(s_path)
+                            elif not chk and s_path in st.session_state["selected_env_stills"]:
+                                st.session_state["selected_env_stills"].remove(s_path)
+                            st.rerun()
+                            
+                        is_active = (st.session_state.get("primary_env_img") == s_path)
+                        if st.button(f"{'🎯 Primary Master' if is_active else 'Set Primary #' + str(i+1)}", key=f"sel_env_still_{i}", type="primary" if is_active else "secondary", use_container_width=True):
+                            st.session_state["primary_env_img"] = s_path
+                            if s_path not in st.session_state.get("selected_env_stills", []):
+                                st.session_state.setdefault("selected_env_stills", []).append(s_path)
+                            st.toast(f"🎯 Set Still #{i+1} as Primary Master Anchor!")
+                            st.rerun()
+                            
+                        with open(s_path, "rb") as f_img:
+                            st.download_button(f"⬇️ Download #{i+1}", f_img, file_name=os.path.basename(s_path), mime="image/png", key=f"dl_env_still_{i}")
+        elif "primary_env_img" in st.session_state and os.path.exists(st.session_state["primary_env_img"]):
+            st.image(st.session_state["primary_env_img"], caption=f"✨ Generated 35mm Higgsfield Environment Master Still ({target_env_name})", use_container_width=True)
+
+    # --- STEP 3: WRITER'S ROOM ---
     st.markdown("---")
-    st.markdown("### ✍️ Writer's Room")
+    st.markdown("### ✍️ Step 3: Writer's Room & Director Vision AI")
     
     c_script, c_action = st.columns([3, 1])
     with c_script:
         with st.form(key="director_form"):
             series_script = st.text_area("Episode Synopsis & Dialogue Intent", height=200, placeholder="Synopsis: She finds out he's been lying, but he doesn't know she knows yet.\n\nIntent:\nALICE: Cold, distant.\nBOB: Trying too hard to be casual.")
-            
-            # V3: Hollywood Camera Controls - Restored & Expanded
-            with st.expander("🎥 Cinematography Settings", expanded=False):
-                c_cam, c_lens = st.columns(2)
-                with c_cam:
-                     cam_opts = [
-                         "Auto", 
-                         "Arri Alexa 65 (Large Format)", "Arri Alexa Mini LF", "Sony Venice 2 (8K)", 
-                         "RED V-Raptor [VV]", "Panavision Millennium DXL2", 
-                         "IMAX 15/70mm Film", "Kodak Vision3 35mm Film", "16mm Bolex", "Super 8mm",
-                         "iPhone 15 Pro Max (ProRes)", "VHS Camcorder (90s)", "CCTV Security Cam"
-                     ]
-                     s_camera = st.selectbox("Camera Body", cam_opts)
-                     
-                     stock_opts = [
-                         "Auto", 
-                         "Kodak Portra 400", "Kodak Portra 800", "Fujifilm Velvia 100", 
-                         "Cinestill 800T (Halation)", "Kodak Tri-X 400 (B&W)", "Ilford HP5 (Grainy B&W)",
-                         "Technicolor (3-Strip)", "Bleach Bypass (Gritty)"
-                     ]
-                     s_film_stock = st.selectbox("Film Stock / LUT", stock_opts)
-
-                with c_lens:
-                     lens_opts = [
-                         "Auto", 
-                         "Arri Signature Prime", "Cooke S4/i Prime", "Panavision Primo 70", "Canon K-35 Vintage",
-                         "Atlas Orion Anamorphic", "Laowa Probe Lens",
-                         "14mm Ultra Wide", "24mm Wide", "35mm Standard", "50mm Standard", 
-                         "85mm Portrait", "105mm Macro", "200mm Telephoto", "600mm Sniper"
-                     ]
-                     s_lens = st.selectbox("Lens Glass", lens_opts)
-
-                     grade_opts = ["Auto", "Teal & Orange (Blockbuster)", "Vintage Warmth", "Cool Blue", "Noir B&W", "Matrix Green", "Euphoria Purple"]
-                     s_filter_look = st.selectbox("Color Grade", grade_opts)
-                
-                c_light, c_style = st.columns(2)
-                with c_light:
-                     light_opts = ["Auto", "Golden Hour", "Studio Softbox", "Rembrandt", "Neon Cyberpunk", "Natural Diffused", "Hard Flash", "Silhouette", "God Rays"]
-                     s_lighting = st.selectbox("Lighting", light_opts)
-                with c_style:
-                     style_opts = [
-                         "Auto", 
-                         "Wes Anderson (Symmetrical/Pastel)", "Christopher Nolan (IMAX/Cold)", "Denis Villeneuve (Brutalist)",
-                         "Wong Kar-wai (Step Printing)", "Quentin Tarantino (Low Angle)", 
-                         "Euphoria (Glitter/A24)", "Cyberpunk (Neon)", "1950s Technicolor", "1990s Sitcom"
-                     ]
-                     s_movie_style = st.selectbox("Style Reference", style_opts)
-                
-                c_ar_col, c_res_col = st.columns(2)
-                with c_ar_col:
-                     s_aspect_ratio = st.selectbox("Aspect Ratio", ["16:9", "9:16", "4:5", "1:1"], index=0, key="series_ar")
-                with c_res_col:
-                     s_resolution = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, key="series_res", help="Higher = sharper but slower + more expensive")
-                
-                series_engine_selected = st.selectbox(
-                    "AI Engine",
-                    ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
-                    help="Both models now fully support face, outfit, and location image references!",
-                    key="series_engine_select"
-                )
-            
             s_transition_style = st.selectbox("Transition Pacing", ["Standard", "Fast / TikTok", "Slow / Cinematic", "Match Cut"])
             
             st.markdown("<br>", unsafe_allow_html=True)
@@ -413,6 +587,21 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                              "path": c_path,
                              "label": f"Cast Member: {c_name}"
                          })
+
+                    # Attach Generated Environment Master Stills to Director AI References
+                    sel_env_stills = st.session_state.get("selected_env_stills", [])
+                    if sel_env_stills:
+                        for e_idx, e_s_path in enumerate(sel_env_stills):
+                            if os.path.exists(e_s_path):
+                                director_refs.append({
+                                    "path": e_s_path,
+                                    "label": f"Environment Master Still #{e_idx+1} (360° Architectural Set)"
+                                })
+                    elif "primary_env_img" in st.session_state and os.path.exists(st.session_state["primary_env_img"]):
+                        director_refs.append({
+                            "path": st.session_state["primary_env_img"],
+                            "label": "Primary Environment Master Still"
+                        })
 
                     # V2 API Call
                     sb_data = parse_script_to_scenes(
@@ -530,6 +719,68 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                         )
                         shot['characters'] = selected_chars
                         
+                        # Per-shot Wardrobe Selection (See, Select, & Reselect mapped outfits)
+                        shot_wardrobe_map = {}
+                        if selected_chars:
+                            with st.expander("👕 Cast Wardrobe for Shot (Select / Change)", expanded=True):
+                                for c_name in selected_chars:
+                                    w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                                    orig_outfit = w_snapshot.get(c_name) or w_snapshot.get(c_name.replace('_', ' ').split(' ')[0], "Default Outfit")
+                                    if orig_outfit == "Default":
+                                        orig_outfit = "Default Outfit"
+                                        
+                                    outfit_options = ["Default Outfit"] + list(outfits_data.keys())
+                                    def_fit_idx = 0
+                                    if orig_outfit in outfit_options:
+                                        def_fit_idx = outfit_options.index(orig_outfit)
+                                        
+                                    w_col1, w_col2 = st.columns([3, 1])
+                                    with w_col1:
+                                        sel_fit = st.selectbox(
+                                            f"Outfit for {c_name}",
+                                            outfit_options,
+                                            index=def_fit_idx,
+                                            key=f"shot_fit_{key_base}_{c_name}"
+                                        )
+                                        shot_wardrobe_map[c_name] = sel_fit
+                                    with w_col2:
+                                        if sel_fit and sel_fit != "Default Outfit" and sel_fit != "Default":
+                                            o_path = outfits_data.get(sel_fit)
+                                            if isinstance(o_path, dict): o_path = o_path.get('default_img')
+                                            if o_path and os.path.exists(o_path):
+                                                st.image(o_path, caption=sel_fit[:15], width=60)
+                                        else:
+                                            st.caption("Default Outfit")
+                                            
+                        shot['wardrobe'] = shot_wardrobe_map
+                        
+                        all_cast_keys = list(st.session_state.cast_lookup_map.keys())
+                        shot_chars = shot.get('characters', [])
+                        
+                        # Match current shot characters to available cast keys
+                        matched_shot_cast = []
+                        for sc in shot_chars:
+                            sc_clean = sc.replace('(My)', '').replace('(User)', '').replace('[My]', '').strip()
+                            first_w = sc_clean.replace('_', ' ').split(' ')[0]
+                            for ak in all_cast_keys:
+                                ak_clean = ak.replace('(My)', '').replace('(User)', '').replace('[My]', '').strip()
+                                ak_first = ak_clean.replace('_', ' ').split(' ')[0]
+                                if sc_clean.lower() in ak_clean.lower() or ak_clean.lower() in sc_clean.lower() or (first_w and first_w.lower() == ak_first.lower()):
+                                    if ak not in matched_shot_cast:
+                                        matched_shot_cast.append(ak)
+                                        
+                        if not matched_shot_cast and all_cast_keys:
+                            matched_shot_cast = [all_cast_keys[0]]
+                            
+                        sel_shot_cast = st.multiselect(
+                            "👤 Star Cast Member(s) in this Shot",
+                            options=all_cast_keys,
+                            default=matched_shot_cast,
+                            key=f"shot_star_cast_{key_base}",
+                            help="Select which cast member(s) from your project star in this shot."
+                        )
+                        shot['characters'] = sel_shot_cast
+                        
                         time_opts = ["Morning", "Noon", "Afternoon", "Golden Hour", "Blue Hour", "Night", "Midnight"]
                         ai_time = shot.get('time_of_day', 'Day')
                         ai_time_norm = ai_time.title() if ai_time else "Day"
@@ -552,118 +803,391 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                         sel_trans = st.selectbox("Transition", trans_opts, key=f"trans_{key_base}", label_visibility="collapsed")
                         shot['transition'] = sel_trans
                         
-                        shot_prompt = st.text_area("Visual Prompt", value=shot.get('visual_prompt'), height=250, key=f"p_{key_base}", label_visibility="collapsed")
+                        # Format Master Director Script block combining Action, Dialogue, Notes & Camera
+                        raw_vp = shot.get('visual_prompt', '')
+                        raw_dial = shot.get('dialogue', '')
+                        raw_notes = shot.get('director_notes', '')
+                        raw_action = shot.get('action_description', '')
+                        
+                        if "DIALOGUE:" not in raw_vp and "ACTION:" not in raw_vp:
+                            master_script_block = ""
+                            if raw_action: master_script_block += f"ACTION: {raw_action}\n"
+                            if raw_dial: master_script_block += f"DIALOGUE:\n{raw_dial}\n"
+                            if raw_notes: master_script_block += f"DIRECTOR NOTES: {raw_notes}\n"
+                            if master_script_block: master_script_block += f"CINEMATOGRAPHY:\n{raw_vp}"
+                            else: master_script_block = raw_vp
+                        else:
+                            master_script_block = raw_vp
+
+                        st.write("**🎬 Master Director Script & Prompt**")
+                        shot_prompt = st.text_area("Master Director Script & Visual Prompt", value=master_script_block, height=220, key=f"p_{key_base}", label_visibility="collapsed", help="Edit character dialogue lines, physical action cues, or 35mm camera directions here.")
                         st.caption(f"Length: {len(shot_prompt) if shot_prompt else 0} chars (Target: 800+)")
                         
-                        c_gen, c_type = st.columns([1, 1.5])
-                        with c_gen:
-                            if st.button(f"Generate Shot {shot_idx+1}", key=f"btn_{key_base}"):
-                                user = st.session_state.current_user.get("username")
-                                if not auth_mgr.deduct_credits(user, 1):
-                                    st.error("❌ No Credits!")
-                                else:
-                                    with st.spinner("Rolling camera..."):
-                                        final_assets_payload = []
+                        if st.button(f"📸 Generate Shot {shot_idx+1} Still (Nano Banana 2)", key=f"btn_{key_base}", use_container_width=True):
+                            user = st.session_state.current_user.get("username")
+                            if not auth_mgr.deduct_credits(user, 1):
+                                st.error("❌ No Credits!")
+                            else:
+                                with st.spinner("Rolling camera..."):
+                                    final_assets_payload = []
+                                    
+                                    # Resolve Cast Assets (Robust)
+                                    target_chars = shot.get('characters', [])
+                                    is_broll = shot.get('is_broll', False)
+                                    if not target_chars and cast_selection and not is_broll:
+                                         pass 
+
+                                    for raw_name in target_chars:
+                                        c_path = st.session_state.cast_lookup_map.get(raw_name)
+                                        if not c_path:
+                                             first_w = raw_name.replace('_', ' ').split(' ')[0]
+                                             c_path = st.session_state.cast_lookup_map.get(first_w)
                                         
-                                        # Resolve Cast Assets (Robust)
-                                        target_chars = shot.get('characters', [])
-                                        # If empty and not B-Roll, force first cast
-                                        is_broll = shot.get('is_broll', False)
-                                        if not target_chars and cast_selection and not is_broll:
-                                             # Fallback protagonist
-                                             pass 
-
-                                        for raw_name in target_chars:
-                                            c_path = st.session_state.cast_lookup_map.get(raw_name)
-                                            if not c_path:
-                                                 # Try first word
-                                                 first_w = raw_name.replace('_', ' ').split(' ')[0]
-                                                 c_path = st.session_state.cast_lookup_map.get(first_w)
-                                            
-                                            if c_path:
-                                                final_assets_payload.append({"path": c_path, "label": f"Cast: {raw_name}"})
-                                                # Outfit
+                                        if c_path:
+                                            final_assets_payload.append({"path": c_path, "label": f"Cast: {raw_name}"})
+                                            # Outfit from shot level override, fallback to snapshot
+                                            o_key = shot_wardrobe_map.get(raw_name)
+                                            if not o_key:
+                                                first_w = raw_name.replace('_', ' ').split(' ')[0]
+                                                o_key = shot_wardrobe_map.get(first_w)
+                                            if not o_key:
                                                 w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
-                                                o_key = w_snapshot.get(raw_name)
-                                                
-                                                if not o_key:
-                                                    # Try first word
-                                                    first_w = raw_name.replace('_', ' ').split(' ')[0]
-                                                    o_key = w_snapshot.get(first_w)
-                                                
-                                                if not o_key: o_key = "Default"
-                                                if o_key != "Default":
-                                                    o_path = outfits_data.get(o_key)
-                                                    if isinstance(o_path, dict): o_path = o_path.get('default_img')
-                                                    if o_path: 
-                                                        # Use "Outfit for {character}" format for explicit pairing
-                                                        final_assets_payload.append({"path": o_path, "label": f"Outfit for {raw_name}"})
+                                                o_key = w_snapshot.get(raw_name) or w_snapshot.get(raw_name.replace('_', ' ').split(' ')[0], "Default Outfit")
+                                            
+                                            if o_key and o_key != "Default Outfit" and o_key != "Default":
+                                                o_path = outfits_data.get(o_key)
+                                                if isinstance(o_path, dict): o_path = o_path.get('default_img')
+                                                if o_path: 
+                                                    final_assets_payload.append({"path": o_path, "label": f"Outfit for {raw_name}"})
 
-                                        # Location
-                                        target_env = sec_env if is_broll and sec_env != "None" else series_env
+                                    # Location (Pass ALL selected Higgsfield AI Environment Master Stills for full 360° coverage)
+                                    target_env = sec_env if is_broll and sec_env != "None" else series_env
+                                    selected_env_stills = st.session_state.get("selected_env_stills", [])
+                                    if selected_env_stills and not is_broll:
+                                        for env_idx, env_s_path in enumerate(selected_env_stills):
+                                            if os.path.exists(env_s_path):
+                                                final_assets_payload.append({
+                                                    "path": env_s_path,
+                                                    "label": f"Location Master Angle #{env_idx+1} (FULL COVERAGE): {target_env}"
+                                                })
+                                    elif "primary_env_img" in st.session_state and os.path.exists(st.session_state["primary_env_img"]) and not is_broll:
+                                        final_assets_payload.append({"path": st.session_state["primary_env_img"], "label": f"Location Master: {target_env}"})
+                                    else:
                                         env_path = vibes_data.get(target_env) or assets.get('locations', {}).get(target_env)
                                         if isinstance(env_path, dict): env_path = env_path.get('default_img')
                                         if env_path: final_assets_payload.append({"path": env_path, "label": f"Location: {target_env}"})
-                                        
-                                        # Prompt — Structured Camera Direction + Scene Still
-                                        time_setting = shot.get('time_of_day', 'Day')
-                                        
-                                        # Build camera direction block from shot metadata
-                                        cam_parts = []
-                                        if shot.get('shot_size'): cam_parts.append(f"Shot: {shot['shot_size']}")
-                                        if shot.get('camera_angle'): cam_parts.append(f"Angle: {shot['camera_angle']}")
-                                        if shot.get('composition'): cam_parts.append(f"Composition: {shot['composition']}")
-                                        if shot.get('depth_of_field'): cam_parts.append(f"DoF: {shot['depth_of_field']}")
-                                        if shot.get('lighting_type'): cam_parts.append(f"Lighting: {shot['lighting_type']}")
-                                        cam_direction = ". ".join(cam_parts) + "." if cam_parts else ""
-                                        
-                                        final_shot_prompt = f"Photorealistic film still. Time of Day: {time_setting}. {cam_direction}\n{shot_prompt}"
-                                        
-                                        # Cascading context — attach prior shot for scene consistency
-                                        prior_key = f"img_s{scene_idx}_sh{shot_idx - 1}" if shot_idx > 0 else None
-                                        prior_path = st.session_state.get(prior_key) if prior_key else None
-                                        
-                                        if prior_path and os.path.exists(prior_path):
-                                            final_shot_prompt += (
-                                                "\n\nSCENE CONTINUITY: The attached 'Prior Shot' image shows the PREVIOUS moment "
-                                                "from this same scene. Match the EXACT environment, lighting, color palette, "
-                                                "set design, and character wardrobe from that image."
-                                            )
-                                            final_assets_payload.append({
-                                                "path": prior_path,
-                                                "label": "Prior Shot (SCENE CONTINUITY - MATCH ENVIRONMENT & LIGHTING)"
-                                            })
-                                        
-                                        series_engine_val = "openai" if "OpenAI" in st.session_state.get('series_engine_select', 'Gemini') else "gemini"
-                                        p_data = {
-                                             "positive_prompt": final_shot_prompt,
-                                             "model_type": "nano", 
-                                             "assets": final_assets_payload,
-                                             "aspect_ratio": st.session_state.get('series_ar', '16:9'),
-                                             "image_size": st.session_state.get('series_res', '1K')
-                                        }
-                                        
-                                        res = generate_image_from_prompt(p_data, get_user_out_dir_func("Series"), engine=series_engine_val)
-                                        if res["status"] == "success":
-                                            st.session_state[f"img_{key_base}"] = res["image_path"]
-                                            st.success("Shot Captured!")
-                                        else:
-                                            st.error(f"Error: {res.get('logs')}")
-                        
-                        with c_type:
-                            motion_type = st.radio("Media", ["Still", "Kling Video", "Sora 2 Video", "Mocap"], key=f"m_{key_base}", horizontal=True, label_visibility="collapsed")
-                            if motion_type == "Mocap":
-                                mocap_file = st.file_uploader("Ref", type=['mp4'], key=f"up_{key_base}", label_visibility="collapsed")
+                                    
+                                    # Prompt — Structured Camera Direction + Scene Still
+                                    time_setting = shot.get('time_of_day', 'Day')
+                                    
+                                    # Build camera direction block from shot metadata
+                                    cam_parts = []
+                                    if shot.get('shot_size'): cam_parts.append(f"Shot: {shot['shot_size']}")
+                                    if shot.get('camera_angle'): cam_parts.append(f"Angle: {shot['camera_angle']}")
+                                    if shot.get('composition'): cam_parts.append(f"Composition: {shot['composition']}")
+                                    if shot.get('depth_of_field'): cam_parts.append(f"DoF: {shot['depth_of_field']}")
+                                    if shot.get('lighting_type'): cam_parts.append(f"Lighting: {shot['lighting_type']}")
+                                    cam_direction = ". ".join(cam_parts) + "." if cam_parts else ""
+                                    
+                                    final_shot_prompt = f"Photorealistic film still. Time of Day: {time_setting}. {cam_direction}\n{shot_prompt}"
+                                    
+                                    # Cascading context — attach prior shot for scene consistency
+                                    prior_key = f"img_s{scene_idx}_sh{shot_idx - 1}" if shot_idx > 0 else None
+                                    prior_path = st.session_state.get(prior_key) if prior_key else None
+                                    
+                                    if prior_path and os.path.exists(prior_path):
+                                        final_shot_prompt += (
+                                            "\n\nSCENE CONTINUITY: The attached 'Prior Shot' image shows the PREVIOUS moment "
+                                            "from this same scene. Match the EXACT environment, lighting, color palette, "
+                                            "set design, and character wardrobe from that image."
+                                        )
+                                        final_assets_payload.append({
+                                            "path": prior_path,
+                                            "label": "Prior Shot (SCENE CONTINUITY - MATCH ENVIRONMENT & LIGHTING)"
+                                        })
+                                    
+                                    p_data = {
+                                         "positive_prompt": final_shot_prompt,
+                                         "model_type": "nano", 
+                                         "assets": final_assets_payload,
+                                         "aspect_ratio": st.session_state.get('series_ar', '16:9'),
+                                         "image_size": st.session_state.get('series_res', '1K')
+                                    }
+                                    
+                                    res = generate_image_from_prompt(p_data, get_user_out_dir_func("Series"))
+                                    if res["status"] == "success":
+                                        st.session_state[f"img_{key_base}"] = res["image_path"]
+                                        st.success("Shot Captured!")
+                                    else:
+                                        st.error(f"Error: {res.get('logs')}")
 
                     with col_img:
-                        if f"img_{key_base}" in st.session_state:
-                            img_p = st.session_state[f"img_{key_base}"]
-                            st.image(img_p, caption=f"Shot {shot_idx+1}", use_container_width=True)
-                            if os.path.exists(img_p):
-                                with open(img_p, "rb") as file:
-                                    st.download_button("⬇️", file, file_name=os.path.basename(img_p), mime="image/png", key=f"dl_{key_base}")
-                        else:
-                            st.info("No Image")
+                        # 1. Display Active Anchor Image (Keyframe Still if generated, fallback to Primary Environment Master Still)
+                        img_p = st.session_state.get(f"img_{key_base}")
+                        active_anchor = img_p if (img_p and os.path.exists(img_p)) else st.session_state.get("primary_env_img")
+                        
+                        if active_anchor and os.path.exists(active_anchor):
+                            is_kf = (active_anchor == img_p)
+                            st.image(
+                                active_anchor,
+                                caption=f"Shot {shot_idx+1} {'Keyframe Still' if is_kf else 'Location Master Anchor'}",
+                                use_container_width=True
+                            )
+                            with open(active_anchor, "rb") as file:
+                                st.download_button(
+                                    f"⬇️ Download {'Still' if is_kf else 'Location Anchor'}",
+                                    file,
+                                    file_name=os.path.basename(active_anchor),
+                                    mime="image/png",
+                                    key=f"dl_{key_base}"
+                                )
+                                    
+                        # 2. HIGGSFIELD MOTION RIG & SEEDANCE ANIMATION (ALWAYS AVAILABLE)
+                        with st.expander(f"🎬 Higgsfield Motion Rig & Seedance Video", expanded=True if not img_p else False):
+                            st.caption("Animate this shot using Seedance 2.0 Reference-to-Video (Atlas Cloud) with your characters, environment master, video motion, and voiceovers.")
+                            
+                            v_engine = st.selectbox(
+                                "Video Engine", 
+                                [
+                                    "Seedance 2.0 (Reference-to-Video)",
+                                    "Seedance 2.0 Mini (Reference-to-Video)",
+                                    "Seedance 2.0 (Image-to-Video)",
+                                    "Wan 2.7 (Image-to-Video)",
+                                    "Kling 1.6 Video"
+                                ],
+                                key=f"v_eng_{key_base}"
+                            )
+                            c_vres, c_var, c_vdur = st.columns(3)
+                            with c_vres:
+                                v_res = st.selectbox("Resolution", ["1080P (Full HD)", "720P (Draft)"], index=0, key=f"v_res_{key_base}")
+                            with c_var:
+                                v_ar = st.selectbox("Aspect Ratio", ["16:9 (Widescreen)", "9:16 (Vertical / Reels)", "1:1 (Square)"], index=0, key=f"v_ar_{key_base}")
+                            with c_vdur:
+                                v_dur = st.slider("Duration (Sec)", 2, 15, 5, key=f"v_dur_{key_base}")
+                            
+                            all_cast_keys = list(st.session_state.cast_lookup_map.keys())
+                            
+                            # Robust character matching for multiselect default values
+                            shot_chars = shot.get('characters', [])
+                            matched_defaults = []
+                            for sc in shot_chars:
+                                if sc in all_cast_keys:
+                                    matched_defaults.append(sc)
+                                else:
+                                    # Try matching base name or first word (e.g., "(My) Jazi Concept 1" or "Jazi")
+                                    sc_clean = sc.replace('(My)', '').replace('(User)', '').replace('[My]', '').strip()
+                                    sc_first = sc_clean.replace('_', ' ').split(' ')[0]
+                                    for ak in all_cast_keys:
+                                        ak_clean = ak.replace('(My)', '').replace('(User)', '').replace('[My]', '').strip()
+                                        ak_first = ak_clean.replace('_', ' ').split(' ')[0]
+                                        if sc_clean.lower() in ak_clean.lower() or ak_clean.lower() in sc_clean.lower() or (sc_first and sc_first.lower() == ak_first.lower()):
+                                            if ak not in matched_defaults:
+                                                matched_defaults.append(ak)
+                                                
+                            # Fallback: if no shot character matched, pre-select all available project cast members to guarantee likeness lock
+                            if not matched_defaults and all_cast_keys:
+                                matched_defaults = list(all_cast_keys)
+                                
+                            sel_anim_cast = st.multiselect(
+                                "Character References (Likeness Lock)",
+                                options=all_cast_keys,
+                                default=matched_defaults,
+                                key=f"v_cast_{key_base}",
+                                help="Select cast members to pass their CreateFlow account reference images to Seedance / Wan for 100% likeness lock."
+                            )
+                            
+                            # Explicit Wardrobe Mapping Indicator
+                            w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                            active_wardrobe_labels = []
+                            for c_ref in sel_anim_cast:
+                                o_k = shot_wardrobe_map.get(c_ref) or w_snapshot.get(c_ref) or w_snapshot.get(c_ref.replace('_', ' ').split(' ')[0])
+                                if o_k and o_k != "Default Outfit" and o_k != "Default":
+                                    active_wardrobe_labels.append(f"👗 {c_ref}: {o_k}")
+                                else:
+                                    active_wardrobe_labels.append(f"👔 {c_ref}: Default Outfit")
+                            
+                            if active_wardrobe_labels:
+                                st.caption("Mapped Reference Attachments: " + " | ".join(active_wardrobe_labels))
+                            
+                            active_env_stills = st.session_state.get("selected_env_stills", [])
+                            if active_env_stills:
+                                st.info(f"🏛️ **Location Master Lock**: Attaching **{len(active_env_stills)} Environment Master Stills** of '{series_env}' to Seedance 2.0 for 360° architectural set consistency!")
+                            elif "primary_env_img" in st.session_state and os.path.exists(st.session_state["primary_env_img"]):
+                                st.info(f"🏛️ **Location Master Lock**: Attaching Primary Environment Master Still of '{series_env}' to Seedance 2.0!")
+                            
+                            # Cascading Video Continuity Toggle (Only when a prior shot video exists)
+                            has_prior_video = (shot_idx > 0) or (scene_idx > 0)
+                            use_cascade_vid = False
+                            if has_prior_video:
+                                use_cascade_vid = st.checkbox(
+                                    "🔗 Cascading Video Continuity (Reference Shot N-1 Video)",
+                                    value=True,
+                                    key=f"v_casc_{key_base}",
+                                    help="Automatically passes the previously generated shot video into Seedance 2.0 for 100% lighting, camera motion, and character continuity across clips!"
+                                )
+                            
+                            c_vref_col, c_aref_col = st.columns(2)
+                            with c_vref_col:
+                                up_vref = st.file_uploader("Reference Motion / Video (MP4)", type=["mp4", "mov"], key=f"v_vref_{key_base}")
+                            with c_aref_col:
+                                up_aref = st.file_uploader("Reference Voiceover / Audio (MP3/WAV)", type=["mp3", "wav", "m4a"], key=f"v_aref_{key_base}")
+
+                            motion_prompt_input = st.text_area(
+                                "Motion Action Prompt",
+                                value=shot_prompt,
+                                height=100,
+                                key=f"v_p_{key_base}"
+                            )
+
+                            if st.button(f"🎥 Animate Shot {shot_idx+1} with Seedance", type="primary", key=f"v_btn_{key_base}", use_container_width=True):
+                                user = st.session_state.current_user.get("username") if "current_user" in st.session_state and st.session_state.current_user else "guest"
+                                if not auth_mgr.deduct_credits(user, 3):
+                                    st.error("❌ Not enough credits! Video generation requires 3 credits.")
+                                else:
+                                    with st.spinner("⚡ Animating shot with Seedance 2.0 / Wan 2.7 on Atlas Cloud..."):
+                                        # 1. Resolve Active Cast Character References (FIRST PRIORITY at index 0!)
+                                        user_out_dir = get_user_out_dir_func("Series")
+                                        char_ref_paths = []
+                                        for c_ref_name in sel_anim_cast:
+                                            c_path = st.session_state.cast_lookup_map.get(c_ref_name)
+                                            if not c_path:
+                                                c_clean = c_ref_name.replace('(My)', '').replace('(User)', '').replace('[My]', '').strip()
+                                                first_w = c_clean.replace('_', ' ').split(' ')[0]
+                                                c_path = st.session_state.cast_lookup_map.get(c_clean) or st.session_state.cast_lookup_map.get(first_w)
+                                            if c_path and os.path.exists(c_path):
+                                                cached_c_path = cache_asset_locally(c_path, user_out_dir, prefix=f"cast_{c_ref_name}")
+                                                if cached_c_path and cached_c_path not in char_ref_paths:
+                                                    char_ref_paths.append(cached_c_path)
+                                                
+                                        # 2. Resolve Active Wardrobe References (SECOND PRIORITY!)
+                                        wardrobe_ref_paths = []
+                                        w_snapshot = st.session_state.get('cast_wardrobe_map_snapshot', {})
+                                        for c_ref_name in sel_anim_cast:
+                                            o_key = shot_wardrobe_map.get(c_ref_name) or w_snapshot.get(c_ref_name) or w_snapshot.get(c_ref_name.replace('_', ' ').split(' ')[0])
+                                            if o_key and o_key != "Default Outfit" and o_key != "Default":
+                                                o_path = outfits_data.get(o_key)
+                                                if isinstance(o_path, dict): o_path = o_path.get('default_img')
+                                                if o_path:
+                                                    cached_o_path = cache_asset_locally(o_path, user_out_dir, prefix=f"wardrobe_{o_key}")
+                                                    if cached_o_path and cached_o_path not in wardrobe_ref_paths:
+                                                        wardrobe_ref_paths.append(cached_o_path)
+
+                                        # 3. Environment Master Stills (THIRD PRIORITY!)
+                                        env_ref_paths = []
+                                        selected_env_stills = st.session_state.get("selected_env_stills", [])
+                                        if selected_env_stills:
+                                            for env_s_path in selected_env_stills:
+                                                if os.path.exists(env_s_path) and env_s_path not in env_ref_paths:
+                                                    env_ref_paths.append(env_s_path)
+                                        elif "primary_env_img" in st.session_state and os.path.exists(st.session_state["primary_env_img"]):
+                                            env_ref_paths.append(st.session_state["primary_env_img"])
+
+                                        # Assemble Multi-Reference Array (Character -> Wardrobe -> Environment)
+                                        ref_images = []
+                                        for p in char_ref_paths + wardrobe_ref_paths + env_ref_paths:
+                                            if p not in ref_images:
+                                                ref_images.append(p)
+
+                                        # Primary image: keyframe still if generated for THIS shot; fallback to active character reference, then environment
+                                        primary_img_path = img_p
+                                        if not primary_img_path or not os.path.exists(primary_img_path):
+                                            if char_ref_paths:
+                                                primary_img_path = char_ref_paths[0]
+                                            elif env_ref_paths:
+                                                primary_img_path = env_ref_paths[0]
+                                            else:
+                                                t_env = sec_env if is_broll and sec_env != "None" else series_env
+                                                fallback_path = vibes_data.get(t_env) or assets.get('locations', {}).get(t_env)
+                                                if isinstance(fallback_path, dict): fallback_path = fallback_path.get('default_img')
+                                                if fallback_path and os.path.exists(fallback_path):
+                                                    primary_img_path = fallback_path
+
+                                        if not primary_img_path and not ref_images:
+                                            st.error("❌ Cannot animate: Please generate a Keyframe Still or Environment Master Still in Step 2 first!")
+                                            st.stop()
+
+                                        # Save Uploaded Video Reference if provided, or use Cascading Video Continuity (SAME CHARACTER ONLY!)
+                                        temp_v_path = None
+                                        if up_vref:
+                                            temp_v_dir = get_user_out_dir_func("Series/TempUploads")
+                                            temp_v_path = os.path.join(temp_v_dir, f"ref_v_{key_base}.mp4")
+                                            with open(temp_v_path, "wb") as f_v:
+                                                f_v.write(up_vref.getbuffer())
+                                        elif use_cascade_vid:
+                                            # Retrieve prior shot details
+                                            prior_shot_obj = None
+                                            prev_shots = []
+                                            if shot_idx > 0:
+                                                prior_shot_obj = sb.get('scenes', [])[scene_idx].get('shots', [])[shot_idx - 1]
+                                            elif scene_idx > 0:
+                                                prev_shots = sb.get('scenes', [])[scene_idx - 1].get('shots', [])
+                                                if prev_shots:
+                                                    prior_shot_obj = prev_shots[-1]
+                                                    
+                                            prior_chars = prior_shot_obj.get('characters', []) if prior_shot_obj else []
+                                            current_chars = shot.get('characters', [])
+                                            
+                                            clean_prior = [c.replace('(My)', '').replace('(User)', '').replace('[My]', '').strip().lower() for c in prior_chars]
+                                            clean_curr = [c.replace('(My)', '').replace('(User)', '').replace('[My]', '').strip().lower() for c in current_chars]
+                                            
+                                            same_character = any(c1 in clean_curr or any(c1 in c2 for c2 in clean_curr) for c1 in clean_prior)
+                                            
+                                            if same_character:
+                                                prior_vid_key = f"vid_s{scene_idx}_sh{shot_idx - 1}" if shot_idx > 0 else (f"vid_s{scene_idx - 1}_sh{len(prev_shots) - 1}" if scene_idx > 0 and prev_shots else None)
+                                                if prior_vid_key and prior_vid_key in st.session_state and os.path.exists(st.session_state[prior_vid_key]):
+                                                    temp_v_path = st.session_state[prior_vid_key]
+                                                    st.toast(f"🔗 Cascading Video Continuity: Attached Shot Video '{os.path.basename(temp_v_path)}' as Motion Reference!")
+                                            else:
+                                                st.toast(f"🎭 Scene Character Transition: Suppressed prior video cascade to prevent character identity bleeding.")
+
+                                        # Save Uploaded Audio / Voiceover Reference if provided
+                                        temp_a_path = None
+                                        if up_aref:
+                                            temp_a_dir = get_user_out_dir_func("Series/TempUploads")
+                                            temp_a_path = os.path.join(temp_a_dir, f"ref_a_{key_base}.mp3")
+                                            with open(temp_a_path, "wb") as f_a:
+                                                f_a.write(up_aref.getbuffer())
+
+                                        if "Mini" in v_engine:
+                                            target_model = "bytedance/seedance-2.0-mini/reference-to-video"
+                                        elif "Seedance" in v_engine and "Reference" in v_engine:
+                                            target_model = "bytedance/seedance-2.0/reference-to-video"
+                                        elif "Seedance" in v_engine and "Image" in v_engine:
+                                            target_model = "bytedance/seedance-2.0/image-to-video"
+                                        elif "Wan" in v_engine:
+                                            target_model = "alibaba/wan-2.7/image-to-video"
+                                        else:
+                                            target_model = "bytedance/seedance-2.0/reference-to-video"
+                                            
+                                        from execution.generate_wan import generate_wan_video
+                                        res_video = generate_wan_video(
+                                            prompt=motion_prompt_input,
+                                            image_path=primary_img_path,
+                                            resolution=v_res,
+                                            duration=v_dur,
+                                            aspect_ratio=v_ar.split(" ")[0],
+                                            ref_video_path=temp_v_path,
+                                            ref_audio_path=temp_a_path,
+                                            extra_images=ref_images if ref_images else None,
+                                            model=target_model,
+                                            output_folder=get_user_out_dir_func("Series/Videos")
+                                        )
+                                        
+                                        if res_video.get("status") == "success":
+                                            st.session_state[f"vid_{key_base}"] = res_video["video_path"]
+                                            st.toast(f"✅ Shot {shot_idx+1} Animated Successfully with Seedance!")
+                                            st.rerun()
+                                        else:
+                                            auth_mgr.add_credits(user, 3)
+                                            st.error(f"Video Generation Failed: {res_video.get('error')}")
+                                            with st.expander("View Logs"):
+                                                st.code("\n".join(res_video.get("logs", [])))
+
+                        if f"vid_{key_base}" in st.session_state and os.path.exists(st.session_state[f"vid_{key_base}"]):
+                            vid_p = st.session_state[f"vid_{key_base}"]
+                            st.video(vid_p)
+                            with open(vid_p, "rb") as v_file:
+                                st.download_button("⬇️ Download Motion Video", v_file, file_name=os.path.basename(vid_p), mime="video/mp4", key=f"dl_vid_{key_base}")
                     
                     st.divider()
 
@@ -671,10 +1195,11 @@ def mini_series_ui(user_asset_path, outfits_data, vibes_data, assets, knowledge_
                         "scene_id": scene.get('id'),
                         "shot_id": shot_idx + 1,
                         "prompt": shot_prompt,
-                        "type": motion_type, # Fixed scope
+                        "type": motion_type,
                         "mocap": mocap_file,
                         "characters": shot.get('characters'),
                         "environment": series_env,
                         "transition": shot.get('transition'),
-                        "generated_still": st.session_state.get(f"img_{key_base}") 
+                        "generated_still": st.session_state.get(f"img_{key_base}"),
+                        "generated_video": st.session_state.get(f"vid_{key_base}")
                     })

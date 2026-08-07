@@ -5,9 +5,6 @@ from datetime import datetime
 from execution.generate_image import generate_image_from_prompt
 from execution.generate_video import generate_video_kling, generate_video_humo
 
-# Max QC attempts before marking a job failed
-_QC_MAX_ATTEMPTS = 3
-
 class CampaignManager:
     def __init__(self, campaign_file="current_campaign.json"):
         self.campaign_file = campaign_file
@@ -38,10 +35,9 @@ class CampaignManager:
         with open(self.campaign_file, 'w') as f:
             json.dump(self.queue, f, indent=4)
 
-    def add_job(self, name, description, prompt_data, settings, output_folder,
-                char_path=None, outfit_path=None, vibe_path=None, job_type="image",
-                extra_images=None):
-
+    def add_job(self, name, description, prompt_data, settings, output_folder, 
+                char_path=None, outfit_path=None, vibe_path=None, job_type="image"):
+        
         job = {
             "id": f"job_{int(time.time())}_{len(self.queue)}",
             "name": name,
@@ -57,21 +53,13 @@ class CampaignManager:
                     "char_path": char_path,
                     "outfit_path": outfit_path,
                     "vibe_path": vibe_path
-                },
-                "extra_images": extra_images or []
+                }
             },
             "results": []
         }
         self.queue.append(job)
         self.save_queue()
         return job
-
-    def move_job(self, index, direction):
-        """Move a job up (-1) or down (+1) in the queue."""
-        new_index = index + direction
-        if 0 <= new_index < len(self.queue):
-            self.queue[index], self.queue[new_index] = self.queue[new_index], self.queue[index]
-            self.save_queue()
 
     def clear_queue(self):
         self.queue = []
@@ -135,58 +123,7 @@ class CampaignManager:
                     output_folder=paths["output_folder"]
                 )
                 job_results.append(result)
-
-            elif job_type == "reel":
-                # ── Full Reel Pipeline: VO → Remotion render ──────────────────
-                # p_data expects:
-                #   context       — scene context string for VO script
-                #   style         — hook | builder | lifestyle | day_in_life
-                #   account       — "ty" | "shay"
-                #   image_paths   — list of pre-generated image paths
-                #   music_mood    — chill | catch | club | house
-                from execution.generate_vo import generate_vo
-                from execution.render_reel import render_reel
-
-                reel_id    = job["id"]
-                context    = p_data.get("context", "")
-                style      = p_data.get("style", "hook")
-                account    = p_data.get("account", "ty")
-                image_paths = p_data.get("image_paths", [])
-                music_mood  = p_data.get("music_mood", "chill")
-
-                reel_output_dir = os.path.join(paths["output_folder"], "reels")
-
-                # Step 1: Generate VO
-                print(f"   🎙️  Generating VO (style={style})...")
-                vo_result = generate_vo(
-                    context=context,
-                    account=account,
-                    output_dir=reel_output_dir,
-                    reel_id=reel_id,
-                    style=style,
-                )
-
-                # Step 2: Render Remotion
-                print(f"   🎬  Rendering Reel with Remotion...")
-                mp4_path = render_reel(
-                    reel_id=reel_id,
-                    vo_path=vo_result["audio_path"],
-                    transcript_path=vo_result["transcript_path"],
-                    image_paths=image_paths or None,  # None = auto-pick from account folder
-                    output_dir=reel_output_dir,
-                    account=account,
-                    music_mood=music_mood,
-                )
-
-                job_results.append({
-                    "status": "success",
-                    "reel_path": mp4_path,
-                    "script": vo_result["script"],
-                    "duration": vo_result["duration"],
-                    "audio_path": vo_result["audio_path"],
-                    "transcript_path": vo_result["transcript_path"],
-                })
-
+                
             else:
                 # --- IMAGE JOBS ---
                 # Cascading Context: Check if previous job was from the same scene
@@ -224,57 +161,17 @@ class CampaignManager:
                         })
                         print(f"   🔗 Cascading context: attached prior shot from same scene")
                 
-                # Inject extra_images (companions) into prompt_data assets
-                extra_images = job["data"].get("extra_images", [])
-                if extra_images:
-                    if "assets" not in p_data:
-                        p_data["assets"] = []
-                    for ei in extra_images:
-                        # Avoid duplicates
-                        if not any(a.get("path") == ei.get("path") for a in p_data["assets"]):
-                            p_data["assets"].append(ei)
-
-                # Resolve engine from job settings (defaults to gemini)
-                job_engine = settings.get("engine", "gemini")
-                print(f"   🎨 Engine: {job_engine}")
-
                 for r in range(repeats):
                     print(f"   ... Batch {r+1}/{repeats}")
-
-                    # QC auto-retry loop
-                    qc_attempt = 0
-                    result = None
-                    while qc_attempt < _QC_MAX_ATTEMPTS:
-                        result = generate_image_from_prompt(
-                            p_data,
-                            output_folder=paths["output_folder"],
-                            reference_image_path=paths["char_path"],
-                            outfit_path=paths["outfit_path"],
-                            vibe_path=paths["vibe_path"],
-                            engine=job_engine
-                        )
-                        qc_attempt += 1
-
-                        img_path = result.get("image_path") if result else None
-                        if not img_path or not os.path.exists(img_path):
-                            print(f"   ⚠️  QC: no image produced (attempt {qc_attempt})")
-                            continue
-
-                        # Run QC
-                        try:
-                            from execution.qc_image import run_qc
-                            is_portrait = "9:16" in str(p_data.get("aspect_ratio", "9:16"))
-                            qc = run_qc(img_path, is_portrait=is_portrait)
-                            result["qc"] = qc
-                            if qc["pass"]:
-                                print(f"   ✅ QC passed (attempt {qc_attempt})")
-                                break
-                            else:
-                                print(f"   ❌ QC fail: {qc['reason']} — regenerating (attempt {qc_attempt}/{_QC_MAX_ATTEMPTS})")
-                        except Exception as qc_err:
-                            print(f"   ⚠️  QC check skipped: {qc_err}")
-                            break  # Skip QC if unavailable
-
+                    
+                    # Call the generator
+                    result = generate_image_from_prompt(
+                        p_data, 
+                        output_folder=paths["output_folder"],
+                        reference_image_path=paths["char_path"],
+                        outfit_path=paths["outfit_path"],
+                        vibe_path=paths["vibe_path"]
+                    )
                     job_results.append(result)
                 
             # Mark complete

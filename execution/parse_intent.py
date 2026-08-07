@@ -51,7 +51,7 @@ def _load_asset_catalog(world_db_path: str = "world_db.json") -> dict:
 def parse_intent(
     brief: str,
     world_db_path: str = "world_db.json",
-    model_engine: str = "gemini-3.5-flash",
+    model_engine: str = "gemini-2.0-flash",
 ) -> dict:
     """
     Map a free-text creative brief to structured CreateFlow asset keys.
@@ -137,7 +137,16 @@ OUTPUT: Return ONLY valid JSON in this exact format:
 
     try:
         genai.configure(api_key=google_key)
-        model = genai.GenerativeModel(model_engine)
+        try:
+            model = genai.GenerativeModel(model_engine)
+        except Exception:
+            try:
+                model = genai.GenerativeModel("gemini-3.5-flash")
+            except Exception:
+                try:
+                    model = genai.GenerativeModel("gemini-2.5-flash")
+                except Exception:
+                    model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content([system_prompt, user_message])
         raw = response.text.strip()
 

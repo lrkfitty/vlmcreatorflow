@@ -91,24 +91,10 @@ def get_age_description(value):
     elif value < 70: return f"{value} years old, senior, elderly"
     else: return f"{value} years old, very elderly, aged"
 
-def get_character_sheet_prompt(base_prompt, engine="gemini"):
+def get_character_sheet_prompt(base_prompt):
     """Wraps the prompt to generate a character reference sheet."""
-    if engine == "openai":
-        # Plain-English layout — OpenAI sanitizer strips (term:N.N) weighted notation
-        suffix = (
-            "CHARACTER REFERENCE SHEET — multi-panel layout on a pure white background. "
-            "TOP ROW (2 panels): panel 1 = close-up front-facing portrait of the face; "
-            "panel 2 = close-up 3/4 angle portrait of the face. "
-            "BOTTOM ROW (3 panels): panel 3 = right side profile full body; "
-            "panel 4 = left side profile full body; "
-            "panel 5 = front-facing full body shot. "
-            "ALL 5 panels depict the EXACT SAME person — identical face, hair, skin tone, and outfit throughout. "
-            "Photorealistic, hyperrealistic, NOT cartoon, NOT illustration, NOT 3D render. "
-            "High detail, studio lighting, 8K resolution."
-        )
-    else:
-        # Weighted notation for Gemini/Stable-Diffusion-style models
-        suffix = "(character reference sheet:1.5), (split into 5 panels:1.5), (top half 2 images: close up of facial details straight at camera, close up of 3/4 view:1.4), (bottom half 3 images: side profile right, side profile left, full body shot:1.4), white background, consistent character, detailed anatomy, 8k, (photorealistic:1.4), (raw photo:1.3), (hyperrealistic:1.3), (not illustration:1.5), (not cartoon:1.5), (not 3d render:1.5)"
+    # Strong weights for sheet structure + High Fidelity Enforcement
+    suffix = "(character reference sheet:1.5), (split into 5 panels:1.5), (top half 2 images: close up of facial details straight at camera, close up of 3/4 view:1.4), (bottom half 3 images: side profile right, side profile left, full body shot:1.4), white background, consistent character, detailed anatomy, 8k, (photorealistic:1.4), (raw photo:1.3), (hyperrealistic:1.3), (not illustration:1.5), (not cartoon:1.5), (not 3d render:1.5)"
     return f"{base_prompt}, {suffix}"
 
 def get_product_sheet_prompt(base_prompt):

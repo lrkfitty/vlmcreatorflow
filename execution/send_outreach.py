@@ -22,9 +22,11 @@ from pathlib import Path
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from pathlib import Path
+from dotenv import load_dotenv
 
 BASE_DIR  = Path(__file__).resolve().parent.parent
+load_dotenv(BASE_DIR / ".env")
+
 TMP_DIR   = BASE_DIR / ".tmp"
 TMP_DIR.mkdir(exist_ok=True)
 
@@ -37,7 +39,7 @@ TEMPLATES_DIR = Path(__file__).resolve().parent / "email_templates"
 SMTP_HOST = "mail.privateemail.com"
 SMTP_PORT = 587
 SMTP_USER = "hello@vlmcreateflow.com"
-SMTP_PASS = "Vlmcreateflow1!"
+SMTP_PASS = os.getenv("SMTP_HELLO_PASS", "PLACEHOLDER")
 FROM_ADDR = "hello@vlmcreateflow.com"
 FROM_NAME = "Ty | Viral Lense Media"
 REPLY_TO  = "virallensemediavlm@gmail.com"   # Gmail MCP monitors this for replies

@@ -3,7 +3,7 @@ import google.generativeai as genai
 from dotenv import load_dotenv
 
 # Load Env
-load_dotenv()
+load_dotenv(override=True)
 
 def generate_motion_prompt(image_path, movement_type="Auto", physics_focus="standard", emotion="Neutral", additional_context=""):
     """
@@ -16,11 +16,14 @@ def generate_motion_prompt(image_path, movement_type="Auto", physics_focus="stan
         return "Error: Missing GOOGLE_API_KEY for Motion Analysis."
 
     genai.configure(api_key=api_key)
-    # Using 2.0 Flash as verified in available models list
+    # Using 3.5 Flash or falling back to 2.5 Flash / 1.5 Flash based on quota availability
     try:
         model = genai.GenerativeModel('gemini-3.5-flash')
-    except:
-        model = genai.GenerativeModel('gemini-3.5-flash') # Fallback to free model
+    except Exception:
+        try:
+            model = genai.GenerativeModel('gemini-2.5-flash')
+        except Exception:
+            model = genai.GenerativeModel('gemini-1.5-flash')
 
     # Read Image Data
     import PIL.Image
@@ -29,15 +32,52 @@ def generate_motion_prompt(image_path, movement_type="Auto", physics_focus="stan
     import requests
     from io import BytesIO
     
+    # Try local recovery first if it is an S3 URL representing a local file
+    if image_path and image_path.startswith(('http://', 'https://')) and "users/" in image_path:
+         try:
+              local_rel = image_path.split(".amazonaws.com/")[1].split("?")[0]
+              local_abs = os.path.join(os.getcwd(), "output", local_rel)
+              if os.path.exists(local_abs):
+                   image_path = local_abs
+         except Exception:
+              pass
+
     try:
         if image_path.startswith(('http://', 'https://')):
-            resp = requests.get(image_path)
+            # Add custom User-Agent to avoid WAF / S3 signature issues when fetched by requests
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            }
+            # Check if it's a signed S3 URL. If so, standard download is fine but avoid query param encoding issues.
+            resp = requests.get(image_path, headers=headers, timeout=15)
             resp.raise_for_status()
             img = PIL.Image.open(BytesIO(resp.content))
-        else:
+        elif os.path.exists(image_path):
             img = PIL.Image.open(image_path)
+        else:
+            # Maybe it's a relative path in S3 or local output folder, check local output
+            local_alt = os.path.join(os.getcwd(), image_path)
+            if os.path.exists(local_alt):
+                 img = PIL.Image.open(local_alt)
+            else:
+                 raise FileNotFoundError(f"Path does not exist locally: {image_path}")
     except Exception as e:
-        return f"Error loading image: {e}"
+        # Fallback: if it failed but is actually a local file path or represented by S3 URL
+        try:
+             clean_path = image_path.split("?")[0] if "?" in image_path else image_path
+             if "users/" in clean_path:
+                  local_rel = clean_path.split(".amazonaws.com/")[-1]
+                  local_abs = os.path.join(os.getcwd(), "output", local_rel)
+                  if os.path.exists(local_abs):
+                       img = PIL.Image.open(local_abs)
+                  else:
+                       raise Exception("No fallback match")
+             elif clean_path.startswith("output/") and os.path.exists(clean_path):
+                  img = PIL.Image.open(clean_path)
+             else:
+                  raise Exception("No fallback match")
+        except Exception:
+             return f"Error loading image: {e}"
 
     # Construct Constraints based on user input
     physics_keywords = ""
@@ -108,8 +148,16 @@ def generate_motion_prompt(image_path, movement_type="Auto", physics_focus="stan
     - NO: "Here is the prompt", just give me the raw prompt text.
     """
 
-    try:
-        response = model.generate_content([prompt_instruction, img])
-        return response.text.strip()
-    except Exception as e:
-        return f"Error analyzing image: {e}"
+    models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-flash-latest', 'gemini-pro-latest', 'gemini-2.0-flash-001', 'gemini-2.5-pro']
+    last_err = "No models succeeded."
+    
+    for m_name in models_to_try:
+        try:
+            fallback_model = genai.GenerativeModel(m_name)
+            response = fallback_model.generate_content([prompt_instruction, img])
+            return response.text.strip()
+        except Exception as e:
+            last_err = str(e)
+            continue
+            
+    return f"Error analyzing image: {last_err}"

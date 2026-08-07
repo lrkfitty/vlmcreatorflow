@@ -222,11 +222,10 @@ def load_assets(base_path="assets", user_assets_dir=None, skip_base=False, targe
                              # RE-SIGN URL IF KEY EXISTS (Fix Expiry)
                              if key and bucket:
                                  try:
-                                     url = s3.generate_presigned_url(
-                                         'get_object',
-                                         Params={'Bucket': bucket, 'Key': key},
-                                         ExpiresIn=3600
-                                     )
+                                     import urllib.parse
+                                     encoded_parts = [urllib.parse.quote(part) for part in key.split('/')]
+                                     encoded_key = '/'.join(encoded_parts)
+                                     url = f"https://{bucket}.s3.{os.getenv('AWS_REGION', 'ap-southeast-2')}.amazonaws.com/{encoded_key}"
                                  except Exception:
                                      pass # Fallback to cached URL if signing fails
                              
@@ -300,12 +299,11 @@ def load_assets(base_path="assets", user_assets_dir=None, skip_base=False, targe
                                     p_str = " / ".join([p.replace('_', ' ').title() for p in sub_parts])
                                     final_name = f"(My) {p_str} / {name_base}"
                                 
-                                # Generate Signed URL (valid 1 hour)
-                                url = s3.generate_presigned_url(
-                                    'get_object',
-                                    Params={'Bucket': bucket, 'Key': key},
-                                    ExpiresIn=3600
-                                )
+                                # Generate Direct Public URL (Fix Expiry)
+                                import urllib.parse
+                                encoded_parts = [urllib.parse.quote(part) for part in key.split('/')]
+                                encoded_key = '/'.join(encoded_parts)
+                                url = f"https://{bucket}.s3.{os.getenv('AWS_REGION', 'ap-southeast-2')}.amazonaws.com/{encoded_key}"
                                 data[target_key][final_name] = url
                                 
                                 # Add to List for Cache
@@ -401,7 +399,6 @@ def load_assets(base_path="assets", user_assets_dir=None, skip_base=False, targe
             "Friends", "Pets", "Props", "Vehicles", "Foods", ".DS_Store",
             "AI Content Creators", "ai content creators", "Ai Content Creators", "Assets",
             "ui_icons", "UI_Icons", "Ui_icons", "icons", "Icons",  # Never load UI icon folders
-            "sprites", "Sprites", "sprites_2d", "Sprites_2d",  # 2D animation sprites — not content characters
         ]
         
         if os.path.exists(base_path):

@@ -171,18 +171,40 @@ def post_to_instagram(
 
             print("  [browser] Logged in. Opening Create Post...")
 
-            # Click the "Create" / New post button
-            _wait_and_click(
-                page,
-                "[aria-label='New post']",
-                "svg[aria-label='New post']",
-                "[aria-label='Create']",
-                # fallback: find by text in nav
-                "text=Create",
-                description="Create Post button",
-                timeout=10000,
-            )
-            time.sleep(1.5)
+            # Click Create using Playwright locator with force=True to bypass div overlay
+            # The Create button is an <a href="#"> wrapping the SVG
+            create_loc = page.locator("a").filter(has=page.locator("[aria-label='New post']")).first
+            try:
+                create_loc.wait_for(state="attached", timeout=8000)
+                # First click: may trigger notification dialog
+                create_loc.click(force=True)
+            except Exception as ce:
+                print(f"  [browser] Create click error: {ce}")
+                raise TimeoutError(f"Could not activate Create button: {ce}")
+            time.sleep(0.8)
+
+            # Dismiss notification dialog if it appeared, then use keyboard to re-activate Create
+            try:
+                not_now = page.locator("button:has-text('Not Now'), button:has-text('Not now')").first
+                if not_now.is_visible(timeout=1500):
+                    not_now.click()
+                    time.sleep(0.5)
+                    # Re-activate Create using Locator.press (focuses element and presses key)
+                    # without using pointer events
+                    create_loc.press("Enter")
+                    time.sleep(1.5)
+            except Exception:
+                pass
+
+            # If Instagram shows a sub-menu (Post / Story / Reel / Live), click "Post"
+            try:
+                page.wait_for_selector("text=Live video, text=Reel", timeout=3000)
+                post_loc = page.locator("text=Post").first
+                post_loc.press("Enter")
+                time.sleep(1)
+            except Exception:
+                pass  # No sub-menu — likely already on upload dialog
+
             _dismiss_dialogs(page)
 
             # Upload files via the file chooser dialog
@@ -192,6 +214,7 @@ def post_to_instagram(
                     page,
                     "text=Select from computer",
                     "button:has-text('Select from computer')",
+                    "[role='button']:has-text('Select from computer')",
                     description="Select from computer button",
                     timeout=8000,
                 )

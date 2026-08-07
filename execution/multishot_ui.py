@@ -180,8 +180,6 @@ def render_multishot_ui(get_user_out_dir_func):
                             st.error("Missing GOOGLE_API_KEY for AI Director.")
                         else:
                             genai.configure(api_key=google_key)
-                            model = genai.GenerativeModel("gemini-3.5-flash")
-                            
                             from PIL import Image
                             start_img = Image.open(temp_path)
                             
@@ -208,7 +206,20 @@ def render_multishot_ui(get_user_out_dir_func):
                             if extra_context:
                                 director_prompt += f"\nCONTEXT FROM USER:\n{extra_context}\n\nIncorporate the user's intent into your suggestion."
                             
-                            response = model.generate_content([director_prompt, start_img])
+                            # Try models sequentially during generate_content execution
+                            models_to_try = ["gemini-flash-latest", "gemini-pro-latest", "gemini-2.0-flash-001"]
+                            response = None
+                            last_err = "No models succeeded."
+                            for m_name in models_to_try:
+                                try:
+                                    model = genai.GenerativeModel(m_name)
+                                    response = model.generate_content([director_prompt, start_img])
+                                    break
+                                except Exception as e:
+                                    last_err = str(e)
+                                    continue
+                            if not response:
+                                raise ValueError(f"AI Director execution failed: {last_err}")
                             suggestion = response.text.strip()
                             
                             st.session_state["ai_director_suggestion"] = suggestion
@@ -329,7 +340,6 @@ def render_multishot_ui(get_user_out_dir_func):
                         st.error("Missing GOOGLE_API_KEY for AI Director.")
                     else:
                         genai.configure(api_key=google_key)
-                        model = genai.GenerativeModel("gemini-3.5-flash")
                         
                         # Build rich context from all inputs
                         context_parts = []
@@ -384,7 +394,20 @@ def render_multishot_ui(get_user_out_dir_func):
                             start_img = Image.open(temp_path)
                             content_parts.append(start_img)
                         
-                        response = model.generate_content(content_parts)
+                        # Try models sequentially during generate_content execution
+                        models_to_try = ["gemini-flash-latest", "gemini-pro-latest", "gemini-2.0-flash-001"]
+                        response = None
+                        last_err = "No models succeeded."
+                        for m_name in models_to_try:
+                            try:
+                                model = genai.GenerativeModel(m_name)
+                                response = model.generate_content(content_parts)
+                                break
+                            except Exception as e:
+                                last_err = str(e)
+                                continue
+                        if not response:
+                            raise ValueError(f"Coverage Director execution failed: {last_err}")
                         suggestion = response.text.strip()
                         
                         st.session_state["coverage_director_suggestion"] = suggestion
@@ -589,18 +612,6 @@ def render_multishot_ui(get_user_out_dir_func):
 
     st.divider()
 
-    # --- AI Engine Selector ---
-    st.markdown("**🎨 AI Engine**")
-    ms_engine_selected = st.selectbox(
-        "Select Model",
-        ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
-        help="Both models now fully support face, outfit, and location image references!",
-        key="ms_engine_select"
-    )
-    ms_engine_val = "openai" if "OpenAI" in ms_engine_selected else "gemini"
-
-    st.divider()
-
     # --- Generate Button (minimal form) ---
     with st.form("multishot_form"):
         col_q, col_gen = st.columns([1, 2])
@@ -716,7 +727,7 @@ def render_multishot_ui(get_user_out_dir_func):
                             "assets": assets
                         }
                         
-                        res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
+                        res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
                         
                         if res["status"] == "success":
                             st.session_state['multishot_result'] = res['image_path']
@@ -744,7 +755,7 @@ def render_multishot_ui(get_user_out_dir_func):
                             "assets": assets
                         }
                         
-                        res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
+                        res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
                         
                         if res["status"] == "success":
                             st.session_state['multishot_result'] = res['image_path']
@@ -779,7 +790,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                     "assets": assets
                                 }
                                 
-                                res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
+                                res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
                                 
                                 if res["status"] == "success":
                                     st.session_state['multishot_batch_results'].append({
@@ -814,7 +825,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                 "assets": assets
                             }
                             
-                            res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
+                            res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
                             
                             if res["status"] == "success":
                                 st.session_state['multishot_result'] = res['image_path']
@@ -883,7 +894,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                 "assets": assets
                             }
                             
-                            res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
+                            res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
                             
                             if res["status"] == "success":
                                 st.session_state['endframe_result'] = {
@@ -1054,7 +1065,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                     "assets": shot_assets
                                 }
                                 
-                                res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
+                                res = generate_image_from_prompt(payload, get_user_out_dir_func("MultiShot"))
                                 
                                 if res["status"] == "success":
                                     last_generated_path = res['image_path']  # Chain for next shot
@@ -1180,7 +1191,7 @@ def render_multishot_ui(get_user_out_dir_func):
                                                 rerun_payload = dict(stored_payload)
                                                 rerun_payload["assets"] = rerun_assets
                                                 
-                                                res = generate_image_from_prompt(rerun_payload, get_user_out_dir_func("MultiShot"), engine="openai" if "OpenAI" in st.session_state.get("ms_engine_select", "Gemini") else "gemini")
+                                                res = generate_image_from_prompt(rerun_payload, get_user_out_dir_func("MultiShot"))
                                                 if res["status"] == "success":
                                                     cov_results[actual_idx]["path"] = res['image_path']
                                                     cov_results[actual_idx]["payload"] = rerun_payload

@@ -15,7 +15,7 @@ def generate_prompt_content(vibe, outfit, character,
                             film_stock=None, filter_look=None, # New Inputs
                             aspect_ratio="9:16", # Default
                             extra_images=None, # New: List of {path, label} types
-                            model_engine="gemini-3.5-flash"): # Standard: Gemini 2.0 Flash (Free & Fast)
+                            model_engine="gemini-2.0-flash"): # Standard: Gemini 2.0 Flash (Free & Fast)
     """
     Generates a detailed image prompt using Google Gemini.
     CRITICAL: Visual references take ABSOLUTE priority over text descriptions.
@@ -26,20 +26,58 @@ def generate_prompt_content(vibe, outfit, character,
         import base64
         import requests
         
+        if not image_path:
+            return ""
+            
+        # Try local recovery first if it is an S3 URL representing a local file
+        if image_path.startswith(('http://', 'https://')) and "users/" in image_path:
+             try:
+                  local_rel = image_path.split(".amazonaws.com/")[1].split("?")[0]
+                  local_abs = os.path.join(os.getcwd(), "output", local_rel)
+                  if os.path.exists(local_abs):
+                       image_path = local_abs
+             except Exception:
+                  pass
+                  
         # Case A: URL
         if image_path.startswith(('http://', 'https://')):
             try:
-                resp = requests.get(image_path)
+                headers = {
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                }
+                resp = requests.get(image_path, headers=headers, timeout=5)
                 resp.raise_for_status()
                 return base64.b64encode(resp.content).decode('utf-8')
             except Exception as e:
                 print(f"Failed to download reference image: {e}")
-                return "" # Handle gracefully
+                
+                # Check clean path fallback
+                clean_path = image_path.split("?")[0]
+                if clean_path.startswith("output/") and os.path.exists(clean_path):
+                     try:
+                         with open(clean_path, "rb") as image_file:
+                             return base64.b64encode(image_file.read()).decode('utf-8')
+                     except Exception:
+                         pass
+                return ""
                 
         # Case B: Local File
         if os.path.exists(image_path):
-            with open(image_path, "rb") as image_file:
-                return base64.b64encode(image_file.read()).decode('utf-8')
+            try:
+                with open(image_path, "rb") as image_file:
+                    return base64.b64encode(image_file.read()).decode('utf-8')
+            except Exception as e:
+                print(f"Failed to read local file: {e}")
+                return ""
+                
+        # Case C: Check relative in current directory
+        local_alt = os.path.join(os.getcwd(), image_path)
+        if os.path.exists(local_alt):
+             try:
+                 with open(local_alt, "rb") as image_file:
+                     return base64.b64encode(image_file.read()).decode('utf-8')
+             except Exception:
+                 pass
         
         return ""
 
@@ -102,35 +140,24 @@ def generate_prompt_content(vibe, outfit, character,
     system_prompt = textwrap.dedent(f"""
         {instructions}
         
-        ROLE: You are an ACADEMY AWARD-WINNING CINEMATOGRAPHER and DOCUMENTARY PHOTOGRAPHER. You are famous for capturing AUTHENTIC, LIVED-IN moments — not polished ad campaigns.
-
-        GOAL: Your job is to take visual references and turn them into a **REAL, CANDID, PHOTOREALISTIC PROMPT** that looks like it was shot in the moment, not staged.
-
+        ROLE: You are an ACADEMY AWARD-WINNING CINEMATOGRAPHER and HOLLYWOOD DIRECTOR. You are famous for your visual storytelling, intense detail, and atmospheric lighting.
+        
+        GOAL: Your job is to take visual references and turn them into a **VISUAL MASTERPIECE PROMPT**.
+        
         🚨 ABSOLUTE RULE #1: VISUAL REFERENCES = TRUTH 🚨
         The images provided are ABSOLUTE REALITY. Your job is to DESCRIBE WHAT YOU SEE, not what the text says.
         - If IMAGE 1 shows a blonde woman → You MUST write "blonde woman"
         - If IMAGE 2 shows a brown fur top → You MUST write "brown fur top"
         - If the text says "red dress" but IMAGE 2 shows black pants → DESCRIBE THE BLACK PANTS
-
+        
         IMAGES OVERRIDE TEXT. ALWAYS. NO EXCEPTIONS.
-
-        🚨 ABSOLUTE RULE #2: NO AI LOOK — LIVED-IN ONLY 🚨
-        The single biggest failure mode is images that look generated. Eliminate ALL of these:
-        - FORBIDDEN: Perfect smooth skin (looks plastic) → ADD: subtle pores, slight texture, natural imperfection
-        - FORBIDDEN: Perfectly symmetrical lighting (looks studio) → ADD: mixed light sources, one side slightly darker
-        - FORBIDDEN: Generic backgrounds (empty walls, perfect bokeh) → ADD: real environment details — cups on tables, people in background, signs, clutter, texture
-        - FORBIDDEN: Posed stiff body language → ADD: mid-laugh, caught mid-sentence, hand adjusting hair, looking away
-        - FORBIDDEN: Overly sharp/rendered look → ADD: slight motion blur on hands, shallow depth of field, film grain
-        - FORBIDDEN: Perfect makeup/hair → ADD: a strand of hair out of place, slight lip gloss smear, natural brows
-
-        THE AESTHETIC YOU'RE GOING FOR: Think Instagram candid by a talented friend with a Sony A7IV. Not a billboard. Not a fashion editorial. REAL LIFE captured beautifully.
-
+        
         CRITICAL OUTPUT RULES:
         1.  **DESCRIBE EXACTLY WHAT YOU SEE IN THE IMAGES.** Do not invent features or clothing.
-        2.  **RICH, DENSE, EVOCATIVE LANGUAGE:** 150+ words. Use cinematic terms like "Volumetric Lighting", "Subsurface Scattering", "Shallow Depth of Field", "Film Grain", "Natural Bounce Light".
+        2.  **RICH, DENSE, EVOCATIVE LANGUAGE:** 150+ words. Use cinematic terms like "Volumetric Lighting", "Subsurface Scattering", "Bokeh", "Film Grain", "Chiaroscuro".
         3.  **NEVER BE GENERIC:**
             -   BAD: "She is wearing a top."
-            -   GOOD: "She is draped in a plush brown fur cropped top, one shoulder slightly slipped, catching the golden hour light with each movement — she's mid-laugh, eyes squinted, totally unaware of the camera."
+            -   GOOD: "She is draped in a plush brown fur cropped top that catches the golden hour light with each movement, revealing hints of skin at her midriff."
         
         INSTRUCTION MANUAL:
         
@@ -171,7 +198,7 @@ def generate_prompt_content(vibe, outfit, character,
         OUTPUT JSON FORMAT:
         {{
             "positive_prompt": "(MASTERPIECE): [What you SEE in the images] + [Technical specs] + [Action/Emotion expansion] + [Cinematic atmosphere]. High aesthetic, 8k, photorealistic.",
-            "negative_prompt": "cartoon, illustration, anime, 3d render, painting, drawing, text, watermark, low quality, glitch, deformed, mutated, ugly, disfigured, smooth plastic skin, airbrushed skin, overly perfect skin, symmetrical lighting, studio lighting, posed stiff posture, generic background, empty background, perfect hair, overly sharp rendering, AI generated look, digital art, CGI, wrong hair color, wrong outfit, hallucinated features, oversaturated colors, fake bokeh",
+            "negative_prompt": "cartoon, illustration, anime, 3d render, painting, drawing, text, watermark, low quality, glitch, deformed, mutated, ugly, disfigured, smooth skin, plastic look, wrong hair color, wrong outfit, hallucinated features...",
             "aspect_ratio": "{aspect_ratio}"
         }}
     """)
@@ -222,16 +249,18 @@ def generate_prompt_content(vibe, outfit, character,
             load_dotenv(override=True)
             google_key = os.getenv("GOOGLE_API_KEY")
             if not google_key: return {"positive_prompt": "Error: GOOGLE_API_KEY missing", "aspect_ratio": "9:16"}
-
+            
             genai.configure(api_key=google_key)
-            # Fallback chain: if primary model is quota-limited, try the next one
-            model_fallback_chain = [model_engine]
-            if model_engine == "gemini-3.5-flash":
-                model_fallback_chain += ["gemini-1.5-flash", "gemini-1.5-flash-8b"]
-            elif model_engine == "gemini-1.5-flash":
-                model_fallback_chain += ["gemini-1.5-flash-8b"]
-
-            model = genai.GenerativeModel(model_engine)
+            try:
+                model = genai.GenerativeModel(model_engine)
+            except Exception:
+                try:
+                    model = genai.GenerativeModel("gemini-3.5-flash")
+                except Exception:
+                    try:
+                        model = genai.GenerativeModel("gemini-2.5-flash")
+                    except Exception:
+                        model = genai.GenerativeModel("gemini-1.5-flash")
             
             # Prepare Content List
             gemini_content = [system_prompt, "\n\nUSER REQUEST:\n" + user_text_content]
@@ -323,35 +352,86 @@ def generate_prompt_content(vibe, outfit, character,
                         gemini_content.append(f"ADDITIONAL REFERENCE ({lbl} - DESCRIBE EXACTLY AS SHOWN):")
                         gemini_content.append(img_obj)
                 
-            # Exponential backoff + model fallback for Gemini 429 / Resource exhausted
-            backoff_delays = [5, 15, 30]
+            # RETRY LOGIC FOR 429 (RATE LIMIT)
+            max_retries = 3
+            retry_delay = 2
+            
+            # RETRY LOGIC FOR 429 (RATE LIMIT) and fallback model resolution
+            max_retries = 3
+            retry_delay = 2
             response = None
-
-            for model_name in model_fallback_chain:
-                active_model = genai.GenerativeModel(model_name)
-                succeeded = False
-                for attempt, wait in enumerate(backoff_delays + [None]):
-                    try:
-                        response = active_model.generate_content(gemini_content)
-                        succeeded = True
-                        if model_name != model_engine:
-                            print(f"✅ Fell back to {model_name} after quota limit on {model_engine}")
+            success = False
+            last_err = None
+            
+            # First try the default model
+            for attempt in range(max_retries):
+                try:
+                    response = model.generate_content(gemini_content)
+                    success = True
+                    break 
+                except Exception as e:
+                    last_err = e
+                    if "429" in str(e) and attempt < max_retries - 1:
+                        time.sleep(retry_delay * (attempt + 1))
+                        continue
+                    else:
                         break
-                    except Exception as e:
-                        is_rate_limit = "429" in str(e) or "Resource exhausted" in str(e) or "quota" in str(e).lower()
-                        if is_rate_limit and wait is not None:
-                            print(f"Gemini 429 on {model_name} (attempt {attempt+1}), waiting {wait}s...")
-                            time.sleep(wait)
-                        else:
-                            if is_rate_limit:
-                                print(f"Quota exhausted on {model_name}, trying next model...")
-                            else:
-                                raise e
+            
+            # If default fails, try fallback models in sequence
+            if not success:
+                fallback_models = ["gemini-flash-latest", "gemini-pro-latest", "gemini-2.0-flash-001"]
+                for f_model_name in fallback_models:
+                    try:
+                        fallback_model = genai.GenerativeModel(f_model_name)
+                        for attempt in range(max_retries):
+                            try:
+                                response = fallback_model.generate_content(gemini_content)
+                                success = True
+                                break
+                            except Exception as e:
+                                last_err = e
+                                if "429" in str(e) and attempt < max_retries - 1:
+                                    time.sleep(retry_delay * (attempt + 1))
+                                    continue
+                                else:
+                                    break
+                        if success:
                             break
-                if succeeded:
-                    break
-            if response is None:
-                raise Exception("All Gemini models quota-limited. Try again later.")
+                    except Exception as e:
+                        last_err = e
+                        continue
+                        
+            if not success or not response:
+                # Try Atlas Cloud API fallback using ATLASCLOUD_API_KEY
+                atlas_key = os.getenv("ATLASCLOUD_API_KEY")
+                if atlas_key:
+                    try:
+                        print("⚡ Falling back to Atlas Cloud LLM (Zero Quota)...")
+                        headers = {
+                            "Content-Type": "application/json",
+                            "Authorization": f"Bearer {atlas_key}"
+                        }
+                        atlas_payload = {
+                            "model": "google/gemini-2.5-flash",
+                            "messages": [
+                                {"role": "user", "content": f"{system_prompt}\n\nUSER REQUEST:\n{user_text_content}"}
+                            ]
+                        }
+                        a_resp = requests.post("https://api.atlascloud.ai/v1/chat/completions", headers=headers, json=atlas_payload, timeout=30)
+                        if a_resp.status_code == 200:
+                            a_json = a_resp.json()
+                            raw_text = a_json['choices'][0]['message']['content']
+                            if "```json" in raw_text:
+                                try: raw_text = raw_text.split("```json")[1].split("```")[0].strip()
+                                except IndexError: pass
+                            elif "{" in raw_text:
+                                start = raw_text.find("{")
+                                end = raw_text.rfind("}") + 1
+                                raw_text = raw_text[start:end]
+                            return json.loads(raw_text)
+                    except Exception as atlas_e:
+                        print(f"Atlas LLM Fallback Error: {atlas_e}")
+                raise last_err
             
             # Parse JSON
             raw_text = response.text

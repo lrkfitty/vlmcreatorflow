@@ -29,35 +29,29 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
         user = st.session_state.current_user.get("username") if st.session_state.get("current_user") else "guest"
 
         st.markdown("#### Design Specs")
-
-        st.markdown("**AI Engine**")
-        selected_engine = st.selectbox(
-            "Select Model",
-            ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
-            help="Both models now fully support face, outfit, and location image references!"
-        )
-        engine_val = "openai" if "OpenAI" in selected_engine else "gemini"
-
-        st.divider()
-
-        # Individual Shots (Batch) requires cascade reference images — not supported by gpt-image-2
-        if engine_val == "openai":
-            available_modes = [
-                "Concept Portrait (Vertical)",
-                "Character Sheet (5 Angles - Vertical)",
-            ]
-            st.info("💡 Individual Shots (Batch) is unavailable with OpenAI — gpt-image-2 can't accept reference images for cascade consistency. Use Character Sheet instead.", icon="ℹ️")
-        else:
-            available_modes = [
-                "Concept Portrait (Vertical)",
-                "Character Sheet (5 Angles - Vertical)",
-                "Individual Shots (Batch)"
-            ]
-
+        
+        # 1.5 Model Engine Selection
+        st.markdown("**Image Engine**")
+        model_opt = st.selectbox("Select Model", [
+            "Nano (SDXL Fine-Tuned)",
+            "Wan 2.7 (High Fidelity)",
+            "GPT Image 2.0 (DALL-E 3)"
+        ], index=0)
+        
+        model_key = "nano"
+        if "Wan" in model_opt:
+            model_key = "wan"
+        elif "GPT" in model_opt:
+            model_key = "gpt"
+            
         # 2. Output Mode (Outside Form for Instant Reactivity)
         st.markdown("**Output Format**")
-        output_mode = st.selectbox("Generation Mode", available_modes)
-
+        output_mode = st.selectbox("Generation Mode", [
+            "Concept Portrait (Vertical)", 
+            "Character Sheet (5 Angles - Vertical)",
+            "Individual Shots (Batch)"
+        ])
+        
         selected_angles = []
         if output_mode == "Individual Shots (Batch)":
             angle_opts = [
@@ -71,8 +65,9 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 angle_opts,
                 default=["Front View", "Side View (Left)", "3/4 View (Left)", "Back View"]
             )
-
+            
         st.divider()
+        
         
         with st.form("character_creator_form"):
             # 1. Reference Images (Multi-Upload)
@@ -562,7 +557,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                 base_prompt = build_character_prompt(attrs)
                 
                 if output_mode == "Character Sheet (5 Angles - Vertical)":
-                    full_prompt = get_character_sheet_prompt(base_prompt, engine=engine_val)
+                    full_prompt = get_character_sheet_prompt(base_prompt)
                     ar = "4:5" # User requested 4:5 for all Studio generations
                     target_w, target_h = 896, 1152
                 else:
@@ -602,10 +597,10 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                              "width": target_w, "height": target_h,
                              "aspect_ratio": ar,
                              "image_size": "4K",
-                             "model_type": "nano",
+                             "model_type": model_key,
                              "assets": assets
                         },
-                        settings={"batch_count": 1, "engine": engine_val},
+                        settings={"batch_count": 1},
                         output_folder=get_user_out_dir_func("Characters/Concepts"),
                         char_path=st.session_state.get("lock_identity_path")
                      )
@@ -661,10 +656,10 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                                             "width": target_w, "height": target_h,
                                             "aspect_ratio": ar,
                                             "image_size": "4K",
-                                            "model_type": "nano",
+                                            "model_type": model_key,
                                             "assets": current_assets
                                         }
-                                        res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"), engine=engine_val)
+                                        res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
                                         if res["status"] == "success":
                                             st.session_state['char_batch_results'].append({
                                                 "angle": angle,
@@ -708,11 +703,11 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                                      "width": target_w, "height": target_h,
                                      "aspect_ratio": ar,
                                      "image_size": "4K",
-                                     "model_type": "nano",
+                                     "model_type": model_key,
                                      "assets": assets
                                  }
                                  
-                                 res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"), engine=engine_val)
+                                 res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
                                  
                                  if res["status"] == "success":
                                      st.session_state['char_preview'] = res['image_path']
@@ -752,7 +747,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                         user = st.session_state.current_user.get("username") if 'current_user' in st.session_state and st.session_state.current_user else "guest"
                         if auth_mgr.deduct_credits(user, 1):
                             with st.spinner(f"🔄 Re-generating {first['angle']}..."):
-                                res = generate_image_from_prompt(stored_payload, get_user_out_dir_func("Characters/Concepts"), engine=engine_val)
+                                res = generate_image_from_prompt(stored_payload, get_user_out_dir_func("Characters/Concepts"))
                                 if res["status"] == "success":
                                     # Overwrite path in session state
                                     st.session_state['char_batch_results'][0]['path'] = res['image_path']
@@ -792,7 +787,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                                      user = st.session_state.current_user.get("username") if 'current_user' in st.session_state and st.session_state.current_user else "guest"
                                      if auth_mgr.deduct_credits(user, 1):
                                          with st.spinner(f"🔄 Re-generating {item['angle']}..."):
-                                             res = generate_image_from_prompt(stored_payload, get_user_out_dir_func("Characters/Concepts"), engine=engine_val)
+                                             res = generate_image_from_prompt(stored_payload, get_user_out_dir_func("Characters/Concepts"))
                                              if res["status"] == "success":
                                                  # Overwrite path in session state
                                                  st.session_state['char_batch_results'][actual_idx]['path'] = res['image_path']
@@ -859,7 +854,7 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
             if attrs and lock_path:
                 # Re-import not needed as we imported at top
                     base_prompt = build_character_prompt(attrs)
-                    full_prompt = get_character_sheet_prompt(base_prompt, engine=engine_val)
+                    full_prompt = get_character_sheet_prompt(base_prompt)
                     target_w, target_h = 896, 1152  # 4:5 vertical
                     
                     user = st.session_state.current_user.get("username")
@@ -879,10 +874,10 @@ def render_character_studio(characters_data, get_user_out_dir_func, campaign_mgr
                             "width": target_w, "height": target_h,
                             "aspect_ratio": "4:5",
                             "image_size": "4K",
-                            "model_type": "nano",
+                            "model_type": model_key,
                             "assets": assets
                         }
-                    res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"), engine=engine_val)
+                    res = generate_image_from_prompt(payload, get_user_out_dir_func("Characters/Concepts"))
                     if res["status"] == "success":
                         st.session_state['char_preview'] = res['image_path']
                         st.session_state['char_final_prompt'] = full_prompt

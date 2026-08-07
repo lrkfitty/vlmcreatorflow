@@ -706,8 +706,8 @@ def icon_grid_selector(label, options, icons_dir, key, cols_per_row=4):
 
 def thumbnail_carousel(label, items_dict, state_key, thumb_cols=3, show_label=True):
     """
-    Paginated photo-gallery carousel with inline text-search.
-    Shows `thumb_cols` items at a time with ◀ / ▶ navigation.
+    Paginated photo-gallery carousel — shows `thumb_cols` items at a time
+    with ◀ / ▶ navigation. Uses st.image() for local files (no base64 crash).
 
     Args:
         label:       Section header
@@ -729,40 +729,9 @@ def thumbnail_carousel(label, items_dict, state_key, thumb_cols=3, show_label=Tr
         st.caption("No items available.")
         return st.session_state.get(state_key)
 
-    # ── Inline search box ─────────────────────────────────────────────────────
-    search_key = f"_tc_search_{state_key}"
-    page_key   = f"_tc_page_{state_key}"
-
-    if search_key not in st.session_state:
-        st.session_state[search_key] = ""
-
-    prev_query = st.session_state[search_key]
-    query = st.text_input(
-        "Search",
-        value=prev_query,
-        key=f"_tc_search_input_{state_key}",
-        placeholder="Type a name to filter…",
-        label_visibility="collapsed",
-    )
-    if query != prev_query:
-        st.session_state[search_key] = query
-        st.session_state[page_key]   = 0
-
-    q_low = query.strip().lower()
-    if q_low:
-        filtered = {k: v for k, v in items_dict.items() if q_low in k.lower()}
-    else:
-        filtered = items_dict
-
-    items = list(filtered.items())
-    total = len(items)
-
-    if total == 0:
-        st.caption(f"No results for **{query}**")
-        return st.session_state.get(state_key)
-
-    if total != len(items_dict):
-        st.caption(f"{total} of {len(items_dict)} shown")
+    items   = list(items_dict.items())
+    total   = len(items)
+    page_key = f"_tc_page_{state_key}"
 
     if page_key not in st.session_state:
         st.session_state[page_key] = 0
@@ -785,8 +754,7 @@ def thumbnail_carousel(label, items_dict, state_key, thumb_cols=3, show_label=Tr
             st.session_state[page_key] -= 1
             st.rerun()
     with nav_mid:
-        selected_display = st.session_state.get(state_key, "")
-        st.caption(f"{start + 1}–{end} of {total}   |   {'✅ ' + str(selected_display) if selected_display else 'None selected'}")
+        st.caption(f"{start + 1}–{end} of {total}   |   {'✅ ' + str(st.session_state.get(state_key, '')) if st.session_state.get(state_key) else 'None selected'}")
     with nav_r:
         if st.button("▶", key=f"_tc_next_{state_key}", disabled=(page >= max_page),
                      use_container_width=True):
@@ -855,88 +823,6 @@ def thumbnail_carousel(label, items_dict, state_key, thumb_cols=3, show_label=Tr
 
     return st.session_state.get(state_key)
 
-
-def outfit_carousel(items_dict, state_key, thumb_cols=3):
-    """
-    Categorized outfit selector with horizontal category pill-buttons.
-
-    Parses the first path segment of each outfit name as its category
-    (e.g. "AtHome / Cozy Tee" → category "AtHome") and renders pill buttons
-    so the user can quickly filter the thumbnail grid by wardrobe category.
-    A text-search box (from thumbnail_carousel) is also available.
-
-    Args:
-        items_dict:  Dict {display_name: value}  — same format as thumbnail_carousel.
-        state_key:   Session-state key for the selected outfit name.
-        thumb_cols:  Columns in the thumbnail grid (default 3).
-
-    Returns:
-        Currently selected outfit key (display name) or None.
-    """
-    cat_key = f"_oc_cat_{state_key}"
-
-    # ── Build category list ───────────────────────────────────────────────────
-    categories = set()
-    for name in items_dict:
-        clean = name.replace("(My) ", "").replace("AI / ", "")
-        parts = clean.split(" / ")
-        if len(parts) > 1:
-            categories.add(parts[0].strip())
-
-    sorted_cats = sorted(categories)
-
-    if cat_key not in st.session_state:
-        st.session_state[cat_key] = "All"
-
-    # ── Category pill buttons ─────────────────────────────────────────────────
-    if sorted_cats:
-        st.markdown(
-            "<p style='font-size:0.75rem;color:#94A3B8;font-weight:600;"
-            "text-transform:uppercase;letter-spacing:0.1em;margin-bottom:4px;'>"
-            "CATEGORY</p>",
-            unsafe_allow_html=True
-        )
-        pill_labels = ["All"] + sorted_cats
-        max_per_row = 8
-        for row_start in range(0, len(pill_labels), max_per_row):
-            row_labels = pill_labels[row_start : row_start + max_per_row]
-            pill_cols = st.columns(len(row_labels))
-            for i, cat in enumerate(row_labels):
-                with pill_cols[i]:
-                    is_active = (st.session_state[cat_key] == cat)
-                    if st.button(
-                        cat,
-                        key=f"_oc_pill_{state_key}_{cat}",
-                        type="primary" if is_active else "secondary",
-                        use_container_width=True,
-                    ):
-                        st.session_state[cat_key] = cat
-                        st.session_state[f"_tc_page_{state_key}"] = 0
-                        st.session_state[f"_tc_search_{state_key}"] = ""
-                        st.rerun()
-
-        active_cat = st.session_state[cat_key]
-        if active_cat == "All":
-            filtered_dict = items_dict
-        else:
-            filtered_dict = {}
-            for name, val in items_dict.items():
-                clean = name.replace("(My) ", "").replace("AI / ", "")
-                parts = clean.split(" / ")
-                if len(parts) > 1 and parts[0].strip() == active_cat:
-                    filtered_dict[name] = val
-                elif len(parts) == 1 and active_cat == "Other":
-                    filtered_dict[name] = val
-    else:
-        filtered_dict = items_dict
-
-    return thumbnail_carousel(
-        label="",
-        items_dict=filtered_dict,
-        state_key=state_key,
-        thumb_cols=thumb_cols,
-        show_label=False,
-    )
 
 
 def fidelity_mode_selector(state_key="fidelity_mode"):

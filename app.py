@@ -3,6 +3,8 @@ import sys
 import os
 import json
 import time
+from dotenv import load_dotenv
+load_dotenv(override=True)
 
 # Add execution directory to path to import scripts
 sys.path.append(os.path.join(os.path.dirname(__file__), 'execution'))
@@ -16,7 +18,7 @@ try:
     from load_assets import load_assets, promote_image_to_asset
     import execution.magic_ui as magic_ui_module
     importlib.reload(magic_ui_module)
-    from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button, icon_grid_selector, thumbnail_carousel, outfit_carousel, fidelity_mode_selector
+    from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button, icon_grid_selector, thumbnail_carousel, fidelity_mode_selector
     import generate_image as gi_module
     importlib.reload(gi_module)
     from generate_image import generate_image_from_prompt
@@ -26,6 +28,7 @@ try:
     from generate_prompt import generate_prompt_content
     from campaign_runner import CampaignManager
     from execution.generate_video import generate_video_kling, generate_video_humo
+    from execution.generate_wan import generate_wan_image, generate_wan_video
     from execution.s3_uploader import upload_file_obj, delete_file
     from generate_video_prompt import generate_motion_prompt
     from world_manager import load_world_db, get_assets_by_category, get_scenarios
@@ -221,9 +224,9 @@ with st.sidebar:
 
 # HEADER
 # HEADER
-st.markdown("<div class='brand-overline'>Viral Lense Media</div>", unsafe_allow_html=True)
-st.markdown("<h1 style='text-align: center; font-size: 6rem; font-weight: 800; letter-spacing: -0.05em; margin-bottom: 0.5rem; text-shadow: 0 0 30px rgba(255,255,255,0.1);'>CreateFlow</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; color: #94A3B8; font-size: 1.2rem; margin-bottom: 3rem; letter-spacing: 0.2em; text-transform: uppercase;'>Enterprise-Grade Content Workflow</p>", unsafe_allow_html=True)
+st.markdown("<div class='brand-overline'>CreateFlow</div>", unsafe_allow_html=True)
+st.markdown("<h1 style='text-align: center; font-size: 6rem; font-weight: 800; letter-spacing: -0.05em; margin-bottom: 0.5rem; text-shadow: 0 0 30px rgba(21,101,192,0.25);'>Enterprise Asset Studio</h1>", unsafe_allow_html=True)
+st.markdown("<p style='text-align: center; color: #94A3B8; font-size: 1.2rem; margin-bottom: 3rem; letter-spacing: 0.2em; text-transform: uppercase;'>Your Brand. Your Assets. Total Control.</p>", unsafe_allow_html=True)
 
 # Load Assets
 user_asset_path = None
@@ -241,9 +244,10 @@ try:
     # V4.2: Split Caching (Ultra Performance)
     # 1. Base Assets (Persisted to Disk, Updates Hourly or Manual)
     # V4.3: Renamed to get_global_assets to force hard cache bust of old stale ui_icons
-    @st.cache_data(ttl=3600, persist="disk", show_spinner="Loading Global Catalog...")
+    @st.cache_data(ttl=3600, persist="disk", show_spinner="Loading Asset Library...")
     def get_global_assets():
-        return load_assets(user_assets_dir=None, skip_base=False)
+        # Enterprise: skip shared preset library — clients upload their own assets only
+        return load_assets(user_assets_dir=None, skip_base=True)
 
     # 2. User Assets (Session Cache, Fast, Updates often)
     @st.cache_data(ttl=300, show_spinner=False)
@@ -305,23 +309,6 @@ try:
     relations_data = assets.get('relations', {})
     characters_data.update(relations_data)
     
-    # ── Inject Celebrity Roster ──────────────────────────────────────────
-    # Celebrities appear in every dropdown as text-only references (⭐ prefix)
-    try:
-        from execution.celebrities import CELEBRITIES as _CELEBS
-        for _celeb in _CELEBS:
-            _key = f"⭐ {_celeb['name']}"
-            characters_data[_key] = {
-                "name": _celeb["name"],
-                "default_img": None,        # no image — text description only
-                "is_celebrity": True,
-                "celebrity_desc": _celeb["prompt_description"],
-                "category": _celeb["category"]
-            }
-    except Exception as _e:
-        pass  # Non-fatal: celebrities.py missing or import error
-    # ────────────────────────────────────────────────────────────────────
-    
     vibes_list = list(vibes_data.keys())
     outfits_list = list(outfits_data.keys())
     characters_list = list(characters_data.keys())
@@ -342,15 +329,9 @@ except FileNotFoundError:
 # Initialize Campaign Manager
 campaign_mgr = CampaignManager()
 
-# --- HELPER: Resolve character to asset dict (handles both image chars & celebrity text refs) ---
+# --- HELPER: Resolve character to asset dict ---
 def resolve_char_asset(char_key, char_val):
-    """Returns an asset dict for generate_image. Handles image refs and celebrity text refs."""
-    if isinstance(char_val, dict) and char_val.get("is_celebrity"):
-        return {
-            "path": None,
-            "label": f"Cast: {char_val['name']}",
-            "celebrity_desc": char_val.get("celebrity_desc", "")
-        }
+    """Returns an asset dict for generate_image from an uploaded brand ambassador."""
     path = char_val.get("default_img") if isinstance(char_val, dict) else char_val
     name = char_val.get("name", char_key) if isinstance(char_val, dict) else os.path.splitext(os.path.basename(str(char_key)))[0]
     return {"path": path, "label": f"Cast: {name}"}
@@ -371,10 +352,215 @@ def get_user_out_dir(category="General"):
     os.makedirs(path, exist_ok=True)
     return path
 
+# --- HELPER: WAN & SEEDANCE ASSET MAPPING RIG ---
+def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
+    """
+    Renders the visual Character, Outfit & Environment Mapping Rig for Wan & Seedance Studio.
+    Returns dict:
+      {
+        "primary_image_path": str or None,
+        "extra_ref_paths": list of str,
+        "char_name": str or None,
+        "outfit_name": str or None,
+        "env_name": str or None,
+        "mapping_tags": list of str
+      }
+    """
+    rig_results = {
+        "primary_image_path": None,
+        "extra_ref_paths": [],
+        "char_name": None,
+        "outfit_name": None,
+        "env_name": None,
+        "mapping_tags": []
+    }
+    
+    with st.expander("🎭 Character, Outfit & Environment Mapping Rig (Asset Library Shortcuts)", expanded=True):
+        st.markdown("Select your characters, outfits, and environments directly from your loaded Asset Library. The rig automatically maps thumbnails and injects reference tags (`Image1`, `Image2`, `Image3`) into Wan 2.7 & Seedance 2.0.")
+        
+        c_tab_char, c_tab_fit, c_tab_env = st.tabs(["👤 Characters", "👗 Outfits", "🏞️ Environments & Locations"])
+        
+        selected_char_path = None
+        selected_char_name = None
+        selected_fit_path = None
+        selected_fit_name = None
+        selected_env_path = None
+        selected_env_name = None
+        
+        # Access session assets safely
+        session_assets = st.session_state.get("global_assets", {})
+        
+        # 1. CHARACTER PICKER
+        with c_tab_char:
+            from execution.world_manager import load_world_db
+            db = load_world_db()
+            characters_data = session_assets.get('characters', {}).copy()
+            characters_data.update(db.get('characters', {}))
+            characters_data.update(session_assets.get('relations', {}))
+            
+            char_key = thumbnail_carousel(
+                "Select Main Character (Image1)",
+                {"None": None, **characters_data},
+                state_key=f"{prefix_key}_rig_char_main",
+                thumb_cols=4,
+                show_label=True
+            )
+            
+            if char_key and char_key != "None":
+                p_val = characters_data.get(char_key)
+                if isinstance(p_val, dict):
+                    selected_char_name = p_val.get('name', char_key)
+                    selected_char_path = p_val.get('default_img')
+                elif p_val:
+                    filename = str(char_key).split('/')[-1]
+                    if "default" in filename.lower():
+                        selected_char_name = str(char_key).split('/')[-2]
+                    else:
+                        selected_char_name = os.path.splitext(filename)[0]
+                    selected_char_path = p_val
+                
+                # Check for specific look/variant
+                if selected_char_path and os.path.exists(str(selected_char_path)):
+                    char_dir = os.path.dirname(str(selected_char_path))
+                    valid_exts = ('.png', '.jpg', '.jpeg', '.webp')
+                    siblings = [f for f in os.listdir(char_dir) if f.lower().endswith(valid_exts) and not f.startswith('.')]
+                    if siblings and len(siblings) > 1:
+                        current_file = os.path.basename(str(selected_char_path))
+                        def_idx = siblings.index(current_file) if current_file in siblings else 0
+                        selected_var = st.selectbox("Select Character Look/Angle Variant", siblings, index=def_idx, key=f"{prefix_key}_char_var")
+                        selected_char_path = os.path.join(char_dir, selected_var)
+            
+            if selected_char_path:
+                st.caption(f"✅ **Main Character Assigned (Image1)**: `{selected_char_name}`")
+                
+        # 2. OUTFIT PICKER
+        with c_tab_fit:
+            fit_opts = session_assets.get('outfits', {})
+            fit_key = thumbnail_carousel(
+                "Select Outfit (Image2)",
+                {"None": None, **fit_opts},
+                state_key=f"{prefix_key}_rig_fit_main",
+                thumb_cols=4,
+                show_label=True
+            )
+            
+            if fit_key and fit_key != "None":
+                f_val = fit_opts.get(fit_key)
+                if isinstance(f_val, dict):
+                    selected_fit_name = f_val.get('name', fit_key)
+                    selected_fit_path = f_val.get('default_img')
+                elif f_val:
+                    selected_fit_name = str(fit_key).split('/')[-1]
+                    if os.path.sep in selected_fit_name:
+                        selected_fit_name = os.path.splitext(selected_fit_name)[0]
+                    selected_fit_path = f_val
+                    
+            if selected_fit_path:
+                st.caption(f"✅ **Outfit Assigned (Image2)**: `{selected_fit_name}`")
+                
+        # 3. ENVIRONMENT PICKER
+        with c_tab_env:
+            loc_opts = get_assets_by_category("locations")
+            loc_key = thumbnail_carousel(
+                "Select Location (Image3)",
+                {"None": None, **loc_opts},
+                state_key=f"{prefix_key}_rig_loc_main",
+                thumb_cols=4,
+                show_label=True
+            )
+            
+            if loc_key and loc_key != "None":
+                l_val = loc_opts.get(loc_key)
+                if isinstance(l_val, dict):
+                    selected_env_name = l_val.get('name', loc_key)
+                    selected_env_path = l_val.get('default_img')
+                elif l_val:
+                    selected_env_name = str(loc_key).split('/')[-1]
+                    if os.path.sep in selected_env_name:
+                        selected_env_name = os.path.splitext(selected_env_name)[0]
+                    selected_env_path = l_val
+            elif "primary_env_img" in st.session_state and os.path.exists(st.session_state["primary_env_img"]):
+                selected_env_path = st.session_state["primary_env_img"]
+                selected_env_name = "Primary Environment Master Still"
+                
+            if selected_env_path:
+                st.caption(f"✅ **Environment Assigned (Image3)**: `{selected_env_name}`")
+                
+        # THUMBNAIL PREVIEW STRIP & RIG SUMMARY
+        rig_imgs = []
+        if selected_char_path:
+            rig_imgs.append(("Image1 (Character)", selected_char_path, selected_char_name))
+        if selected_fit_path:
+            idx_label = f"Image{len(rig_imgs)+1} (Outfit)"
+            rig_imgs.append((idx_label, selected_fit_path, selected_fit_name))
+        if selected_env_path:
+            idx_label = f"Image{len(rig_imgs)+1} (Location)"
+            rig_imgs.append((idx_label, selected_env_path, selected_env_name))
+            
+        if rig_imgs:
+            st.markdown("---")
+            st.markdown("##### 📌 Active Rig Mapping Slots")
+            cols = st.columns(min(len(rig_imgs), 4))
+            for i, (slot_tag, img_p, item_n) in enumerate(rig_imgs):
+                with cols[i]:
+                    st.caption(f"**{slot_tag}**")
+                    if img_p and os.path.exists(str(img_p)):
+                        st.image(img_p, use_container_width=True)
+                    st.caption(f"`{item_n}`")
+                    
+            # Set Rig outputs
+            if selected_char_path:
+                rig_results["primary_image_path"] = selected_char_path
+                rig_results["char_name"] = selected_char_name
+                rig_results["mapping_tags"].append(f"Image1: Character ({selected_char_name})")
+            
+            curr_ref_idx = 2 if selected_char_path else 1
+            if selected_fit_path:
+                if not rig_results["primary_image_path"]:
+                    rig_results["primary_image_path"] = selected_fit_path
+                else:
+                    rig_results["extra_ref_paths"].append(selected_fit_path)
+                rig_results["outfit_name"] = selected_fit_name
+                rig_results["mapping_tags"].append(f"Image{curr_ref_idx}: Outfit ({selected_fit_name})")
+                curr_ref_idx += 1
+                
+            if selected_env_path:
+                if not rig_results["primary_image_path"]:
+                    rig_results["primary_image_path"] = selected_env_path
+                else:
+                    rig_results["extra_ref_paths"].append(selected_env_path)
+                rig_results["env_name"] = selected_env_name
+                rig_results["mapping_tags"].append(f"Image{curr_ref_idx}: Location ({selected_env_name})")
+                curr_ref_idx += 1
+                
+            # INJECTION BUTTON
+            if prompt_target_key:
+                if st.button("⚡ Auto-Inject Mapping Rig to Prompt", key=f"{prefix_key}_inject_btn", use_container_width=True):
+                    tag_str = "\n".join(rig_results["mapping_tags"])
+                    descr_parts = []
+                    if selected_char_name: descr_parts.append(f"character {selected_char_name}")
+                    if selected_fit_name: descr_parts.append(f"wearing {selected_fit_name} outfit")
+                    if selected_env_name: descr_parts.append(f"in {selected_env_name} environment")
+                    
+                    combined_descr = ", ".join(descr_parts) if descr_parts else "character in scene"
+                    injected_text = f"{tag_str}\n\nCinematic film shot of {combined_descr}, 35mm lens, highly detailed, realistic lighting."
+                    st.session_state[prompt_target_key] = injected_text
+                    st.toast("✅ Mapping Rig tags injected into Prompt!")
+                    st.rerun()
+                    
+    return rig_results
+
 # --- TABS LAYOUT ---
 # --- TABS LAYOUT (Persistent) ---
 if "active_tab" not in st.session_state:
     st.session_state.active_tab = "Workflow Wizard"
+
+if "wan_edit_image" not in st.session_state:
+    st.session_state.wan_edit_image = None
+if "wan_animate_image" not in st.session_state:
+    st.session_state.wan_animate_image = None
+if "wan_active_subtab" not in st.session_state:
+    st.session_state.wan_active_subtab = 0
 
 # Custom CSS for Pill-like Tabs
 st.markdown("""
@@ -405,16 +591,16 @@ st.markdown("""
         font-size: 0.85rem !important;
     }
     div[data-testid="stRadio"] > div[role="radiogroup"] > label:hover {
-        background-color: rgba(255, 255, 255, 0.12);
-        border-color: rgba(56, 189, 248, 0.4);
-        box-shadow: 0 0 12px rgba(56, 189, 248, 0.15);
+        background-color: rgba(21, 101, 192, 0.15);
+        border-color: rgba(21, 101, 192, 0.5);
+        box-shadow: 0 0 12px rgba(21, 101, 192, 0.2);
     }
     div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-checked="true"] {
-        background: linear-gradient(135deg, #2563EB 0%, #7C3AED 100%);
+        background: linear-gradient(135deg, #0D2137 0%, #1565C0 100%);
         color: white;
         border-color: transparent;
         font-weight: bold;
-        box-shadow: 0 0 20px rgba(124, 58, 237, 0.4);
+        box-shadow: 0 0 20px rgba(21, 101, 192, 0.45);
     }
     div[data-testid="stRadio"] > div[role="radiogroup"] > label[data-checked="true"] p {
         color: #FFFFFF !important;
@@ -426,12 +612,14 @@ st.markdown("""
 nav_options = [
     "Workflow Wizard", 
     "My Gallery",
+    "Video Vault",
     "Asset Library",
     "Mini Series",
     "World Builder",
     "Campaign Queue",
     "Art Director",
     "Video Studio",
+    "Wan & Seedance Studio",
     "Character Studio",
     "Multi-Shot Generator"
 ]
@@ -485,21 +673,18 @@ def _scan_s3_gallery(bucket_name, prefix, region):
                 "time": obj.get('LastModified').timestamp()
             })
     all_images_meta.sort(key=lambda x: x["time"], reverse=True)
-    return all_images_meta[:200]
+    return all_images_meta[:300]
 
 # --- Cached Presigned URL batch (avoids re-signing on rerun) ---
 @st.cache_data(ttl=3500, show_spinner=False)
 def _sign_urls(bucket_name, region, keys_tuple):
-    """Generate presigned URLs for a batch of S3 keys. keys_tuple for hashability."""
-    import boto3
-    s3 = boto3.client('s3', region_name=region)
+    """Generate direct public S3 URLs for a batch of keys. keys_tuple for hashability."""
     urls = {}
+    import urllib.parse
     for key in keys_tuple:
-        urls[key] = s3.generate_presigned_url(
-            'get_object',
-            Params={'Bucket': bucket_name, 'Key': key},
-            ExpiresIn=3600
-        )
+        encoded_parts = [urllib.parse.quote(part) for part in key.split('/')]
+        encoded_key = '/'.join(encoded_parts)
+        urls[key] = f"https://{bucket_name}.s3.{region}.amazonaws.com/{encoded_key}"
     return urls
 
 # --- Cached Local Scanner (survives reruns, 2-min TTL) ---
@@ -535,7 +720,99 @@ def _scan_local_gallery(user_root):
                 "is_local": True
             })
     local_imgs.sort(key=lambda x: x["time"], reverse=True)
-    return local_imgs[:200]
+    return local_imgs[:300]
+
+# --- Cached Presigned S3 Video Stream URL ---
+@st.cache_data(ttl=3500, show_spinner=False)
+def _sign_stream_video_url(bucket_name, key, region):
+    """Generates an S3 presigned URL with explicit video/mp4 MIME headers for instant HTML5 streaming."""
+    import boto3
+    try:
+        s3 = boto3.client('s3', region_name=region)
+        return s3.generate_presigned_url(
+            'get_object',
+            Params={
+                'Bucket': bucket_name,
+                'Key': key,
+                'ResponseContentType': 'video/mp4'
+            },
+            ExpiresIn=3600
+        )
+    except Exception as e:
+        import urllib.parse
+        encoded_parts = [urllib.parse.quote(part) for part in key.split('/')]
+        encoded_key = '/'.join(encoded_parts)
+        return f"https://{bucket_name}.s3.{region}.amazonaws.com/{encoded_key}"
+
+# --- Cached S3 Video Vault Scanner ---
+@st.cache_data(ttl=120, show_spinner="☁️ Scanning Cloud Video Vault...")
+def _scan_s3_video_vault(bucket_name, prefix, region):
+    """Scans S3 bucket recursively for all user generated videos."""
+    import boto3
+    s3 = boto3.client('s3', region_name=region)
+    all_vids_meta = []
+    paginator = s3.get_paginator('list_objects_v2')
+    
+    try:
+        for page in paginator.paginate(Bucket=bucket_name, Prefix=prefix):
+            for obj in page.get('Contents', []):
+                key = obj['Key']
+                if key.lower().endswith(('.mp4', '.mov', '.webm', '.m4v')) and '/Assets/' not in key and '/Temp' not in key:
+                    url = _sign_stream_video_url(bucket_name, key, region)
+                    
+                    filename = os.path.basename(key)
+                    size_mb = obj.get('Size', 0) / (1024 * 1024)
+                    mtime = obj.get('LastModified').timestamp() if obj.get('LastModified') else 0
+                    
+                    folder_tag = "🎬 Mini-Series" if "Series" in key else ("📹 Studio" if "Videos" in key else "🎥 Render")
+                    
+                    all_vids_meta.append({
+                        "key": key,
+                        "url": url,
+                        "name": filename,
+                        "size_mb": round(size_mb, 2),
+                        "time": mtime,
+                        "folder": folder_tag,
+                        "is_local": False
+                    })
+    except Exception as e:
+        print(f"S3 Video Vault scan warning: {e}")
+        
+    all_vids_meta.sort(key=lambda x: x["time"], reverse=True)
+    return all_vids_meta[:300]
+
+# --- Cached Local Video Vault Scanner ---
+@st.cache_data(ttl=60, show_spinner="📂 Scanning Local Video Vault...")
+def _scan_local_video_vault(user_root):
+    """Scans local user directory recursively for all generated videos."""
+    local_vids = []
+    if not os.path.exists(user_root):
+        return local_vids
+        
+    for root, dirs, files in os.walk(user_root):
+        for file in files:
+            if file.lower().endswith(('.mp4', '.mov', '.webm', '.m4v')) and "Assets" not in root and "Temp" not in root:
+                full_path = os.path.join(root, file)
+                try:
+                    mtime = os.path.getmtime(full_path)
+                    size_mb = os.path.getsize(full_path) / (1024 * 1024)
+                except OSError:
+                    mtime = 0
+                    size_mb = 0
+                    
+                folder_tag = "🎬 Mini-Series" if "Series" in root else ("📹 Studio" if "Videos" in root else "🎥 Render")
+                
+                local_vids.append({
+                    "src": full_path,
+                    "name": file,
+                    "size_mb": round(size_mb, 2),
+                    "time": mtime,
+                    "folder": folder_tag,
+                    "is_local": True
+                })
+                
+    local_vids.sort(key=lambda x: x["time"], reverse=True)
+    return local_vids[:300]
 
 # --- Zoom Dialog ---
 @st.dialog("🔍 Image Viewer", width="large")
@@ -563,6 +840,90 @@ def _gallery_zoom_dialog(src, name, is_local=False):
             ''',
             unsafe_allow_html=True
         )
+
+if selection == "Video Vault":
+    with st.container():
+        st.markdown("### 🎬 Enterprise Video Vault & History")
+        
+        if not st.session_state.get("authenticated"):
+            st.warning("Please login to access your Video Vault.")
+        else:
+            username = st.session_state.current_user.get("username")
+            user_root = os.path.join("output", "users", username)
+            
+            # Header stats & controls
+            c_vhead, c_vsearch, c_vref = st.columns([2, 2, 1])
+            with c_vhead:
+                if os.getenv("S3_BUCKET_NAME"):
+                    st.caption(f"☁️ Cloud Vault: `s3://{os.getenv('S3_BUCKET_NAME')}/users/{username}`")
+                else:
+                    st.caption(f"📂 Local Vault: `{os.path.abspath(user_root)}`")
+            with c_vsearch:
+                search_query = st.text_input("🔍 Search Videos", placeholder="Filter by name, shot, or series...", key="vv_search", label_visibility="collapsed")
+            with c_vref:
+                if st.button("🔄 Sync Vault", use_container_width=True, key="vv_sync_btn"):
+                    _scan_s3_video_vault.clear()
+                    _scan_local_video_vault.clear()
+                    st.rerun()
+
+            # Gather Cloud + Local Videos
+            vids = []
+            if os.getenv("S3_BUCKET_NAME"):
+                bucket = os.getenv("S3_BUCKET_NAME")
+                region = os.getenv("AWS_REGION", "ap-southeast-2")
+                prefix = f"users/{username}/"
+                vids = _scan_s3_video_vault(bucket, prefix, region)
+            else:
+                vids = _scan_local_video_vault(user_root)
+                
+            # Filter search query
+            if search_query:
+                vids = [v for v in vids if search_query.lower() in v["name"].lower()]
+                
+            if not vids:
+                st.info("ℹ️ No videos found in your Video Vault history yet. Generate a video in **Mini Series** or **Wan & Seedance Studio** to automatically save it here!")
+            else:
+                st.success(f"🎥 Found **{len(vids)} generated videos** in your Video Vault.")
+                
+                # Grid of video cards (2 columns per row)
+                for i in range(0, len(vids), 2):
+                    v_cols = st.columns(2)
+                    for c_idx, vid in enumerate(vids[i:i+2]):
+                        with v_cols[c_idx]:
+                            with st.container(border=True):
+                                st.markdown(f"**{vid['name']}**")
+                                st.caption(f"🏷️ {vid['folder']} | 💾 {vid['size_mb']} MB")
+                                
+                                vid_src = vid["src"] if vid.get("is_local") else vid["url"]
+                                if vid.get("is_local"):
+                                    st.video(vid_src)
+                                else:
+                                    st.markdown(f"""
+                                    <video width="100%" controls preload="metadata" playsinline style="border-radius: 8px; max-height: 320px; background-color: #000; outline: none;">
+                                        <source src="{vid_src}" type="video/mp4">
+                                        Your browser does not support HTML5 video streaming.
+                                    </video>
+                                    """, unsafe_allow_html=True)
+                                
+                                c_act1, c_act2 = st.columns(2)
+                                with c_act1:
+                                    if vid.get("is_local") and os.path.exists(vid["src"]):
+                                        with open(vid["src"], "rb") as f_v:
+                                            st.download_button(
+                                                "⬇️ Download MP4",
+                                                data=f_v,
+                                                file_name=vid["name"],
+                                                mime="video/mp4",
+                                                use_container_width=True,
+                                                key=f"vv_dl_{vid['name']}_{i}_{c_idx}"
+                                            )
+                                    else:
+                                        st.markdown(f"[⬇️ Download MP4]({vid_src})")
+                                with c_act2:
+                                    if st.button("🎬 Edit in Studio", key=f"vv_edit_{vid['name']}_{i}_{c_idx}", use_container_width=True):
+                                        st.session_state.wan_edit_image = vid_src
+                                        st.session_state.active_tab = "Wan & Seedance Studio"
+                                        st.rerun()
 
 if selection == "My Gallery":
     with st.container():
@@ -717,7 +1078,7 @@ if selection == "My Gallery":
                     }
                     .gallery-card img:hover {
                         transform: scale(1.03);
-                        box-shadow: 0 4px 20px rgba(56, 189, 248, 0.25);
+                        box-shadow: 0 4px 20px rgba(21, 101, 192, 0.3);
                     }
                     .gallery-card {
                         margin-bottom: 1rem;
@@ -770,6 +1131,23 @@ if selection == "My Gallery":
                                     ''',
                                     unsafe_allow_html=True
                                 )
+                        
+                        # Row 2: Wan 2.7 Studio Shortcuts
+                        c_wan_edit, c_wan_anim = st.columns(2)
+                        # Identify the best local path if available
+                        target_shortcut_path = item.get("local_path", item["src"]) if is_local else item["src"]
+                        with c_wan_edit:
+                            if st.button("✏️ Edit", key=f"wan_edit_btn_{idx}", use_container_width=True, help="Edit this image using Wan 2.7 Image-to-Image"):
+                                st.session_state.wan_edit_image = target_shortcut_path
+                                st.session_state.wan_studio_subtab_radio = "Image-to-Image (Scene Editor)"
+                                st.session_state.active_tab = "Wan & Seedance Studio"
+                                st.rerun()
+                        with c_wan_anim:
+                            if st.button("🎬 Animate", key=f"wan_anim_btn_{idx}", use_container_width=True, help="Animate this image using Wan 2.7 Image-to-Video"):
+                                st.session_state.wan_animate_image = target_shortcut_path
+                                st.session_state.wan_studio_subtab_radio = "Image-to-Video (Motion)"
+                                st.session_state.active_tab = "Wan & Seedance Studio"
+                                st.rerun()
 
 # ==========================================
 # TAB: ASSET LIBRARY
@@ -1027,10 +1405,12 @@ if selection == "Workflow Wizard":
             if st.session_state.get("wiz_char"):
                 st.markdown("#### 2. Choose Outfit")
                 outfit_carousel_data = {k: v for k, v in o_data.items()}
-                outfit_carousel(
+                thumbnail_carousel(
+                    "Outfits",
                     outfit_carousel_data,
                     state_key="wiz_outfit",
                     thumb_cols=3,
+                    show_label=False
                 )
 
             st.markdown("#### 3. Vibe / Atmosphere")
@@ -1049,17 +1429,6 @@ if selection == "Workflow Wizard":
         # --- FIDELITY MODE ROW ---
         fidelity_label, fidelity_modifier = fidelity_mode_selector(state_key="wiz_fidelity")
         st.session_state['wiz_fidelity_modifier'] = fidelity_modifier
-
-        st.divider()
-
-        st.markdown("**AI Engine**")
-        wiz_engine_selected = st.selectbox(
-            "Select Model",
-            ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
-            help="Both models now fully support face, outfit, and location image references!",
-            key="wiz_engine_select"
-        )
-        wiz_engine_val = "openai" if "OpenAI" in wiz_engine_selected else "gemini"
 
         st.divider()
 
@@ -1102,7 +1471,7 @@ if selection == "Workflow Wizard":
             with col_adv:
                 with st.expander("⚙️ Advanced Brain Settings"):
                      st.caption("Brain: Gemini 2.0 Flash (Optimized for Cost)")
-                     prompt_engine = "gemini-3.5-flash" 
+                     prompt_engine = "gemini-2.0-flash" 
                      render_engine = "nano" 
                      likeness = 0.5
                      st.sidebar.success("✅ Running in Low-Cost Mode (Flash 2.0)")
@@ -1145,7 +1514,7 @@ if selection == "Workflow Wizard":
                 s_outfit = st.session_state.get("wiz_outfit")
                 s_vibe = st.session_state.get("wiz_vibe")
 
-                # Get path for Vision — celebrity uses text-only asset
+                # Get path for Vision
                 char_val = characters_data.get(s_char)
                 char_asset = resolve_char_asset(s_char, char_val) if char_val else None
                 char_path = char_asset.get("path") if char_asset else None
@@ -1179,16 +1548,12 @@ if selection == "Workflow Wizard":
                 
                 prompt_data["model_type"] = render_engine 
                 prompt_data["image_size"] = sel_res
-                # Inject celebrity text asset into prompt_data if needed
-                if char_asset and char_asset.get("celebrity_desc"):
-                    prompt_data.setdefault("assets", []).insert(0, char_asset)
-                
                 job_name = f"{s_outfit} - {clean_val(s_vibe)}"
                 campaign_mgr.add_job(
                     name=job_name,
                     description=f"Engine: {render_engine}",
                     prompt_data=prompt_data,
-                    settings={"batch_count": campaign_batch, "engine": wiz_engine_val},
+                    settings={ "batch_count": campaign_batch },
                     output_folder=get_user_out_dir("Campaign"),
                     char_path=char_path,
                     outfit_path=outfit_path,
@@ -1230,7 +1595,7 @@ if selection == "Workflow Wizard":
                 custom_scenario = st.session_state.get('wiz_custom_scenario', '')
                 custom_notes = st.session_state.get('wiz_custom_notes', '')
 
-                # Get path for Vision — celebrity uses text-only asset
+                # Get path for Vision
                 char_val = characters_data.get(s_char)
                 char_asset = resolve_char_asset(s_char, char_val) if char_val else None
                 char_path = char_asset.get("path") if char_asset else None
@@ -1293,16 +1658,13 @@ if selection == "Workflow Wizard":
                  final_prompt_data["positive_prompt"] = wiz_prompt_text
                  final_prompt_data["likeness_strength"] = likeness
                  final_prompt_data["model_type"] = render_engine 
-                 # Re-resolve paths — celebrity uses text-only asset
+                 # Re-resolve paths for execution
                  s_char = st.session_state.get("wiz_char")
                  s_outfit = st.session_state.get("wiz_outfit")
                  s_vibe = st.session_state.get("wiz_vibe")
                  char_val = characters_data.get(s_char)
                  char_asset = resolve_char_asset(s_char, char_val) if char_val else None
                  char_path = char_asset.get("path") if char_asset else None
-                 # Inject celebrity asset into prompt_data assets if needed
-                 if char_asset and char_asset.get("celebrity_desc"):
-                     final_prompt_data.setdefault("assets", []).insert(0, char_asset)
                  outfit_path = outfits_data.get(s_outfit)
                  vibe_path = vibes_data.get(s_vibe)
                  
@@ -1310,7 +1672,7 @@ if selection == "Workflow Wizard":
                     name=f"Wiz_{s_char}_{int(time.time())}",
                     description=f"Wizard: {s_char} in {s_outfit}",
                     prompt_data=final_prompt_data,
-                    settings={"batch_count": num_images, "engine": wiz_engine_val},
+                    settings={"batch_count": num_images},
                     output_folder=get_user_out_dir("Wizard"),
                     char_path=char_path,
                     outfit_path=outfit_path,
@@ -1328,7 +1690,7 @@ if selection == "Workflow Wizard":
                     final_prompt_data["positive_prompt"] = wiz_prompt_text
                     final_prompt_data["likeness_strength"] = likeness
                     final_prompt_data["model_type"] = render_engine 
-                    # Re-resolve paths for execution — celebrity uses text-only asset
+                    # Re-resolve paths for execution
                     s_char = st.session_state.get("wiz_char")
                     s_outfit = st.session_state.get("wiz_outfit")
                     s_vibe = st.session_state.get("wiz_vibe")
@@ -1336,9 +1698,6 @@ if selection == "Workflow Wizard":
                     char_val = characters_data.get(s_char)
                     char_asset = resolve_char_asset(s_char, char_val) if char_val else None
                     char_path = char_asset.get("path") if char_asset else None
-                    # Inject celebrity asset into prompt_data assets if needed
-                    if char_asset and char_asset.get("celebrity_desc"):
-                        final_prompt_data.setdefault("assets", []).insert(0, char_asset)
                     outfit_path = outfits_data.get(s_outfit)
                     vibe_path = vibes_data.get(s_vibe)
                     
@@ -1353,7 +1712,7 @@ if selection == "Workflow Wizard":
                     
                     with ThreadPoolExecutor() as executor:
                         # CRITICAL: Pass the image paths so Generation Logic can see them
-                        futures = [executor.submit(generate_image_from_prompt, final_prompt_data, wiz_out_dir, char_path, outfit_path, vibe_path, wiz_engine_val) for i in range(num_images)]
+                        futures = [executor.submit(generate_image_from_prompt, final_prompt_data, wiz_out_dir, char_path, outfit_path, vibe_path) for i in range(num_images)]
                         for future in futures:
                             results.append(future.result())
                     
@@ -1517,6 +1876,10 @@ if selection == "Admin Panel":
 
         with tab_stats:
             st.write("Coming soon: Usage stats per student.")
+# Global defaults for form submit buttons — must be set before any tab block
+gen_world = False
+wb_queue = False
+
 if selection == "World Builder":
     with st.container():
         st.markdown("### World Builder")
@@ -1569,7 +1932,10 @@ if selection == "World Builder":
             )
             
             if selected_scenario_key:
-                scenario = scenarios[selected_scenario_key]
+                scenario = dict(scenarios[selected_scenario_key])
+                scenario['is_custom'] = False
+                st.session_state['wb_current_scenario'] = scenario
+                st.session_state['wb_selected_scenario_key'] = selected_scenario_key
                 st.caption(f"💡 Template: {scenario['template_prompt']}")
         else:
             # NEW: Custom Scenario Builder
@@ -1625,7 +1991,6 @@ if selection == "World Builder":
         
         card_end()
     
-    gen_world = False  # default; set to True inside form when user submits
     if selected_scenario_key:
         # --- SCENE COMPOSITION UI (Synced with Filesystem) ---
         # Fragment to prevent full reload
@@ -1634,7 +1999,7 @@ if selection == "World Builder":
             assets = st.session_state.global_assets
             temp_selections = {}
             temp_assets = []
-            prompt_engine = "gemini-3.5-flash" # Default for World Builder
+            prompt_engine = "gemini-2.0-flash" # Default for World Builder
             
             col_c1, col_c2 = st.columns(2)
             
@@ -1646,17 +2011,6 @@ if selection == "World Builder":
                     
                     
                     characters_data = assets.get('characters', {})
-                    # Re-inject celebrities into World Builder's local characters_data
-                    try:
-                        from execution.celebrities import CELEBRITIES as _WB_CELEBS
-                        for _c in _WB_CELEBS:
-                            characters_data[f"⭐ {_c['name']}"] = {
-                                "name": _c["name"], "default_img": None,
-                                "is_celebrity": True, "celebrity_desc": _c["prompt_description"],
-                                "category": _c["category"]
-                            }
-                    except Exception:
-                        pass
                     wb_char_opts = {**characters_data}
 
                     # --- CHARACTER CAROUSEL ---
@@ -1709,11 +2063,13 @@ if selection == "World Builder":
                     st.markdown("###### 1b. Main Character Outfit")
                     fit_opts = assets.get('outfits', {})
 
-                    # --- OUTFIT CAROUSEL (categorized) ---
-                    fit_key = outfit_carousel(
+                    # --- OUTFIT CAROUSEL ---
+                    fit_key = thumbnail_carousel(
+                        "Select Outfit",
                         {"None": None, **fit_opts},
                         state_key="wb_outfit_main",
                         thumb_cols=3,
+                        show_label=False
                     )
                     
                     if fit_key and fit_key != "None":
@@ -1766,24 +2122,34 @@ if selection == "World Builder":
                         for idx, k in enumerate(selected_rels):
                             with f_cols[idx]:
                                  f_name = cast_pool[k]['name'] if isinstance(cast_pool[k], dict) else k.split('/')[-1]
-                                 f_fit_opts = assets.get('outfits', {})
-                                 if not f_fit_opts: f_fit_opts = {"Casual": "", "Chic": ""}
-                                 f_outfit_options = ["Default (No Outfit Override)"] + list(f_fit_opts.keys())
-                                 f_outfit_key = st.selectbox(f"Outfit for {f_name.split()[0]}", f_outfit_options, key=f"fit_{idx}")
+                                 
+                                 # Standardize outfit options, starting with "Default Outfit"
+                                 f_fit_opts = {"Default Outfit": None}
+                                 raw_opts = assets.get('outfits', {})
+                                 if raw_opts:
+                                     f_fit_opts.update(raw_opts)
+                                 else:
+                                     f_fit_opts.update({"Casual": "", "Chic": ""})
+                                     
+                                 f_outfit_key = st.selectbox(f"Outfit for {f_name.split()[0]}", list(f_fit_opts.keys()), index=0, key=f"fit_{idx}")
+                                 
                                  f_outfit_path = None
-                                 if f_outfit_key == "Default (No Outfit Override)":
-                                     f_outfit_name = None  # Skip — no outfit override for this friend
-                                 elif isinstance(f_fit_opts.get(f_outfit_key), dict):
+                                 if f_outfit_key == "Default Outfit":
+                                     f_outfit_name = "default outfit"
+                                 elif isinstance(f_fit_opts[f_outfit_key], dict):
                                      f_outfit_name = f_fit_opts[f_outfit_key]['name']
                                      f_outfit_path = f_fit_opts[f_outfit_key].get('default_img')
                                  else:
                                      f_outfit_name = os.path.splitext(f_outfit_key.split('/')[-1])[0]
-                                     f_outfit_path = f_fit_opts.get(f_outfit_key)
-                                 if f_outfit_name:
-                                     temp_assets.append({"path": f_outfit_path, "label": f"Outfit for {f_name}: {f_outfit_name}"})
-                                     friend_outfit_details.append(f"{f_name} in {f_outfit_name}")
-                                     if f_outfit_path: st.image(f_outfit_path, width=150, caption=f_outfit_name)
-
+                                     f_outfit_path = f_fit_opts[f_outfit_key]
+                                 
+                                 if f_outfit_path:
+                                     temp_assets.append({"path": f_outfit_path, "label": f"Outfit for {f_name}: {f_outfit_name}"}) 
+                                     st.image(f_outfit_path, width=150, caption=f_outfit_name)
+                                 else:
+                                     st.caption("Using default appearance.")
+                                     
+                                 friend_outfit_details.append(f"{f_name} in {f_outfit_name}") 
                         if friend_outfit_details:
                             temp_selections["FRIEND_OUTFITS"] = ", ".join(friend_outfit_details)
                     else:
@@ -1902,13 +2268,6 @@ if selection == "World Builder":
                     sel_angle = st.selectbox("Camera Angle", ["Auto"] + knowledge_base.get("camera_angles", []), key="wb_angle")
                     sel_ar = st.selectbox("Aspect Ratio", ["Auto", "4:5", "16:9", "9:16", "1:1", "3:2"], index=0, key="wb_ar")
                     sel_res = st.selectbox("Resolution", ["1K", "2K", "4K"], index=0, key="wb_res", help="Higher = sharper but slower")
-                    wb_engine_selected = st.selectbox(
-                        "AI Engine",
-                        ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
-                        help="Both models now fully support face, outfit, and location image references!",
-                        key="wb_engine_select"
-                    )
-                    wb_engine_val = "openai" if "OpenAI" in wb_engine_selected else "gemini"
                     sel_lighting = st.selectbox("Lighting", ["Auto"] + knowledge_base.get("lighting", []), key="wb_lighting")
     
                 with col_mood:
@@ -2078,12 +2437,7 @@ if selection == "World Builder":
                     
                    # CHECK: Is this a custom scenario? (Use session state flag)
                     use_custom_flow = st.session_state.get('is_custom_scenario', False) and 'custom_scenario_data' in st.session_state
-                    
-                    # DEBUG OUTPUT
-                    st.write(f"🔍 DEBUG: is_custom_scenario in session = {st.session_state.get('is_custom_scenario', 'NOT SET')}")
-                    st.write(f"🔍 DEBUG: custom_scenario_data exists = {'custom_scenario_data' in st.session_state}")
-                    st.write(f"🔍 DEBUG: use_custom_flow = {use_custom_flow}")
-                    
+
                     if use_custom_flow:
                         # CUSTOM SCENARIO FLOW - Use new detailed Director AI
                         custom_data = st.session_state['custom_scenario_data']
@@ -2148,10 +2502,46 @@ CRITICAL REQUIREMENTS:
 Write an immersive, detailed prompt now:"""
                         
                         try:
-                            import google.generativeai as genai
-                            model = genai.GenerativeModel("gemini-3.5-flash")
-                            response = model.generate_content(director_prompt, generation_config={"temperature": sel_temperature})
-                            generated_prompt = response.text.strip()
+                            generated_prompt = None
+                            _atlas_key = os.getenv("ATLASCLOUD_API_KEY")
+                            if _atlas_key:
+                                try:
+                                    _headers = {
+                                        "Content-Type": "application/json",
+                                        "Authorization": f"Bearer {_atlas_key}"
+                                    }
+                                    _payload = {
+                                        "model": "google/gemini-2.5-flash",
+                                        "messages": [{"role": "user", "content": director_prompt}],
+                                        "temperature": sel_temperature
+                                    }
+                                    _resp = requests.post("https://api.atlascloud.ai/v1/chat/completions", headers=_headers, json=_payload, timeout=30)
+                                    if _resp.status_code == 200:
+                                        _res_json = _resp.json()
+                                        generated_prompt = _res_json['choices'][0]['message']['content'].strip()
+                                except Exception as _atlas_err:
+                                    print(f"Atlas Director AI Warning: {_atlas_err}")
+
+                            if not generated_prompt:
+                                import google.generativeai as genai
+                                _google_key = os.getenv("GOOGLE_API_KEY")
+                                if not _google_key:
+                                    raise ValueError("ATLASCLOUD_API_KEY or GOOGLE_API_KEY not configured")
+                                genai.configure(api_key=_google_key)
+                                models_to_try = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-flash-latest', 'gemini-pro-latest', 'gemini-2.0-flash-001', 'gemini-2.5-pro']
+                                response = None
+                                last_err = "No models succeeded."
+                                for m_name in models_to_try:
+                                    try:
+                                        model = genai.GenerativeModel(m_name)
+                                        response = model.generate_content(director_prompt, generation_config={"temperature": sel_temperature})
+                                        break
+                                    except Exception as e:
+                                        last_err = str(e)
+                                        continue
+                                if not response:
+                                    raise ValueError(f"Generative AI execution failed: {last_err}")
+                                generated_prompt = response.text.strip()
                             
                             # Remove any markdown artifacts if present
                             if "```" in generated_prompt:
@@ -2197,9 +2587,23 @@ Write an immersive, detailed prompt now:"""
                         
                         st.toast(f"Director AI Analyzing: {current_selections.get('PROTAGONIST', 'Character')} + {current_selections.get('OUTFIT', 'Outfit')}... [Cam: {sel_camera}, Act: {sel_action}]")
                     
-                        prompt_engine = "gemini-3.5-flash" # User requested specifically (Free Tier)
+                        prompt_engine = "gemini-2.0-flash" # User requested specifically (Free Tier)
+                        
+                        # Extract Active Scenario Details
+                        scenario_obj = st.session_state.get('wb_current_scenario', scenario)
+                        scen_title = scenario_obj.get('name', 'General Scene') if isinstance(scenario_obj, dict) else 'General Scene'
+                        scen_concept = scenario_obj.get('template_prompt', '') if isinstance(scenario_obj, dict) else ''
+
+                        additional_notes_str = (
+                            f"SCENARIO TITLE & THEME: '{scen_title}'. "
+                            f"SCENARIO CONCEPT: {scen_concept}. "
+                            f"ATMOSPHERE/VIBE: {current_selections.get('VIBE', 'General')}. FILM STYLE: {sel_film}. "
+                            f"CURRENT DRAFT CONTEXT: {base_template}. "
+                            f"INSTRUCTION: Create a fresh, vivid, Hollywood-level scene description specifically for the scenario '{scen_title}'. "
+                            f"Integrate all visual references, character identities, outfits, and camera specs smoothly."
+                        )
+
                         # 2. Call Generator with full context
-                        # We treat the current draft as 'additional_notes' context
                         enhanced_res = generate_prompt_content(
                             vibe=current_selections.get("VIBE", "luxury"),
                             outfit=current_selections.get("OUTFIT", "fashion"),
@@ -2219,7 +2623,7 @@ Write an immersive, detailed prompt now:"""
                             film_stock=(sel_film_stock if sel_film_stock != "Auto" else None),
                             filter_look=(sel_filter_look if sel_filter_look != "Auto" else None),
                             
-                            additional_notes=f"CREATIVE BRIEF: The atmosphere is {current_selections.get('VIBE', 'General')}. Overall style: {sel_film}. CREATE A FRESH, HOLLYWOOD-LEVEL SCENE DESCRIPTION from the visual references and cast list. Do not copy template text.",
+                            additional_notes=additional_notes_str,
                             model_engine=prompt_engine # Use currently selected brain (Gemini 2.0)
                         )
                         
@@ -2290,7 +2694,7 @@ Write an immersive, detailed prompt now:"""
                         "model_type": "nano",
                         "assets": assets_to_inject
                     },
-                    settings={"batch_count": 1, "engine": wb_engine_val},
+                    settings={"batch_count": 1},
                     output_folder=get_user_out_dir("World"),
                     char_path=main_char_path
                  )
@@ -2322,10 +2726,10 @@ Write an immersive, detailed prompt now:"""
                          "model_type": "nano", 
                          "assets": assets_to_inject
                      }
-                     res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"), engine=wb_engine_val)
-
+                     res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"))
+                     
                      prog_ph.empty() # Clear Progress
-
+                     
                      with st.expander("Generation Logs", expanded=False):
                          st.code(res.get("logs", "No logs"))
                          
@@ -2393,17 +2797,18 @@ Write an immersive, detailed prompt now:"""
                     reference_context_str = ", ".join(asset_labels) if asset_labels else ""
 
                     # Pass the FULL prompt + specs as context
+                    scen_name = scenario.get('name', 'Custom Scenario') if isinstance(scenario, dict) else str(scenario)
                     sb_prompts = generate_storyboard_prompts(
-                        scenario['name'], 
+                        scen_name, 
                         final_prompt,
                         camera_settings=camera_str,
                         reference_context=reference_context_str
                     )
                     st.session_state['sb_prompts'] = sb_prompts
-                    if sb_prompts and not isinstance(sb_prompts[0], str) or (len(sb_prompts) > 0 and "Error" not in sb_prompts[0]):
+                    if sb_prompts and isinstance(sb_prompts, list) and len(sb_prompts) > 0 and not str(sb_prompts[0]).startswith("Error"):
                         st.success("Storyboard Drafted! See below.")
                     else:
-                        st.error(f"Generation failed: {sb_prompts}")
+                        st.error(f"Generation failed: {sb_prompts[0] if sb_prompts else 'Unknown error'}")
             
             if 'sb_prompts' in st.session_state:
                 prompts = st.session_state['sb_prompts']
@@ -2423,11 +2828,12 @@ Write an immersive, detailed prompt now:"""
                     if st.button("Add All to Queue"):
                          curr_idx = len(campaign_mgr.queue)
                          for i, p in enumerate(prompts):
+                             active_p = st.session_state.get(f"sb_{i}", p)
                              campaign_mgr.add_job(
                                 name=f"SB_Shot_{i+1}_{int(time.time())}",
                                 description=f"Storyboard Shot {i+1}",
                                 prompt_data={
-                                    "positive_prompt": p + f", {final_prompt}", 
+                                    "positive_prompt": active_p, 
                                     "aspect_ratio": sel_ar,
                                     "image_size": sel_res,
                                     "model_type": "nano",
@@ -2442,6 +2848,7 @@ Write an immersive, detailed prompt now:"""
                 with c_sb_run:
                     if st.button("🎬 Generate All"):
                          for i, p in enumerate(prompts):
+                             active_p = st.session_state.get(f"sb_{i}", p)
                              # Credit Check Loop
                              can_proceed = True
                              if st.session_state.get("authenticated"):
@@ -2454,13 +2861,13 @@ Write an immersive, detailed prompt now:"""
                              if can_proceed:
                                  with st.spinner(f"Generating Shot {i+1}..."):
                                      wb_payload = {
-                                         "positive_prompt": p + f", {final_prompt}", # Append full context
+                                         "positive_prompt": active_p, # Use active text
                                          "aspect_ratio": sel_ar, 
                                          "image_size": sel_res,
                                          "model_type": "nano", 
                                          "assets": assets_to_inject
                                      }
-                                 res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"), engine=wb_engine_val)
+                                 res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"))
                                  if res["status"] == "success":
                                      st.toast(f"Shot {i+1} Generated! (-1 Credit)")
                                      st.session_state[f"sb_img_{i}"] = res["image_path"] # Saved!
@@ -2501,7 +2908,7 @@ Write an immersive, detailed prompt now:"""
                                          "model_type": "nano", 
                                          "assets": assets_to_inject
                                      }
-                                    res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"), engine=wb_engine_val)
+                                    res = generate_image_from_prompt(wb_payload, get_user_out_dir("Storyboard"))
                                     with st.expander(f"Logs Shot {i+1}", expanded=False):
                                          st.code(res.get("logs", "No logs"))
                                          
@@ -2555,49 +2962,6 @@ Write an immersive, detailed prompt now:"""
                     
                     st.success(f"Added {count} shots to Campaign Queue! Go to 'Campaign Queue' tab to run them.")
 
-            # Check prompt preview
-            final_prompt = scenario['template_prompt']
-            
-            # Generic Replacement Logic
-            # 1. Known slots
-            for k, v in current_selections.items():
-                final_prompt = final_prompt.replace(f"[{k}]", v)
-            
-            # 2. Catch-all: [PROPS_AND_CAST]
-            # FIX: Added pets to extras
-            extras = rel_names + pet_names + prop_names
-            extras_str = ", ".join(extras) if extras else "background details"
-            final_prompt = final_prompt.replace("[PROPS_AND_CAST]", extras_str)
-
-            # 3. Clean up generic legacy slots if they exist in template but weren't filled
-            final_prompt = final_prompt.replace("[RELATION]", current_selections.get("RELATIONS", "friend"))
-            final_prompt = final_prompt.replace("[OUTFIT]", current_selections.get("OUTFIT", "casual outfit")) # Use selected output or fallback
-
-            st.info(f"**Prompt Preview:**\n{final_prompt}")
-            
-            # 3. Generate Actions
-            if st.button("Generate World Scene", type="primary"):
-                 prog_ph = st.empty()
-                 # from execution.magic_ui import circular_progress
-                 with prog_ph.container():
-                      circular_progress()
-                      st.caption("Generating with Nano...")
-
-                 # Construct Payload
-                 wb_payload = {
-                     "positive_prompt": final_prompt,
-                     "aspect_ratio": "4:5", # Default for social
-                     "model_type": "nano", # Force Nano for multi-ref
-                     "assets": assets_to_inject # New Field
-                 }
-                 
-                 res = generate_image_from_prompt(wb_payload, get_user_out_dir("World"), engine=wb_engine_val)
-                 prog_ph.empty()
-
-                 if res["status"] == "success":
-                     st.image(res["image_path"], caption="World Build Result")
-                 else:
-                     st.error(f"Failed: {res.get('logs')}")
 
 
 # ==========================================
@@ -2727,86 +3091,6 @@ if selection == "Campaign Queue":
                 status_box.success("All Jobs Completed.")
                 st.session_state.campaign_running = False
     
-        # 3. Queue Visualization
-        st.markdown("#### Job List")
-        for i, job in enumerate(st.session_state.campaign_queue):
-            status = job['status']
-            status_icon = "✅" if status == "completed" else "❌" if status == "failed" else "⏳"
-            job_type = job.get('type', 'image')
-            type_icon = "🎬" if job_type == "reel" else "🎥" if "video" in job_type else "🖼️"
-            companions = job.get("data", {}).get("extra_images", [])
-            companion_note = f" · {len(companions)} cast" if companions else ""
-
-            col_info, col_up, col_down, col_regen, col_del = st.columns([6, 0.4, 0.4, 0.8, 0.6])
-
-            with col_info:
-                with st.expander(f"{status_icon} {type_icon} {job.get('name', job.get('id','?'))} ({status}){companion_note}"):
-                    prompt_text = job.get('data', {}).get('prompt_data', {}).get('positive_prompt', 'No Prompt')
-                    st.caption(f"**Prompt:** {prompt_text[:300]}{'...' if len(prompt_text) > 300 else ''}")
-                    st.caption(f"**Created:** {job.get('created_at', '?')}")
-                    if companions:
-                        st.caption(f"**Companions:** {', '.join(os.path.basename(c['path']) for c in companions)}")
-                    if status == 'completed':
-                        for r in job.get('results', []):
-                            # ── Reel result ──
-                            reel_path = r.get('reel_path')
-                            if reel_path and os.path.exists(reel_path):
-                                st.video(reel_path)
-                                st.caption(f"🎬 Script: _{r.get('script', '')}_ ({r.get('duration', 0):.1f}s)")
-
-                            # ── Image result ──
-                            img_path = r.get('image_path')
-                            if img_path and os.path.exists(img_path):
-                                st.image(img_path, use_container_width=True)
-                                # QC badge
-                                qc = r.get('qc')
-                                if qc:
-                                    scores = qc.get('scores', {})
-                                    lap = scores.get('laplacian')
-                                    aes = scores.get('aesthetic_score')
-                                    if qc['pass']:
-                                        badge = "✅ QC Pass"
-                                        if qc.get('needs_review'):
-                                            badge = "🟡 QC Review"
-                                    else:
-                                        badge = f"❌ QC Fail: {qc.get('reason', '')}"
-                                    parts = [badge]
-                                    if lap is not None: parts.append(f"blur={lap:.0f}")
-                                    if aes is not None: parts.append(f"aes={aes:.2f}")
-                                    st.caption("  ·  ".join(parts))
-
-            with col_up:
-                if i > 0 and st.button("↑", key=f"up_{i}", help="Move up"):
-                    campaign_mgr.move_job(i, -1)
-                    st.rerun()
-
-            with col_down:
-                if i < len(st.session_state.campaign_queue) - 1 and st.button("↓", key=f"dn_{i}", help="Move down"):
-                    campaign_mgr.move_job(i, 1)
-                    st.rerun()
-
-            with col_regen:
-                if status in ("completed", "failed") and st.button("↺ Redo", key=f"regen_{i}", help="Re-queue with new seed"):
-                    import copy
-                    new_job_data = copy.deepcopy(job["data"])
-                    campaign_mgr.add_job(
-                        name=job["name"] + "_v2",
-                        description=job.get("description", ""),
-                        prompt_data=new_job_data["prompt_data"],
-                        settings=new_job_data["settings"],
-                        output_folder=new_job_data["paths"]["output_folder"],
-                        char_path=new_job_data["paths"].get("char_path"),
-                        outfit_path=new_job_data["paths"].get("outfit_path"),
-                        vibe_path=new_job_data["paths"].get("vibe_path"),
-                        extra_images=new_job_data.get("extra_images", []),
-                    )
-                    st.toast(f"Re-queued: {job['name']}_v2")
-                    st.rerun()
-
-            with col_del:
-                if status != "running" and st.button("✕", key=f"del_{i}", help="Remove from queue"):
-                    campaign_mgr.remove_job(i)
-                    st.rerun()
 
 # ==========================================
 # TAB: ART DIRECTOR (NL Brief + Voice Dictation)
@@ -3059,15 +3343,6 @@ if selection == "Art Director":
                 key="ad_notes"
             )
 
-            st.markdown("**AI Engine**")
-            ad_engine_selected = st.selectbox(
-                "Select Model",
-                ["Gemini (Nano Banana 2)", "OpenAI (ChatGPT Images 2.0)"],
-                help="Both models now fully support face, outfit, and location image references!",
-                key="ad_engine_select"
-            )
-            ad_engine_val = "openai" if "OpenAI" in ad_engine_selected else "gemini"
-
             st.divider()
             ad_gen_btn = st.button("🎬 Generate Image", type="primary", key="ad_gen_btn", use_container_width=True)
 
@@ -3119,8 +3394,7 @@ if selection == "Art Director":
                         result = generate_image_from_prompt(
                             prompt_data,
                             output_folder=out_dir_ad,
-                            reference_image_path=pchar_path,
-                            engine=ad_engine_val
+                            reference_image_path=pchar_path
                         )
 
                         if result.get("status") == "success":
@@ -3140,201 +3414,13 @@ if selection == "Art Director":
 # ==========================================
 if selection == "Video Studio":
     with st.container():
-        st.markdown("### AI Video Generator (Kling 3.0 / 2.6)")
-        st.info("Transform your generated images into cinematic video clips. Powered by Kling 3.0 (latest), 2.6, and 2.0.")
+        st.markdown("### AI Video Generator (Kling 2.6 / Veo 2.0)")
+        st.info("Transform your generated images into high-motion video clips using the latest 2026 models.")
     
     # Sub-tabs for Creation vs Gallery
-    v_tab_create, v_tab_multishot, v_tab_gallery = st.tabs(["Generate Video", "🎬 Multi-Shot Video", "Video Gallery (Recover)"])
+    v_tab_create, v_tab_gallery = st.tabs(["Generate Video", "Video Gallery (Recover)"])
     
-    with v_tab_multishot:
-        st.markdown("#### 🎬 Multi-Shot Video Generator")
-        st.info("Select a character from your asset library and generate the same scene from multiple cinematic angles — all consistent via Kling reference locking.")
-
-        # ── Character & Outfit Pickers ──────────────────────────────────────
-        _ms_assets = st.session_state.get("global_assets", {})
-        _ms_chars  = _ms_assets.get("characters", {}).copy()
-        _ms_chars.update(_ms_assets.get("relations", {}))
-        _ms_outfits = _ms_assets.get("outfits", {})
-
-        _char_list   = ["None (upload below)"] + sorted(_ms_chars.keys())
-        _outfit_list = ["None"] + sorted(_ms_outfits.keys())
-
-        ms_col1, ms_col2 = st.columns(2)
-        with ms_col1:
-            ms_char_sel = st.selectbox("Character Reference", _char_list, key="msv_char")
-        with ms_col2:
-            ms_outfit_sel = st.selectbox("Outfit Reference", _outfit_list, key="msv_outfit")
-
-        # Resolve paths
-        _ms_char_path   = _ms_chars.get(ms_char_sel) if ms_char_sel != "None (upload below)" else None
-        _ms_outfit_path = _ms_outfits.get(ms_outfit_sel) if ms_outfit_sel != "None" else None
-
-        if isinstance(_ms_char_path, dict):   _ms_char_path   = _ms_char_path.get("default_img")
-        if isinstance(_ms_outfit_path, dict): _ms_outfit_path = _ms_outfit_path.get("default_img")
-
-        # Show thumbnails
-        if _ms_char_path or _ms_outfit_path:
-            th1, th2 = st.columns(2)
-            with th1:
-                if _ms_char_path: st.image(_ms_char_path, caption=ms_char_sel, width=120)
-            with th2:
-                if _ms_outfit_path: st.image(_ms_outfit_path, caption=ms_outfit_sel, width=120)
-
-        # Fallback: upload image if no character selected
-        ms_uploaded = None
-        if not _ms_char_path:
-            ms_uploaded = st.file_uploader("Or upload a reference image", type=["png","jpg","jpeg"], key="msv_upload")
-
-        st.divider()
-
-        # ── Settings ─────────────────────────────────────────────────────────
-        ms_set1, ms_set2, ms_set3 = st.columns(3)
-        with ms_set1:
-            ms_model = st.selectbox("Kling Model", ["3.0", "2.6", "2.0"], key="msv_model",
-                                    help="3.0 = latest, supports 15s")
-        with ms_set2:
-            _ms_dur_opts = ["5s", "10s", "15s"] if ms_model == "3.0" else ["5s", "10s"]
-            ms_duration  = st.selectbox("Duration Per Shot", _ms_dur_opts, key="msv_dur")
-        with ms_set3:
-            ms_quality = st.selectbox("Quality", ["Professional", "Standard"], key="msv_qual")
-
-        ms_motion_prompt = st.text_area(
-            "Motion / Scene Prompt",
-            placeholder="Describe what's happening — will be appended with the camera angle for each shot.\n\nExample: 'Walking confidently through a neon-lit street, cinematic, film grain'",
-            height=90,
-            key="msv_prompt"
-        )
-
-        # ── Angle Selector ────────────────────────────────────────────────────
-        st.markdown("**Select Camera Angles to Generate**")
-        _ms_angle_options = [
-            "Wide Shot",
-            "Medium Shot",
-            "Close-Up",
-            "Over-the-Shoulder",
-            "Low Angle",
-            "High Angle",
-            "Dutch Angle",
-            "POV Shot",
-            "Full Body",
-            "Profile (Side View)",
-            "Three-Quarter Angle",
-            "Bird's Eye View",
-        ]
-        ms_angles = st.multiselect(
-            "Angles (each = 1 credit + 5 Kling credits)",
-            _ms_angle_options,
-            default=["Wide Shot", "Medium Shot", "Close-Up"],
-            key="msv_angles"
-        )
-
-        st.caption(f"💳 Cost: **{len(ms_angles) * 5} credits** for {len(ms_angles)} shot(s)")
-
-        ms_generate_btn = st.button("🎬 Generate Multi-Shot Videos", type="primary", key="msv_gen_btn",
-                                     disabled=not ms_angles)
-
-        if ms_generate_btn:
-            _user = st.session_state.current_user.get("username") if st.session_state.get("current_user") else "guest"
-            _total_credits = len(ms_angles) * 5
-            if not auth_mgr.deduct_credits(_user, _total_credits):
-                st.error(f"❌ Need {_total_credits} credits for {len(ms_angles)} shots.")
-            elif not (_ms_char_path or ms_uploaded):
-                st.error("Please select a character or upload a reference image.")
-            elif not ms_motion_prompt.strip():
-                st.error("Please enter a motion / scene prompt.")
-            else:
-                # Resolve source image path
-                _ref_img_path = _ms_char_path
-                if not _ref_img_path and ms_uploaded:
-                    _tmp_vid_ref = os.path.join("output", "temp_msv_ref.png")
-                    with open(_tmp_vid_ref, "wb") as _f: _f.write(ms_uploaded.getbuffer())
-                    _ref_img_path = _tmp_vid_ref
-
-                # Build character identity prefix for the prompt
-                _char_prefix = ""
-                if ms_char_sel != "None (upload below)":
-                    _char_name = ms_char_sel.replace("(My) ","").split("/")[-1]
-                    _char_name = os.path.splitext(_char_name)[0] if "." in _char_name else _char_name
-                    _char_prefix = (
-                        f"IDENTITY LOCK: The character in the reference image is {_char_name}. "
-                        f"Maintain EXACT facial identity, body, and appearance from the reference. "
-                    )
-                if _ms_outfit_path and ms_outfit_sel != "None":
-                    _char_prefix += f"Character wears: {os.path.splitext(ms_outfit_sel.split('/')[-1])[0]}. "
-
-                _ms_mode = "pro" if ms_quality == "Professional" else "std"
-                _ms_dur_int = int(ms_duration.replace("s", ""))
-
-                st.session_state["msv_results"] = []
-
-                for _angle in ms_angles:
-                    with st.spinner(f"🎬 Generating: {_angle}..."):
-                        _angle_instruction = {
-                            "Wide Shot":            "Wide establishing shot. Full scene visible. Deep depth of field.",
-                            "Medium Shot":          "Medium shot, waist-up framing. Natural depth of field.",
-                            "Close-Up":             "Close-up on face. Head and shoulders. Shallow depth of field, bokeh background.",
-                            "Over-the-Shoulder":    "Over-the-shoulder perspective. Subject in foreground softly blurred, focus ahead.",
-                            "Low Angle":            "Low angle looking up. Powerful, dominant framing.",
-                            "High Angle":           "High angle looking down. Vulnerable, omniscient viewpoint.",
-                            "Dutch Angle":          "Dutch angle / tilted frame. Tension and unease.",
-                            "POV Shot":             "First-person POV shot. Camera IS the character's eyes.",
-                            "Full Body":            "Full body shot, head to toe. Shows posture, movement, and outfit completely.",
-                            "Profile (Side View)":  "Pure side profile. 90-degree lateral view. Strong silhouette and jawline.",
-                            "Three-Quarter Angle":  "Three-quarter angle, 45 degrees to subject. Classic cinematic portrait depth.",
-                            "Bird's Eye View":      "Bird's eye view directly overhead. Spatial layout and movement patterns revealed.",
-                        }.get(_angle, f"{_angle} camera angle.")
-
-                        _full_prompt = f"{_char_prefix}{ms_motion_prompt.strip()}, CAMERA: {_angle_instruction} Photorealistic, cinematic, film grain, professional cinematography."
-
-                        _vid_result = generate_video_kling(
-                            _ref_img_path,
-                            _full_prompt,
-                            duration=_ms_dur_int,
-                            model_version=ms_model,
-                            quality_mode=_ms_mode,
-                            output_folder=get_user_out_dir("Videos")
-                        )
-
-                        if _vid_result["status"] == "success":
-                            st.session_state["msv_results"].append({
-                                "angle": _angle,
-                                "video_path": _vid_result.get("video_path"),
-                                "video_url":  _vid_result.get("video_url"),
-                            })
-                            st.toast(f"✅ {_angle} complete!")
-                        else:
-                            auth_mgr.add_credits(_user, 5)  # Refund this shot
-                            st.error(f"{_angle} failed: {_vid_result.get('error', 'Unknown error')}")
-
-                st.success(f"🎬 Multi-Shot complete! {len(st.session_state.get('msv_results', []))} shots generated.")
-                st.rerun()
-
-        # ── Results Grid ──────────────────────────────────────────────────────
-        if st.session_state.get("msv_results"):
-            st.divider()
-            st.markdown("#### 🎬 Generated Shots")
-            _res_list = st.session_state["msv_results"]
-            _res_cols = st.columns(min(2, len(_res_list)))
-            for _ri, _rv in enumerate(_res_list):
-                with _res_cols[_ri % 2]:
-                    st.markdown(f"**{_rv['angle']}**")
-                    _vp = _rv.get("video_path")
-                    _vu = _rv.get("video_url")
-                    if _vp and os.path.exists(_vp):
-                        st.video(_vp)
-                        with open(_vp, "rb") as _vf:
-                            st.download_button(
-                                f"⬇️ Download — {_rv['angle']}",
-                                _vf,
-                                file_name=os.path.basename(_vp),
-                                mime="video/mp4",
-                                key=f"dl_msv_{_ri}"
-                            )
-                    elif _vu:
-                        st.video(_vu)
-
     with v_tab_gallery:
-
         # Use User Isolated Directory
         vid_dir = get_user_out_dir("Videos")
         
@@ -3372,8 +3458,22 @@ if selection == "Video Studio":
     with v_tab_create:
         with st.form(key="video_form"):
             # Model Selection
-            st.markdown("**Select Video Engine**")
-            video_model = st.selectbox("Engine", ["Kling AI 3.0 (Latest)", "Kling AI 2.6 (Stable)", "Kling AI 2.0 (Master)", "HuMo AI (Human Motion Premium)"], key="vid_model_select")
+            video_model = st.selectbox(
+                "Engine", 
+                [
+                    "Kling AI 2.6 (Professional)", 
+                    "HuMo AI (Human Motion Premium)",
+                    "Seedance 2.0 (Reference-to-Video)",
+                    "Seedance 2.0 Mini (Reference-to-Video)",
+                    "Seedance 2.0 (Image-to-Video)",
+                    "Seedance 2.0 (Text-to-Video)",
+                    "Wan 2.7 (Image-to-Video)",
+                    "Wan 2.7 Spicy (Image-to-Video)",
+                    "Wan 2.7 (Reference-to-Video)",
+                    "Wan 2.7 Spicy (Reference-to-Video)"
+                ], 
+                key="vid_model_select"
+            )
             
             col_v_in, col_v_set = st.columns([1, 1])
         
@@ -3392,123 +3492,55 @@ if selection == "Video Studio":
                 with col_phy:
                     vid_physics = st.selectbox("Physics Focus", ["Standard", "High Physics", "Jiggle Physics", "Water/Liquids"], help="Enforce specific physics simulations.")
                     
-                motion_prompt = st.text_area("Motion Prompt", height=100, placeholder="Describe the movement. For character refs use @image_1, @image_2 in your prompt.\n\nExample: '@image_1 walks confidently down a neon-lit Tokyo street, cinematic slow motion'", key="vid_prompt_text")
-
-                # ── Kling 3.0: Character Reference ───────────────────────────
-                with st.expander("🎭 Character Reference (Kling 3.0)", expanded=False):
-                    st.caption("Add up to 3 reference images for character/element consistency. Reference them in your prompt as @image_1, @image_2, @image_3.")
-                    _vt_assets = st.session_state.get("global_assets", {})
-                    _vt_chars = _vt_assets.get("characters", {}).copy()
-                    _vt_chars.update(_vt_assets.get("relations", {}))
-                    _vt_outfits = _vt_assets.get("outfits", {})
-
-                    _vt_char_list = ["None"] + sorted(_vt_chars.keys())
-                    _vt_outfit_list = ["None"] + sorted(_vt_outfits.keys())
-
-                    vt_ref1_char = st.selectbox("@image_1 — Character", _vt_char_list, key="vt_ref1_char")
-                    vt_ref2_outfit = st.selectbox("@image_2 — Outfit", _vt_outfit_list, key="vt_ref2_outfit")
-                    vt_ref3_upload = st.file_uploader("@image_3 — Upload Extra Ref", type=["png","jpg","jpeg"], key="vt_ref3")
-
-                    # Resolve paths
-                    def _resolve_asset(val, data_dict):
-                        if val == "None": return None
-                        p = data_dict.get(val)
-                        if isinstance(p, dict): p = p.get("default_img")
-                        return p
-
-                    _vt_ref1_path = _resolve_asset(vt_ref1_char, _vt_chars)
-                    _vt_ref2_path = _resolve_asset(vt_ref2_outfit, _vt_outfits)
-
-                    # Show thumbnails
-                    _vt_thumb_items = [(vt_ref1_char, _vt_ref1_path), (vt_ref2_outfit, _vt_ref2_path)]
-                    _vt_visible = [(l, p) for l, p in _vt_thumb_items if p]
-                    if _vt_visible:
-                        _tc = st.columns(len(_vt_visible))
-                        for _ti, (_tl, _tp) in enumerate(_vt_visible):
-                            with _tc[_ti]: st.image(_tp, caption=_tl.split("/")[-1], width=100)
-
-                # ── Kling 3.0: End Frame Control ─────────────────────────────
-                with st.expander("🎬 End Frame Control (image_tail)", expanded=False):
-                    st.caption("Upload an image to use as the LAST frame — Kling will animate the path between start and end.")
-                    vt_tail_img = st.file_uploader("End Frame Image", type=["png","jpg","jpeg"], key="vt_tail")
-                    if vt_tail_img:
-                        st.image(vt_tail_img, caption="End Frame Preview", width=150)
-
-                # ── Kling 3.0: Audio Controls ────────────────────────────────
-                with st.expander("🔊 Audio (Kling 3.0)", expanded=False):
-                    vt_native_audio = st.checkbox(
-                        "Native Audio Generation",
-                        value=False,
-                        key="vt_native_audio",
-                        help="Kling auto-generates lip-sync voice + ambient audio. Only available on Kling 2.6+ Pro."
-                    )
-                    if not vt_native_audio:
-                        vt_custom_audio = st.file_uploader("Or upload custom audio (.mp3/.wav, max 5MB, 2–60s)", type=["mp3","wav","m4a"], key="vt_audio")
-                        vt_audio_url_input = st.text_input("Or paste audio URL", key="vt_audio_url", placeholder="https://...")
-                    else:
-                        vt_custom_audio = None
-                        vt_audio_url_input = ""
-
-                # ── Negative Prompt ──────────────────────────────────────────
-                with st.expander("🚫 Negative Prompt", expanded=False):
-                    vt_negative_prompt = st.text_area("What to EXCLUDE from the video", placeholder="blurry, watermark, text overlay, artifacts, distortion...", height=70, key="vt_neg")
-
-                auto_vis = st.form_submit_button("Auto-Generate Motion Prompt with Vision AI")
-
+                motion_prompt = st.text_area("Motion Prompt", height=100, placeholder="Describe the movement...", key="vid_prompt_text")
+                
+                # NOTE: Auto-Generate Vision AI button inside Form acts as Submit. 
+                # This is tricky. We'll disable it or move it out if problematic.
+                # Actually, submit buttons can distinguish themselves.
+                auto_vis = st.form_submit_button("Auto-Generate with Vision AI")
+                
                 if auto_vis:
-                     pass
-
+                     # ... (Vision logic)
+                     # Since this is a submit, it will rerun. We need to handle logic conditionally.
+                     # However, generating video is also a submit.
+                     # We can't have both run.
+                     pass # We will handle logic below outside form? No, inside form but check bools.
 
             # Settings Column (Dynamic)
             with col_v_set:
+                ref_video_url = None
+                ref_orientation = "image"
                 if "Kling" in video_model:
-                    # Map UI selection → model version string
-                    _model_ver_map = {
-                        "Kling AI 3.0 (Latest)":  "3.0",
-                        "Kling AI 2.6 (Stable)":  "2.6",
-                        "Kling AI 2.0 (Master)":  "2.0",
-                    }
-                    model_version_input = _model_ver_map.get(video_model, "2.6")
-                    st.info(f"⚡ Engine: **{video_model}**")
+                    st.info("⚡ Engine: **Kling AI 2.6** (Professional)")
                     
                     col_dur, col_qual = st.columns(2)
                     with col_dur:
-                        _dur_opts = ["5s", "10s", "15s"] if "3.0" in video_model else ["5s", "10s"]
-                        duration = st.selectbox("Duration", _dur_opts, help="15s is only available on Kling 3.0")
+                        duration = st.selectbox("Duration", ["5s", "10s"])
                     with col_qual:
                         quality = st.selectbox("Quality Mode", ["Professional (High Quality, Slower)", "Standard (Fast, Efficient)"])
                         
-                    # Advanced: Omni / Motion Control variants
+                    # Advanced Model Override
                     with st.expander("Advanced Model Settings (Override)", expanded=False):
-                        _variant_opts = {
-                            "Standard (matches engine above)": model_version_input,
-                            "Kling 2.6 (Stable)": "2.6",
-                            "Kling 2.5": "2.5",
-                            "Kling 2.5 Turbo": "2.5-turbo",
-                            "Kling 2.1": "2.1",
-                            "Kling 2.1 Master (Pro only)": "2.1-master",
-                            "Kling 2.0 Master": "2.0-master",
-                            "Kling 1.6 (Legacy)": "1.6",
-                        }
-                        _variant_label = st.selectbox("Model Variant", list(_variant_opts.keys()), key="vid_variant")
-                        model_version_input = _variant_opts[_variant_label]
-                        st.caption(f"Resolved API name: `{model_version_input}`")
-                        st.divider()
-                        st.markdown("**Cinematic Overrides (Prompt Injection)**")
-                        v_stock = st.selectbox("Film Stock", ["None"] + knowledge_base.get("film_stocks", []), key="vid_stock")
-                        v_filter = st.selectbox("Filter / Look", ["None"] + knowledge_base.get("filters", []), key="vid_filter")
-                        v_movie_style = st.selectbox("Movie Reference", ["None"] + knowledge_base.get("movie_styles", []), key="vid_style")
-                        st.markdown("**Action & Transition**")
-                        c_act, c_trans = st.columns(2)
-                        with c_act:
+                         model_version_input = st.text_input("Kling Model Version", value="2.6", help="Code auto-converts '2.6' to 'kling-v2-6'.")
+                         st.caption("Available: `2.6` (Latest), `1.6` (Stable), `1.5`.")
+                         
+                         st.divider()
+                         st.markdown("**Cinematic Overrides (Prompt Injection)**")
+                         v_stock = st.selectbox("Film Stock", ["None"] + knowledge_base.get("film_stocks", []), key="vid_stock")
+                         v_filter = st.selectbox("Filter / Look", ["None"] + knowledge_base.get("filters", []), key="vid_filter")
+                         v_movie_style = st.selectbox("Movie Reference", ["None"] + knowledge_base.get("movie_styles", []), key="vid_style")
+                         
+                         st.markdown("**Action & Transition**")
+                         c_act, c_trans = st.columns(2)
+                         with c_act:
                              # Actions relevant for video
                              vid_actions = ["None", "Slow Motion Walk", "Turning Head", "Running", "Dancing", "Talking", "Laughing", "Fighting", "Driving", "Flying", "Explosion", "Wind blowing hair"]
                              v_action = st.selectbox("Subject Action", vid_actions, key="vid_action_override")
-                        with c_trans:
+                         with c_trans:
                              v_trans = st.selectbox("Transition In", ["None"] + knowledge_base.get("transitions", []), key="vid_trans")
-
+    
                     mode_val = "pro" if "Professional" in quality else "std"
-
+                    
                     # Camera Controls
                     camera_data = None
                     with st.expander("Camera & Motion Control", expanded=False):
@@ -3542,9 +3574,6 @@ if selection == "Video Studio":
                     st.markdown("**Video Driven Motion**")
                     
                     m_tab1, m_tab2 = st.tabs(["URL Input", "Upload Video"])
-                    
-                    ref_video_url = None
-                    ref_orientation = "image"
                     
                     with m_tab1:
                         url_input = st.text_input("Reference Video URL (S3/Public)", help="Paste an `http` URL to a video. Overrides Camera Control.")
@@ -3596,6 +3625,97 @@ if selection == "Video Studio":
                     h_steps = st.slider("Inference Steps", 10, 100, 50, help="More steps = higher quality (and cost).")
                     h_guidance = st.slider("Text Guidance", 2.0, 15.0, 5.0)
                     h_audio_guidance = st.slider("Audio Guidance", 2.0, 15.0, 5.5)
+                    
+                elif "Wan" in video_model:
+                    st.info("⚡ Engine: **Wan 2.7 (Atlas Cloud API)**")
+                    if "Spicy" in video_model:
+                         if "Reference-to-Video" in video_model:
+                              st.warning("🔥 spicy mode enabled: Model alibaba/wan-2.7/reference-to-video will be called with no guardrails.")
+                         else:
+                              st.warning("🔥 spicy mode enabled: Model alibaba/wan-2.7/image-to-video will be called with no guardrails.")
+                    
+                    col_wan_res, col_wan_ar, col_wan_dur = st.columns(3)
+                    with col_wan_res:
+                        wan_studio_res = st.selectbox("Resolution", ["1080P", "720P"], index=0, key="studio_wan_res")
+                    with col_wan_ar:
+                        wan_studio_ar = st.selectbox("Aspect Ratio", ["16:9 (Widescreen)", "9:16 (Vertical / Reels)", "1:1 (Square)"], index=0, key="studio_wan_ar")
+                    with col_wan_dur:
+                        wan_studio_dur = st.slider("Duration (seconds)", 2, 15, 5, key="studio_wan_dur")
+                        
+                    if "Reference-to-Video" in video_model:
+                        st.markdown("**Video Driven Motion (Reference)**")
+                        
+                        # Character Swap / Motion Keep Toggle for Video Studio
+                        wan_studio_char_swap = st.checkbox(
+                            "🔄 Keep Video Motion (Character Swap)", 
+                            value=False, 
+                            key="wan_video_studio_char_swap",
+                            help="If enabled, this will strictly preserve the motion, background, and physics from the reference video, and swap the character identity with the input image. (Requires reference video to be named Video1 and input image to be named Image1 in your prompt)."
+                        )
+                        
+                        m_tab1, m_tab2 = st.tabs(["URL Input", "Upload Video"])
+                        
+                        with m_tab1:
+                            url_input = st.text_input("Reference Video URL (S3/Public)", key="wan_ref_url_input", help="Paste an `http` URL to a video.")
+                            if url_input: ref_video_url = url_input
+                            
+                        with m_tab2:
+                            st.info("⚠️ **Constraint:** Video must be **≤ 30 seconds** and **< 100MB**.")
+                            uploaded_vid = st.file_uploader("Upload Reference Video", type=['mp4', 'mov'], key="wan_ref_uploader")
+                            if uploaded_vid:
+                                 if uploaded_vid.size > 100 * 1024 * 1024:
+                                      st.error(f"File too large ({uploaded_vid.size / 1024 / 1024:.1f}MB). Max 100MB.")
+                                 else:
+                                      with st.spinner("Uploading to S3..."):
+                                           if 'last_uploaded_vid_name' not in st.session_state or st.session_state['last_uploaded_vid_name'] != uploaded_vid.name:
+                                                s3_url = upload_file_obj(uploaded_vid, f"user_uploads/{uploaded_vid.name}")
+                                                if s3_url:
+                                                     st.session_state['last_uploaded_vid_url'] = s3_url
+                                                     st.session_state['last_uploaded_vid_name'] = uploaded_vid.name
+                                                     st.success("✅ Uploaded!")
+                                                else:
+                                                     st.error("Upload failed.")
+                                           
+                                           if 'last_uploaded_vid_url' in st.session_state:
+                                                ref_video_url = st.session_state['last_uploaded_vid_url']
+                                                st.caption(f"Using: `{ref_video_url}`")
+                                                
+                        with st.expander("📸 Seedance 2.0 Multi-Subject Reference Lock (Up to 9 Reference Images & 4 Videos)", expanded=True):
+                             st.markdown(
+                                 "Reference these subjects in your prompt as `Image1`, `Image2`, `Image3` ... `Image9`, and `Video1`, `Video2`, `Video3`, `Video4`.\n"
+                                 "*(Image1 is your main input image above; Video1 is your main reference video above)*"
+                             )
+                             
+                             # Option A: Quick Multi-File Bulk Upload
+                             st.file_uploader(
+                                 "📁 Quick Bulk Upload (Select up to 8 additional reference images at once)",
+                                 type=["png", "jpg", "jpeg", "webp"],
+                                 accept_multiple_files=True,
+                                 key="v_wan_extra_imgs_bulk",
+                                 help="Select multiple images from your computer at once. They will automatically populate slots Image2 through Image9."
+                             )
+                             
+                             st.markdown("--- **or Upload / Assign Slots Individually (Image 2 through Image 9)** ---")
+                             
+                             c_img_a, c_img_b = st.columns(2)
+                             with c_img_a:
+                                 st.file_uploader("Upload Image 2 (Image2)", type=["png", "jpg", "jpeg", "webp"], key="v_wan_extra_img2")
+                                 st.file_uploader("Upload Image 3 (Image3)", type=["png", "jpg", "jpeg", "webp"], key="v_wan_extra_img3")
+                                 st.file_uploader("Upload Image 4 (Image4)", type=["png", "jpg", "jpeg", "webp"], key="v_wan_extra_img4")
+                                 st.file_uploader("Upload Image 5 (Image5)", type=["png", "jpg", "jpeg", "webp"], key="v_wan_extra_img5")
+                             with c_img_b:
+                                 st.file_uploader("Upload Image 6 (Image6)", type=["png", "jpg", "jpeg", "webp"], key="v_wan_extra_img6")
+                                 st.file_uploader("Upload Image 7 (Image7)", type=["png", "jpg", "jpeg", "webp"], key="v_wan_extra_img7")
+                                 st.file_uploader("Upload Image 8 (Image8)", type=["png", "jpg", "jpeg", "webp"], key="v_wan_extra_img8")
+                                 st.file_uploader("Upload Image 9 (Image9)", type=["png", "jpg", "jpeg", "webp"], key="v_wan_extra_img9")
+                                 
+                             st.markdown("--- **Video Motion / Camera Choreography References (Video 2 through Video 4)** ---")
+                             c_vid_a, c_vid_b = st.columns(2)
+                             with c_vid_a:
+                                 st.file_uploader("Upload Video 2 (Video2)", type=["mp4", "mov"], key="v_wan_extra_vid2")
+                                 st.file_uploader("Upload Video 3 (Video3)", type=["mp4", "mov"], key="v_wan_extra_vid3")
+                             with c_vid_b:
+                                 st.file_uploader("Upload Video 4 (Video4)", type=["mp4", "mov"], key="v_wan_extra_vid4")
     
             st.divider()
             
@@ -3619,7 +3739,13 @@ if selection == "Video Studio":
                 with open(temp_path, "wb") as f:
                     f.write(video_source_img.getbuffer())
                     
-                suggestion = generate_motion_prompt(temp_path, movement_type=vid_movement, physics_focus=vid_physics)
+                current_typed_prompt = st.session_state.get("vid_prompt_text", "")
+                suggestion = generate_motion_prompt(
+                    temp_path, 
+                    movement_type=vid_movement, 
+                    physics_focus=vid_physics,
+                    additional_context=f"User's Scene Idea / Actions: {current_typed_prompt}" if current_typed_prompt else ""
+                )
                 st.session_state["motion_suggestion"] = suggestion
                 st.rerun()
 
@@ -3670,80 +3796,19 @@ if selection == "Video Studio":
                              st.error("Missing KLING_ACCESS_KEY/SECRET.")
                              status.update(label="Failed", state="error")
                         else:
-                             st.write(f"Sending to Kling API (Model: {model_version_input}, Mode: {mode_val.upper()})...")
+                             st.write(f"Sending to Kling AI 2.6 API ({mode_val.upper()} Mode)...")
                              st.write("Processing... (Standard: ~2-5m, Pro: ~5-10m)")
-                             st.caption(f"🔍 Debug — native_audio: `{st.session_state.get('vt_native_audio', False)}` | audio_url: `{st.session_state.get('vt_audio_url', '') or 'None'}`")
-
-
-                             # ── Resolve Kling 3.0 extras ──────────────────
-                             # Character / element reference images
-                             _image_refs = []
-                             _vt_r1 = st.session_state.get("vt_ref1_char", "None")
-                             _vt_r2 = st.session_state.get("vt_ref2_outfit", "None")
-
-                             _vt_assets_resolve = st.session_state.get("global_assets", {})
-                             _vt_chars_r = _vt_assets_resolve.get("characters", {}).copy()
-                             _vt_chars_r.update(_vt_assets_resolve.get("relations", {}))
-                             _vt_outfits_r = _vt_assets_resolve.get("outfits", {})
-
-                             def _get_path(val, dct):
-                                 if val == "None": return None
-                                 p = dct.get(val)
-                                 return p.get("default_img") if isinstance(p, dict) else p
-
-                             r1p = _get_path(_vt_r1, _vt_chars_r)
-                             r2p = _get_path(_vt_r2, _vt_outfits_r)
-                             if r1p: _image_refs.append(r1p)
-                             if r2p: _image_refs.append(r2p)
-
-                             # @image_3 upload
-                             _vt_r3_file = st.session_state.get("vt_ref3")
-                             if _vt_r3_file:
-                                 _tmp_r3 = os.path.join("output", "temp_ref3.png")
-                                 with open(_tmp_r3, "wb") as _f3: _f3.write(_vt_r3_file.getbuffer())
-                                 _image_refs.append(_tmp_r3)
-
-                             # End frame
-                             _tail_path = None
-                             _vt_tail_file = st.session_state.get("vt_tail")
-                             if _vt_tail_file:
-                                 _tail_path = os.path.join("output", "temp_tail.png")
-                                 with open(_tail_path, "wb") as _ftail: _ftail.write(_vt_tail_file.getbuffer())
-
-                             # Audio
-                             _audio_url_final = None
-                             _native_audio_val = st.session_state.get("vt_native_audio", False)
-                             _vt_audio_file = st.session_state.get("vt_audio")
-                             _vt_audio_url_str = st.session_state.get("vt_audio_url", "")
-                             if _vt_audio_url_str:
-                                 _audio_url_final = _vt_audio_url_str
-                             elif _vt_audio_file:
-                                 _tmp_audio = os.path.join("output", f"temp_audio.{_vt_audio_file.name.split('.')[-1]}")
-                                 with open(_tmp_audio, "wb") as _fa: _fa.write(_vt_audio_file.getbuffer())
-                                 # For Kling API, audio must be a URL — upload to S3
-                                 try:
-                                     _audio_url_final = upload_file_obj(_vt_audio_file, f"user_uploads/audio/{_vt_audio_file.name}")
-                                 except:
-                                     st.warning("Audio upload failed — generating without audio.")
-
-                             # Negative prompt
-                             _neg_prompt = st.session_state.get("vt_neg", "").strip() or None
-
+                             
                              result = generate_video_kling(
-                                 temp_path,
-                                 final_motion_prompt,
-                                 duration=int(duration.replace("s","")),
-                                 model_version=model_version_input,
-                                 quality_mode=mode_val,
+                                 temp_path, 
+                                 final_motion_prompt, 
+                                 duration=5, 
+                                 model_version=model_version_input, 
+                                 quality_mode=mode_val, 
                                  camera_control=camera_data,
                                  ref_video_path=ref_video_url,
                                  ref_orientation=ref_orientation,
-                                 output_folder=get_user_out_dir("Videos"),
-                                 image_references=_image_refs or None,
-                                 image_tail=_tail_path,
-                                 native_audio=_native_audio_val,
-                                 audio_url=_audio_url_final,
-                                 negative_prompt=_neg_prompt,
+                                 output_folder=get_user_out_dir("Videos")
                              )
                     
                     elif "HuMo" in video_model:
@@ -3775,6 +3840,84 @@ if selection == "Video Studio":
                                   audio_guidance_scale=h_audio_guidance,
                                   output_folder=get_user_out_dir("Videos")
                               )
+                              
+                    elif "Wan" in video_model or "Seedance" in video_model:
+                        target_engine = "alibaba/wan-2.7/image-to-video"
+                        if "Mini" in video_model:
+                            target_engine = "bytedance/seedance-2.0-mini/reference-to-video"
+                        elif "Seedance" in video_model and "Reference" in video_model:
+                            target_engine = "bytedance/seedance-2.0/reference-to-video"
+                        elif "Seedance" in video_model and "Image" in video_model:
+                            target_engine = "bytedance/seedance-2.0/image-to-video"
+                        elif "Seedance" in video_model and "Text" in video_model:
+                            target_engine = "bytedance/seedance-2.0/text-to-video"
+                        elif "Reference-to-Video" in video_model:
+                            target_engine = "alibaba/wan-2.7/reference-to-video"
+                        
+                        engine_name_display = "Seedance 2.0" if "Seedance" in video_model else "Wan 2.7"
+                        st.write(f"Sending to {engine_name_display} Video API via Atlas Cloud...")
+                        st.write("Animate-to-Video in progress... (Est ~2-3 mins)")
+                        
+                        # Fetch values from session state safely
+                        w_res = st.session_state.get("studio_wan_res", "1080P")
+                        w_dur = st.session_state.get("studio_wan_dur", 5)
+                        
+                        extra_imgs = []
+                        extra_vids = []
+                        
+                        if "Reference-to-Video" in video_model or "Seedance" in video_model:
+                             # 1. Process Quick Bulk Uploaded Reference Images
+                             bulk_uploads = st.session_state.get("v_wan_extra_imgs_bulk", [])
+                             if bulk_uploads:
+                                 for idx, b_file in enumerate(bulk_uploads[:8]):
+                                     b_path = os.path.join("output", f"temp_wan_bulk_ex_img_{idx+2}.png")
+                                     with open(b_path, "wb") as f:
+                                         f.write(b_file.getbuffer())
+                                     if b_path not in extra_imgs and len(extra_imgs) < 8:
+                                         extra_imgs.append(b_path)
+
+                             # 2. Process Slot-by-Slot Reference Images (Image 2 through Image 9)
+                             for slot_idx in range(2, 10):
+                                 w_slot_file = st.session_state.get(f"v_wan_extra_img{slot_idx}")
+                                 if w_slot_file:
+                                     slot_path = os.path.join("output", f"temp_wan_ex_img{slot_idx}.png")
+                                     with open(slot_path, "wb") as f:
+                                         f.write(w_slot_file.getbuffer())
+                                     if slot_path not in extra_imgs and len(extra_imgs) < 8:
+                                         extra_imgs.append(slot_path)
+                                         
+                             # 3. Process Reference Videos (Video 2 through Video 4)
+                             for slot_v_idx in range(2, 5):
+                                 w_vid_file = st.session_state.get(f"v_wan_extra_vid{slot_v_idx}")
+                                 if w_vid_file:
+                                     v_slot_path = os.path.join("output", f"temp_wan_ex_vid{slot_v_idx}.mp4")
+                                     with open(v_slot_path, "wb") as f:
+                                         f.write(w_vid_file.getbuffer())
+                                     if v_slot_path not in extra_vids and len(extra_vids) < 3:
+                                         extra_vids.append(v_slot_path)
+                                  
+                        final_motion_payload_prompt = final_motion_prompt
+                        if "Reference-to-Video" in video_model and st.session_state.get("wan_video_studio_char_swap"):
+                             # Append instructions to enforce motion transfer swap and identity locking
+                             final_motion_payload_prompt = (
+                                  "Strict Character Swap: Lock character identity to Image1. "
+                                  "Transfer all environment details, lighting, physics, frame timing, and motion strictly from Video1. "
+                                  "Keep the actions identical to Video1, but swap the character with Image1. "
+                                  f"Context: {final_motion_prompt}"
+                             )
+                             
+                        result = generate_wan_video(
+                            prompt=final_motion_payload_prompt,
+                            image_path=temp_path,
+                            resolution=w_res,
+                            duration=w_dur,
+                            aspect_ratio=st.session_state.get("studio_wan_ar", "16:9").split(" ")[0],
+                            ref_video_path=ref_video_url,
+                            extra_images=extra_imgs if extra_imgs else None,
+                            extra_videos=extra_vids if extra_vids else None,
+                            model=target_engine,
+                            output_folder=get_user_out_dir("Videos")
+                        )
 
                     # Common Result Handling
                     if result:
@@ -3816,10 +3959,492 @@ if selection == "Video Studio":
                             with st.expander("Error Logs", expanded=True):
                                  st.write(result.get("logs", []))
 
+
+# ==========================================
+# TAB: WAN & SEEDANCE STUDIO (Atlas Cloud API)
+# ==========================================
+if selection == "Wan & Seedance Studio":
+    with st.container():
+        st.markdown("### Wan & Seedance Studio (Atlas Cloud API)")
+        st.info("Edit your scene images and animate them using the latest Wan 2.7 & Seedance 2.0 models on Atlas Cloud.")
+
+    # Check for authentication
+    username = st.session_state.current_user.get("username") if st.session_state.get("authenticated") else "guest"
+    
+    # Initialize session state for subtab radio if not present
+    if "wan_studio_subtab_radio" not in st.session_state:
+        st.session_state.wan_studio_subtab_radio = "Image-to-Image (Scene Editor)"
+
+    w_mode = st.radio(
+        "Select Studio Tool",
+        ["Image-to-Image (Scene Editor)", "Image-to-Video (Motion)"],
+        horizontal=True,
+        key="wan_studio_subtab_radio"
+    )
+    
+    if w_mode == "Image-to-Image (Scene Editor)":
+        st.markdown("#### Wan 2.7 Image-to-Image Editor")
+        st.write("Modify the wardrobe, location, lighting, or style of your generated images.")
+        
+        # 🎭 CHARACTER, OUTFIT & ENVIRONMENT MAPPING RIG
+        rig_edit_res = render_wan_asset_mapping_rig(prefix_key="wan_edit", prompt_target_key="wan_edit_prompt")
+        
+        # Select image source
+        src_option = st.radio("Image Source", ["Shortcut (from Mapping Rig)", "Shortcut (from Gallery)", "Upload custom image"], horizontal=True, key="wan_edit_source_option")
+        
+        edit_image_path = None
+        if src_option == "Shortcut (from Mapping Rig)":
+            if rig_edit_res["primary_image_path"]:
+                target_rig_img = rig_edit_res["primary_image_path"]
+                st.info(f"Using primary image from Mapping Rig: `{os.path.basename(str(target_rig_img))}`")
+                if os.path.exists(str(target_rig_img)):
+                    st.image(target_rig_img, width=300)
+                edit_image_path = target_rig_img
+            else:
+                st.warning("No image selected in Mapping Rig above. Pick a character, outfit, or location in the rig above.")
+        elif src_option == "Shortcut (from Gallery)":
+            if st.session_state.wan_edit_image:
+                st.info(f"Using image from gallery shortcut: `{os.path.basename(st.session_state.wan_edit_image)}`")
+                st.image(st.session_state.wan_edit_image, width=300)
+                edit_image_path = st.session_state.wan_edit_image
+            else:
+                st.warning("No shortcut image selected. Go to 'My Gallery' and click '✏️ Edit' on an image, or upload a custom image.")
+        else:
+            uploaded_edit_img = st.file_uploader("Upload Image to Edit", type=["png", "jpg", "jpeg"], key="wan_edit_uploader")
+            if uploaded_edit_img:
+                temp_edit_path = os.path.join("output", "temp_wan_edit_input.png")
+                with open(temp_edit_path, "wb") as f:
+                    f.write(uploaded_edit_img.getbuffer())
+                st.image(uploaded_edit_img, width=300)
+                edit_image_path = temp_edit_path
+                
+        # Extra Reference Images (for clothing, locations, multi-subject)
+        extra_ref_paths = list(rig_edit_res["extra_ref_paths"])
+        with st.expander("🎨 Multi-Subject / Clothing & Location References (Optional Uploads / URLs)", expanded=False):
+            st.markdown("Add up to 8 additional reference images (e.g. clothing reference, face reference, background style reference) to guide the Wan edit.")
+            
+            ref_input_mode = st.radio("Reference Source Mode", ["Upload Files", "URLs (S3/Web)"], horizontal=True, key="wan_edit_ref_mode")
+            if ref_input_mode == "Upload Files":
+                uploaded_refs = st.file_uploader(
+                    "Upload Reference Images (Max 8)",
+                    type=["png", "jpg", "jpeg", "webp"],
+                    accept_multiple_files=True,
+                    key="wan_edit_uploaded_refs"
+                )
+                if uploaded_refs:
+                    for i, file_obj in enumerate(uploaded_refs[:8]):
+                        temp_ref_path = os.path.join("output", f"temp_wan_ref_{i}.png")
+                        with open(temp_ref_path, "wb") as f:
+                            f.write(file_obj.getbuffer())
+                        if temp_ref_path not in extra_ref_paths:
+                            extra_ref_paths.append(temp_ref_path)
+                    st.success(f"Loaded {len(uploaded_refs[:8])} local upload reference images.")
+            else:
+                url_text = st.text_area(
+                    "Reference URLs (One per line)",
+                    placeholder="https://example.com/outfit.jpg\nhttps://example.com/location.jpg",
+                    key="wan_edit_ref_urls"
+                )
+                if url_text.strip():
+                    lines = [line.strip() for line in url_text.split("\n") if line.strip()]
+                    for u_line in lines[:8]:
+                        if u_line not in extra_ref_paths:
+                            extra_ref_paths.append(u_line)
+                    st.success(f"Registered {len(lines[:8])} reference URLs.")
+
+        edit_prompt = st.text_area("Edit Prompt (SOP instructions)", placeholder="e.g. Change the background to a sunny Malibu beach. Change her outfit to a red leather jacket and black jeans. Keep character identity identical.", key="wan_edit_prompt")
+        edit_size = st.selectbox("Resolution", ["2K", "1K"], index=0, key="wan_edit_size")
+        
+        run_edit_btn = st.button("Generate Edited Image", type="primary", key="wan_run_edit")
+        
+        if run_edit_btn:
+            if not edit_image_path:
+                st.error("Please provide a source image.")
+            elif not edit_prompt:
+                st.error("Please describe what changes you want to make.")
+            else:
+                user = st.session_state.current_user.get("username")
+                if not auth_mgr.deduct_credits(user, 3):
+                    st.error("❌ Need 3 Credits for Wan 2.7 Editing!")
+                else:
+                    with st.status("Submitting job to Atlas API...", expanded=True) as status:
+                        st.write("Uploading and running alibaba/wan-2.7-pro/image-edit...")
+                        
+                        out_dir = get_user_out_dir("World")
+                        res = generate_wan_image(
+                            prompt=edit_prompt,
+                            image_path=edit_image_path,
+                            size=edit_size,
+                            output_folder=out_dir,
+                            extra_images=extra_ref_paths
+                        )
+                        
+                        if res and res["status"] == "success":
+                            status.update(label="Complete!", state="complete")
+                            st.success("✅ Image generated and saved to your Gallery!")
+                            st.image(res["image_path"], caption="Edited Scene Output", use_container_width=True)
+                            
+                            # Option to send immediately to motion generator
+                            if st.button("🎬 Send to Animate", key="send_to_animate_from_edit"):
+                                st.session_state.wan_animate_image = res["image_path"]
+                                st.session_state.wan_studio_subtab_radio = "Image-to-Video (Motion)"
+                                st.rerun()
+                        else:
+                            status.update(label="Failed", state="error")
+                            st.error(f"Error: {res.get('error', 'Unknown error')}")
+                            with st.expander("Logs", expanded=True):
+                                st.write(res.get("logs", []))
+
+    else:
+        st.markdown("#### Wan & Seedance Video Motion Generator")
+        st.write("Animate your edited scene image or generate cinematic video clips from scratch.")
+        
+        # 🎭 CHARACTER, OUTFIT & ENVIRONMENT MAPPING RIG
+        rig_anim_res = render_wan_asset_mapping_rig(prefix_key="wan_anim", prompt_target_key="wan_anim_prompt")
+        
+        # Read selected model flavor to check if Text-to-Video
+        model_flavor_val = st.session_state.get("wan_studio_flavor_select", "Wan 2.7 Standard (Image-to-Video)")
+        is_txt_to_vid = "Text-to-Video" in model_flavor_val
+        
+        anim_image_path = None
+        if is_txt_to_vid:
+            st.info("ℹ️ **Text-to-Video Mode Selected**: No input image is required. Video will be generated purely from your Motion Prompt.")
+        else:
+            # Select image source
+            anim_src_option = st.radio("Image Source", ["Shortcut (from Mapping Rig)", "Shortcut (from Gallery or Editor)", "Upload custom image"], horizontal=True, key="wan_anim_source_option")
+            
+            if anim_src_option == "Shortcut (from Mapping Rig)":
+                if rig_anim_res["primary_image_path"]:
+                    target_p = rig_anim_res["primary_image_path"]
+                    st.info(f"Using image from Mapping Rig: `{os.path.basename(str(target_p))}`")
+                    if os.path.exists(str(target_p)):
+                        st.image(target_p, width=300)
+                    anim_image_path = target_p
+                else:
+                    st.warning("No image selected in Mapping Rig above. Pick a character, outfit, or location in the rig above.")
+            elif anim_src_option == "Shortcut (from Gallery or Editor)":
+                if st.session_state.wan_animate_image:
+                    target_p = st.session_state.wan_animate_image
+                    # If it's a signed S3 URL but we have a matching local file under output/ or user/ directories:
+                    if target_p.startswith(("http://", "https://")) and "users/" in target_p:
+                         try:
+                              # Extract local path from S3 layout structure: users/admin/World/filename.jpg
+                              local_rel = target_p.split(".amazonaws.com/")[1].split("?")[0]
+                              local_abs = os.path.join("output", local_rel)
+                              if os.path.exists(local_abs):
+                                   target_p = local_abs
+                         except Exception:
+                              pass
+                    st.info(f"Using image from shortcut: `{os.path.basename(target_p)}`")
+                    st.image(target_p, width=300)
+                    anim_image_path = target_p
+                else:
+                    st.warning("No shortcut image selected. Go to 'My Gallery' and click '🎬 Animate' on an image, or run the editor above.")
+            else:
+                uploaded_anim_img = st.file_uploader("Upload Image to Animate", type=["png", "jpg", "jpeg"], key="wan_anim_uploader")
+                if uploaded_anim_img:
+                    temp_anim_path = os.path.join("output", "temp_wan_anim_input.png")
+                    with open(temp_anim_path, "wb") as f:
+                        f.write(uploaded_anim_img.getbuffer())
+                    st.image(uploaded_anim_img, width=300)
+                    anim_image_path = temp_anim_path
+                
+        # Director Vision AI Generator for Wan
+        if anim_image_path:
+            st.markdown("---")
+            st.markdown("#### 🪄 Director Vision AI Prompt Generator")
+            st.caption("Let Gemini analyze your scene composition and generate a custom cinematography prompt.")
+            
+            vis_col1, vis_col2, vis_col3 = st.columns(3)
+            with vis_col1:
+                wan_vis_move = st.selectbox(
+                    "Desired Movement", 
+                    ["Auto", "Pan Left/Right", "Zoom In/Out", "Dolly Shot", "Handheld Close-up", "Slow Drone Orbit"], 
+                    key="wan_vis_move"
+                )
+            with vis_col2:
+                wan_vis_physics = st.selectbox(
+                    "Dynamics Focus", 
+                    ["Standard", "Wind Dynamics (hair/fabric)", "High Motion (action/dance)", "Fluid Dynamics (liquids)"], 
+                    key="wan_vis_physics"
+                )
+            with vis_col3:
+                wan_vis_style = st.selectbox(
+                    "Cinematic Style", 
+                    ["Film Scene (Moody)", "High Action (Kinetic)", "Portrait Study (Emotions)", "Surreal (Dreamlike)"], 
+                    key="wan_vis_style"
+                )
+                
+            if st.button("🪄 Analyze & Suggest Prompt", key="wan_run_vision_ai", use_container_width=True):
+                if not os.getenv("GOOGLE_API_KEY"):
+                    st.error("Missing GOOGLE_API_KEY for Vision Analysis.")
+                else:
+                    with st.spinner("🎬 Director AI is analyzing your image composition..."):
+                        from execution.generate_video_prompt import generate_motion_prompt
+                        
+                        current_typed_prompt = st.session_state.get("wan_anim_prompt", "")
+                        additional_context_str = f"Render style guideline: {wan_vis_style}."
+                        if current_typed_prompt:
+                            additional_context_str += f" User's scene idea/action: {current_typed_prompt}"
+                            
+                        suggestion = generate_motion_prompt(
+                            anim_image_path,
+                            movement_type=wan_vis_move,
+                            physics_focus=wan_vis_physics,
+                            emotion="Dynamic",
+                            additional_context=additional_context_str
+                        )
+                        st.session_state["wan_vision_ai_suggestion"] = suggestion
+                        
+            if "wan_vision_ai_suggestion" in st.session_state:
+                st.info(f"💡 **Director AI Prompt Suggestion:**\n\n{st.session_state['wan_vision_ai_suggestion']}")
+                
+                c_apply, c_clear = st.columns(2)
+                with c_apply:
+                    if st.button("✅ Apply to Motion Prompt Box", key="wan_apply_vis_suggestion", use_container_width=True):
+                        st.session_state.wan_anim_prompt = st.session_state["wan_vision_ai_suggestion"]
+                        del st.session_state["wan_vision_ai_suggestion"]
+                        st.rerun()
+                with c_clear:
+                    if st.button("❌ Dismiss", key="wan_clear_vis_suggestion", use_container_width=True):
+                        del st.session_state["wan_vision_ai_suggestion"]
+                        st.rerun()
+            st.markdown("---")
+            
+        wan_model_flavor = st.selectbox(
+            "Model Variant",
+            [
+                "Wan 2.7 Standard (Image-to-Video)", 
+                "Wan 2.7 Spicy (Image-to-Video)",
+                "Wan 2.7 Standard (Reference-to-Video)",
+                "Wan 2.7 Spicy (Reference-to-Video)",
+                "Seedance 2.0 (Reference-to-Video)",
+                "Seedance 2.0 Mini (Reference-to-Video)",
+                "Seedance 2.0 (Image-to-Video)",
+                "Seedance 2.0 (Text-to-Video)"
+            ],
+            index=0,
+            key="wan_studio_flavor_select"
+        )
+        
+        ref_video_url = None
+        wan_char_swap = False
+        if "Reference-to-Video" in wan_model_flavor:
+            st.markdown("**Video Driven Motion (Reference)**")
+            
+            # Character Swap / Motion Keep Toggle
+            wan_char_swap = st.checkbox(
+                "🔄 Keep Video Motion (Character Swap)", 
+                value=False, 
+                help="If enabled, this will strictly preserve the motion, background, and physics from the reference video, and swap the character identity with the input image. (Requires reference video to be named Video1 and input image to be named Image1 in your prompt)."
+            )
+            
+            m_tab1, m_tab2 = st.tabs(["URL Input", "Upload Video"])
+            
+            with m_tab1:
+                url_input = st.text_input("Reference Video URL (S3/Public)", key="wan_studio_ref_url_input", help="Paste an `http` URL to a video.")
+                if url_input: ref_video_url = url_input
+                
+            with m_tab2:
+                st.info("⚠️ **Constraint:** Video must be **≤ 30 seconds** and **< 100MB**.")
+                uploaded_vid = st.file_uploader("Upload Reference Video", type=['mp4', 'mov'], key="wan_studio_ref_uploader")
+                if uploaded_vid:
+                     if uploaded_vid.size > 100 * 1024 * 1024:
+                          st.error(f"File too large ({uploaded_vid.size / 1024 / 1024:.1f}MB). Max 100MB.")
+                     else:
+                          with st.spinner("Uploading to S3..."):
+                               if 'last_uploaded_vid_name' not in st.session_state or st.session_state['last_uploaded_vid_name'] != uploaded_vid.name:
+                                    s3_url = upload_file_obj(uploaded_vid, f"user_uploads/{uploaded_vid.name}")
+                                    if s3_url:
+                                         st.session_state['last_uploaded_vid_url'] = s3_url
+                                         st.session_state['last_uploaded_vid_name'] = uploaded_vid.name
+                                         st.success("✅ Uploaded!")
+                                    else:
+                                         st.error("Upload failed.")
+                               
+                               if 'last_uploaded_vid_url' in st.session_state:
+                                    ref_video_url = st.session_state['last_uploaded_vid_url']
+                                    st.caption(f"Using: `{ref_video_url}`")
+                                    
+            with st.expander("📸 Seedance 2.0 Multi-Subject Reference Lock (Up to 9 Reference Images & 4 Videos)", expanded=True):
+                 st.markdown("Reference these subjects in your prompt as `Image1`, `Image2`, `Image3` ... `Image9`, and `Video1`, `Video2`, `Video3`, `Video4`.")
+                 
+                 # Option A: Quick Bulk Upload
+                 st.file_uploader(
+                     "📁 Quick Bulk Upload (Select up to 8 additional reference images at once)",
+                     type=["png", "jpg", "jpeg", "webp"],
+                     accept_multiple_files=True,
+                     key="studio_wan_extra_imgs_bulk",
+                     help="Select multiple images from your computer at once."
+                 )
+                 
+                 st.markdown("--- **or Upload / Assign Slots Individually (Image 2 through Image 9)** ---")
+                 c_img_a, c_img_b = st.columns(2)
+                 with c_img_a:
+                     st.file_uploader("Upload Image 2 (Image2)", type=["png", "jpg", "jpeg", "webp"], key="studio_wan_extra_img2")
+                     st.file_uploader("Upload Image 3 (Image3)", type=["png", "jpg", "jpeg", "webp"], key="studio_wan_extra_img3")
+                     st.file_uploader("Upload Image 4 (Image4)", type=["png", "jpg", "jpeg", "webp"], key="studio_wan_extra_img4")
+                     st.file_uploader("Upload Image 5 (Image5)", type=["png", "jpg", "jpeg", "webp"], key="studio_wan_extra_img5")
+                 with c_img_b:
+                     st.file_uploader("Upload Image 6 (Image6)", type=["png", "jpg", "jpeg", "webp"], key="studio_wan_extra_img6")
+                     st.file_uploader("Upload Image 7 (Image7)", type=["png", "jpg", "jpeg", "webp"], key="studio_wan_extra_img7")
+                     st.file_uploader("Upload Image 8 (Image8)", type=["png", "jpg", "jpeg", "webp"], key="studio_wan_extra_img8")
+                     st.file_uploader("Upload Image 9 (Image9)", type=["png", "jpg", "jpeg", "webp"], key="studio_wan_extra_img9")
+                     
+                 st.markdown("--- **Video Motion / Camera Choreography References (Video 2 through Video 4)** ---")
+                 c_vid_a, c_vid_b = st.columns(2)
+                 with c_vid_a:
+                     st.file_uploader("Upload Video 2 (Video2)", type=["mp4", "mov"], key="studio_wan_extra_vid2")
+                     st.file_uploader("Upload Video 3 (Video3)", type=["mp4", "mov"], key="studio_wan_extra_vid3")
+                 with c_vid_b:
+                     st.file_uploader("Upload Video 4 (Video4)", type=["mp4", "mov"], key="studio_wan_extra_vid4")
+        
+        anim_prompt = st.text_area("Motion Prompt", placeholder="e.g. The character turns her head to look at the camera and smiles, wind blowing hair, realistic physics and textures, 35mm lens.", key="wan_anim_prompt")
+        
+        c_res, c_ar, c_dur = st.columns(3)
+        with c_res:
+            anim_res = st.selectbox("Resolution", ["1080P", "720P"], index=0, key="wan_anim_res")
+        with c_ar:
+            anim_ar = st.selectbox("Aspect Ratio", ["16:9 (Widescreen)", "9:16 (Vertical / Reels)", "1:1 (Square)"], index=0, key="wan_anim_ar")
+        with c_dur:
+            anim_dur = st.slider("Duration (seconds)", 2, 15, 5, key="wan_anim_dur")
+            
+        run_anim_btn = st.button("Generate Video Motion", type="primary", key="wan_run_anim")
+        
+        if run_anim_btn:
+            # 1. Gather all reference images and videos upfront FIRST!
+            extra_imgs = list(rig_anim_res["extra_ref_paths"])
+            extra_vids = []
+            
+            if "Reference-to-Video" in wan_model_flavor or "Seedance" in wan_model_flavor:
+                bulk_uploads_st = st.session_state.get("studio_wan_extra_imgs_bulk", [])
+                if bulk_uploads_st:
+                    for idx, b_file in enumerate(bulk_uploads_st[:8]):
+                        b_path = os.path.join("output", f"temp_wan_studio_bulk_ex_img_{idx+2}.png")
+                        with open(b_path, "wb") as f:
+                            f.write(b_file.getbuffer())
+                        if b_path not in extra_imgs and len(extra_imgs) < 8:
+                            extra_imgs.append(b_path)
+
+                for slot_idx in range(2, 10):
+                    w_slot_file = st.session_state.get(f"studio_wan_extra_img{slot_idx}")
+                    if w_slot_file:
+                        slot_path = os.path.join("output", f"temp_wan_studio_ex_img{slot_idx}.png")
+                        with open(slot_path, "wb") as f:
+                            f.write(w_slot_file.getbuffer())
+                        if slot_path not in extra_imgs and len(extra_imgs) < 8:
+                            extra_imgs.append(slot_path)
+                            
+                for slot_v_idx in range(2, 5):
+                    w_vid_file = st.session_state.get(f"studio_wan_extra_vid{slot_v_idx}")
+                    if w_vid_file:
+                        v_slot_path = os.path.join("output", f"temp_wan_studio_ex_vid{slot_v_idx}.mp4")
+                        with open(v_slot_path, "wb") as f:
+                            f.write(w_vid_file.getbuffer())
+                        if v_slot_path not in extra_vids and len(extra_vids) < 3:
+                            extra_vids.append(v_slot_path)
+
+            # If anim_image_path is missing but extra_imgs has images, use extra_imgs[0] as primary image!
+            if not anim_image_path and extra_imgs:
+                anim_image_path = extra_imgs[0]
+
+            # 2. JSON Prompt Auto-Extraction if raw JSON was pasted
+            clean_anim_prompt = anim_prompt.strip() if anim_prompt else ""
+            if clean_anim_prompt.startswith("{") and ("visual_prompt" in clean_anim_prompt or "shots" in clean_anim_prompt or "title" in clean_anim_prompt):
+                try:
+                    import json
+                    parsed_j = json.loads(clean_anim_prompt)
+                    if isinstance(parsed_j, dict):
+                        if "visual_prompt" in parsed_j:
+                            clean_anim_prompt = parsed_j["visual_prompt"]
+                        elif "shots" in parsed_j and isinstance(parsed_j["shots"], list) and len(parsed_j["shots"]) > 0:
+                            vp_list = [sh.get("visual_prompt", "") for sh in parsed_j["shots"] if sh.get("visual_prompt")]
+                            if vp_list:
+                                clean_anim_prompt = "\n\n".join(vp_list)
+                            else:
+                                clean_anim_prompt = parsed_j["shots"][0].get("action_description", clean_anim_prompt)
+                except Exception:
+                    pass
+
+            is_text_to_video_selected = "Text-to-Video" in wan_model_flavor
+            
+            if not is_text_to_video_selected and not anim_image_path and not extra_imgs:
+                st.error("⚠️ **Source image missing!** For Reference-to-Video or Image-to-Video, please upload a source image or reference image above. Or select **`Seedance 2.0 (Text-to-Video)`** from Model Variant if generating purely from text!")
+            elif not clean_anim_prompt:
+                st.error("Please describe the motion you want in the Motion Prompt area.")
+            else:
+                user = st.session_state.current_user.get("username")
+                if not auth_mgr.deduct_credits(user, 5):
+                    st.error("❌ Need 5 Credits for Video!")
+                else:
+                    with st.status("⚡ Submitting motion job to Atlas Cloud API...", expanded=True) as status:
+                        target_engine = "alibaba/wan-2.7/image-to-video"
+                        if "Mini" in wan_model_flavor:
+                            target_engine = "bytedance/seedance-2.0-mini/reference-to-video"
+                        elif "Seedance" in wan_model_flavor and "Reference" in wan_model_flavor:
+                            target_engine = "bytedance/seedance-2.0/reference-to-video"
+                        elif "Seedance" in wan_model_flavor and "Image" in wan_model_flavor:
+                            target_engine = "bytedance/seedance-2.0/image-to-video"
+                        elif "Seedance" in wan_model_flavor and "Text" in wan_model_flavor:
+                            target_engine = "bytedance/seedance-2.0/text-to-video"
+                        elif "Reference-to-Video" in wan_model_flavor:
+                            target_engine = "alibaba/wan-2.7/reference-to-video"
+                            
+                        st.write(f"🚀 Running **{target_engine}** model...")
+                        if extra_imgs:
+                            st.write(f"📸 Loaded **{len(extra_imgs)} reference images**.")
+                        if extra_vids:
+                            st.write(f"📹 Loaded **{len(extra_vids)} reference videos**.")
+
+                        final_wan_prompt = clean_anim_prompt
+                        if wan_char_swap:
+                             final_wan_prompt = (
+                                  "Strict Character Swap: Lock character identity to Image1. "
+                                  "Transfer all environment details, lighting, physics, frame timing, and motion strictly from Video1. "
+                                  "Keep the actions identical to Video1, but swap the character with Image1. "
+                                  f"Context: {clean_anim_prompt}"
+                             )
+                        
+                        out_dir = get_user_out_dir("Videos")
+                        res = generate_wan_video(
+                            prompt=final_wan_prompt,
+                            image_path=anim_image_path,
+                            resolution=anim_res,
+                            duration=anim_dur,
+                            aspect_ratio=anim_ar.split(" ")[0],
+                            ref_video_path=ref_video_url,
+                            extra_images=extra_imgs if extra_imgs else None,
+                            extra_videos=extra_vids if extra_vids else None,
+                            model=target_engine,
+                            output_folder=out_dir
+                        )
+                        
+                        if res and res.get("status") == "success":
+                            status.update(label="Complete!", state="complete")
+                            st.success("✅ Video generated successfully!")
+                            st.write(f"💾 Saved to: {res.get('video_path', 'N/A')}")
+                            if res.get("video_url"):
+                                st.video(res["video_url"])
+                            if res.get("video_path") and os.path.exists(res["video_path"]):
+                                with open(res["video_path"], "rb") as vf:
+                                    st.download_button(
+                                        "⬇️ Download MP4",
+                                        data=vf,
+                                        file_name=os.path.basename(res["video_path"]),
+                                        mime="video/mp4"
+                                    )
+                        else:
+                            status.update(label="Failed", state="error")
+                            st.error(f"Error: {res.get('error', 'Unknown error') if res else 'Generation failed'}")
+                            if res and res.get("logs"):
+                                with st.expander("Logs", expanded=True):
+                                    st.write(res.get("logs", []))
+
 # ==========================================
 # TAB 8: CHARACTER STUDIO
 # ==========================================
 if selection == "Character Studio":
+
     with st.container():
         st.markdown("### Character Studio")
     st.info("Design your cast with precision. Used consistently across the platform.")

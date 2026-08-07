@@ -87,15 +87,18 @@ def save_session(account: str):
         print("\nWaiting for you to log in... (watching for Instagram feed)")
         print("Press Ctrl+C to cancel.\n")
 
-        # Wait until the user is logged in (feed visible) — up to 3 minutes
+        # Wait until we land on the actual feed — up to 5 minutes
+        # Exclude any auth/challenge/reset/codeentry pages
+        AUTH_PATHS = ("/accounts/", "/auth_platform/", "/challenge/", "/two_factor/")
+        print("Complete any verification steps in the browser window...")
         try:
-            # Feed is loaded when we're NOT on the login page anymore
-            # and we can see the home/create button
             page.wait_for_url(
-                lambda url: "instagram.com" in url and "/accounts/login" not in url and "/challenge" not in url,
-                timeout=180_000,
+                lambda url: (
+                    "instagram.com" in url
+                    and not any(p in url for p in AUTH_PATHS)
+                ),
+                timeout=300_000,
             )
-            # Extra wait for the page to fully settle
             time.sleep(3)
         except Exception:
             print("Timed out waiting for login. Try again.")

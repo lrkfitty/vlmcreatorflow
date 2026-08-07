@@ -21,162 +21,7 @@ def get_kling_token(access_key, secret_key):
     token = jwt.encode(payload, secret_key, algorithm="HS256", headers=headers)
     return token
 
-def generate_video_kling(
-    image_path,
-    prompt,
-    duration=5,
-    model_version="2.6",
-    quality_mode="pro",
-    camera_control=None,
-    ref_video_path=None,
-    ref_orientation="image",
-    output_folder="output",
-    # ── Kling 3.0 New Features ─────────────────────────────────────
-    image_references=None,      # List of local paths or URLs — character/element refs (up to 7)
-                                # Reference them in prompt as @image_1, @image_2 etc.
-    image_tail=None,            # Path/URL to use as the END FRAME of the video
-    native_audio=False,         # True = Kling generates lip-sync audio natively
-    audio_url=None,             # URL to custom audio file (.mp3/.wav, max 5MB, 2-60s)
-    negative_prompt=None,       # Text describing what NOT to include
-):
-    """
-    Generates video using Kling AI API.
-    Supports full Kling 3.0 feature set: native audio, character references,
-    end-frame control, custom audio, and negative prompts.
-    """
-
-    ak = os.getenv("KLING_ACCESS_KEY")
-    sk = os.getenv("KLING_SECRET_KEY")
-
-    if not ak or not sk:
-        return {"status": "failed", "error": "Missing KLING_ACCESS_KEY or KLING_SECRET_KEY"}
-
-    try:
-        token = get_kling_token(ak, sk)
-    except Exception as e:
-        return {"status": "failed", "error": f"Token Generation Failed: {e}"}
-
-    url = "https://api.klingai.com/v1/videos/image2video"
-
-    import base64
-
-    def encode_image(path_or_url):
-        """Returns base64 string for local file, or URL string for remote."""
-        if not path_or_url:
-            return None
-        if isinstance(path_or_url, str) and path_or_url.startswith(('http://', 'https://')):
-            return path_or_url  # Pass URL directly for image_tail / references
-        elif os.path.exists(str(path_or_url)):
-            with open(path_or_url, "rb") as f:
-                return base64.b64encode(f.read()).decode('utf-8')
-        return None
-
-    # Encode primary source image (always base64)
-    encoded_string = ""
-    if image_path.startswith(('http://', 'https://')):
-        try:
-            resp = requests.get(image_path)
-            resp.raise_for_status()
-            encoded_string = base64.b64encode(resp.content).decode('utf-8')
-        except Exception as e:
-            return {"status": "failed", "error": f"Failed to download source image: {e}"}
-    elif os.path.exists(image_path):
-        with open(image_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
-    else:
-        return {"status": "failed", "error": f"Image path not found: {image_path}"}
-
-    # --- MODEL NAME MAPPING ---
-    MODEL_NAME_MAP = {
-        "3.0":        "kling-v3",
-        "2.6":        "kling-v2-6",
-        "2.5":        "kling-v2-5",
-        "2.5-turbo":  "kling-v2-5-turbo",
-        "2.1":        "kling-v2-1",
-        "2.1-master": "kling-v2-1-master",
-        "2.0":        "kling-v2",
-        "2.0-master": "kling-v2-master",
-        "1.6":        "kling-v1-6",
-        "1.5":        "kling-v1-5",
-        "1.0":        "kling-v1",
-    }
-    target_model_name = MODEL_NAME_MAP.get(model_version.strip(), f"kling-v{model_version.replace('.', '-')}")
-
-    # --- DURATION SAFETY ---
-    duration_int = int(str(duration).replace("s", ""))
-    if duration_int == 15 and "v3" not in target_model_name:
-        duration_int = 10
-
-    # --- MODE SELECTION ---
-    if ref_video_path:
-        # MOTION CONTROL MODE
-        if not ref_video_path.startswith(('http', 'https')):
-            return {"status": "failed", "error": "Motion Control requires a public URL for the reference video."}
-
-        url = "https://api.klingai.com/v1/videos/motion-control"
-        payload = {
-            "image_url": encoded_string,
-            "video_url": ref_video_path,
-            "character_orientation": ref_orientation,
-            "mode": quality_mode,
-            "prompt": prompt,
-            "model_name": target_model_name
-        }
-
-    else:
-        # STANDARD IMAGE-TO-VIDEO
-        payload = {
-            "model_name": target_model_name,
-            "image": encoded_string,
-            "prompt": prompt,
-            "duration": duration_int,
-            "mode": quality_mode,
-            "cfg_scale": 0.5
-        }
-
-        # ── Kling 3.0: Negative Prompt ───────────────────────────────
-        if negative_prompt:
-            payload["negative_prompt"] = negative_prompt
-
-        # ── Native Audio ──────────────────────────────────────
-        # Official Kling API param: "sound": "on" (string, not boolean)
-        # Requires Pro mode on Kling 2.6+. Doubles credit cost.
-        if native_audio:
-            payload["sound"] = "on"
-            payload["enable_audio"] = True  # Fallback alias used by some versions
-
-        # ── Kling 3.0: Custom Audio URL ──────────────────────────────
-        # Provide a public audio URL — mutually exclusive with enable_audio
-        if audio_url:
-            payload["audio_url"] = audio_url
-
-        # ── Kling 3.0: End Frame (image_tail) ────────────────────────
-        # Sets the LAST frame of the video — drives the motion path
-        if image_tail:
-            tail_encoded = encode_image(image_tail)
-            if tail_encoded:
-                if image_tail.startswith(('http', 'https')):
-                    payload["image_tail"] = tail_encoded  # URL passthrough
-                else:
-                    payload["image_tail"] = tail_encoded  # base64
-
-        # ── Kling 3.0: Character / Element Reference Images ──────────
-        # Up to 7 images. Reference in prompt as @image_1, @image_2 etc.
-        if image_references:
-            refs_payload = []
-            for i, ref_path in enumerate(image_references[:7], start=1):
-                ref_enc = encode_image(ref_path)
-                if ref_enc:
-                    refs_payload.append({
-                        "image": ref_enc,
-                        "label": f"@image_{i}"
-                    })
-            if refs_payload:
-                payload["image_references"] = refs_payload
-
-        if camera_control:
-            payload["camera_control"] = camera_control
-
+def generate_video_kling(image_path, prompt, duration=5, model_version="2.6", quality_mode="pro", camera_control=None, ref_video_path=None, ref_orientation="image", output_folder="output"):
     """
     Generates video using Kling AI API.
     camera_control: Optional dict for 'type' and 'config'.
@@ -224,31 +69,14 @@ def generate_video_kling(
     else:
         return {"status": "failed", "error": f"Image path not found: {image_path}"}
 
-    # --- MODEL NAME MAPPING ---
-    # Official Kling API model_name identifiers (verified from klingai.com docs).
-    MODEL_NAME_MAP = {
-        # Kling 3.0 Series (latest) — 3–15s, multi-shot
-        "3.0":        "kling-v3",
-        # Kling 2.x Series
-        "2.6":        "kling-v2-6",           # stable workhorse
-        "2.5":        "kling-v2-5",
-        "2.5-turbo":  "kling-v2-5-turbo",
-        "2.1":        "kling-v2-1",
-        "2.1-master": "kling-v2-1-master",    # pro only
-        "2.0":        "kling-v2",             # "Master Edition" launch name
-        "2.0-master": "kling-v2-master",
-        # Kling 1.x (legacy, still supported)
-        "1.6":        "kling-v1-6",
-        "1.5":        "kling-v1-5",
-        "1.0":        "kling-v1",
-    }
-    target_model_name = MODEL_NAME_MAP.get(model_version.strip(), f"kling-v{model_version.replace('.', '-')}")
-
-    # --- DURATION SAFETY ---
-    # Kling 3.0 supports 5s, 10s, 15s. Older models only support 5s / 10s.
-    duration_int = int(str(duration).replace("s", ""))
-    if duration_int == 15 and "v3" not in target_model_name:
-        duration_int = 10  # Clamp to 10s for non-3.0 models
+    # User Request: ALWAYS use Kling 2.6 (splits on mode parameter if API supports it, otherwise just use 2.6)
+    # DOCS UPDATE: 
+    # 1. Key is now 'model_name', not 'model'.
+    # 2. Format is 'kling-v2-6' (hyphens), not 'kling-v2.6' (dots).
+    
+    clean_version = model_version.replace(".", "-") if "2.6" in model_version else model_version
+    target_model_name = f"kling-v{clean_version}" 
+    target_model_name = target_model_name.replace(".", "-")
 
     # --- MODE SELECTION ---
     if ref_video_path:
@@ -275,7 +103,7 @@ def generate_video_kling(
             "model_name": target_model_name, 
             "image": encoded_string,
             "prompt": prompt,
-            "duration": duration_int,
+            "duration": duration,
             "mode": quality_mode, # "std" or "pro"
             "cfg_scale": 0.5
         }
@@ -434,49 +262,6 @@ def generate_video_kling(
 
     except Exception as e:
         return {"status": "failed", "error": str(e)}
-
-if __name__ == "__main__":
-    import argparse
-    import json as _json
-    from pathlib import Path
-    from dotenv import load_dotenv
-    load_dotenv()
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--image", required=True)
-    parser.add_argument("--prompt", required=True)
-    parser.add_argument("--carousel_id", required=True)
-    parser.add_argument("--queue_file", required=True)
-    parser.add_argument("--model_version", default="3.0")
-    parser.add_argument("--output_folder", default="output")
-    args = parser.parse_args()
-
-    queue_path = Path(args.queue_file)
-
-    def _update_queue(updates):
-        try:
-            q = _json.loads(queue_path.read_text()) if queue_path.exists() else {}
-            if args.carousel_id in q:
-                q[args.carousel_id].update(updates)
-                queue_path.write_text(_json.dumps(q, indent=2))
-        except Exception as ex:
-            print(f"Queue update error: {ex}")
-
-    result = generate_video_kling(
-        image_path=args.image,
-        prompt=args.prompt,
-        model_version=args.model_version,
-        quality_mode="pro",
-        output_folder=args.output_folder,
-    )
-
-    if result.get("status") == "success" and result.get("video_path"):
-        _update_queue({"status": "done", "video_path": result["video_path"]})
-        print(f"Done: {result['video_path']}")
-    else:
-        _update_queue({"status": "failed"})
-        print(f"Failed: {result.get('error', result.get('logs', ''))}")
-
 
 def generate_video_humo(image_path, prompt, audio_path=None, num_frames=49, num_inference_steps=50, guidance_scale=5.0, audio_guidance_scale=5.5, output_folder="output"):
     """

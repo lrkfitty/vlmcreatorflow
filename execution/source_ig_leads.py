@@ -29,8 +29,10 @@ Usage:
 
 import argparse
 import json
+import signal
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -95,52 +97,94 @@ def build_hashtags(city: str, verticals: list[str]) -> list[str]:
     return list(dict.fromkeys(tags))  # dedupe, preserve order
 
 
-def scrape_hashtag(cl, hashtag: str, limit: int, vertical: str, already_contacted: set, existing_handles: set) -> list[dict]:
-    found = []
+def _process_user(cl, user, vertical: str, source: str, already_contacted: set, existing_handles: set) -> dict | None:
+    """Fetch full user info and return a lead dict if they pass filters. Returns None to skip."""
+    handle = user.username.lower()
+    if handle in already_contacted or handle in existing_handles:
+        return None
     try:
-        print(f"  Searching #{hashtag}...")
-        medias = cl.hashtag_medias_recent(hashtag, amount=limit)
-        seen_users = set()
-
-        for media in medias:
-            user = media.user
-            handle = user.username.lower()
-
-            if handle in seen_users:
-                continue
-            seen_users.add(handle)
-
-            if handle in already_contacted or handle in existing_handles:
-                continue
-
-            # Fetch full user info for follower count + bio
-            try:
-                info = cl.user_info(user.pk)
-                followers = info.follower_count
-                bio = info.biography or ""
-
-                if not (FOLLOWER_MIN <= followers <= FOLLOWER_MAX):
-                    continue
-
-                lead = {
-                    "handle": handle,
-                    "business_name": info.full_name or "",
-                    "vertical": vertical,
-                    "bio": bio[:120],
-                    "followers": followers,
-                    "website": str(info.external_url) if info.external_url else "",
-                    "source_hashtag": hashtag,
-                }
-                found.append(lead)
-                print(f"    + @{handle} ({followers:,} followers)" + (f" — {info.full_name}" if info.full_name else ""))
-                time.sleep(1.5)  # polite delay between user_info calls
-
-            except Exception as e:
-                print(f"    ! @{handle} info failed: {e}")
-                continue
-
+        info = cl.user_info(user.pk)
+        followers = info.follower_count
+        if not (FOLLOWER_MIN <= followers <= FOLLOWER_MAX):
+            return None
+        bio = info.biography or ""
+        lead = {
+            "handle": handle,
+            "business_name": info.full_name or "",
+            "vertical": vertical,
+            "bio": bio[:120],
+            "followers": followers,
+            "website": str(info.external_url) if info.external_url else "",
+            "source_hashtag": source,
+        }
+        print(f"    + @{handle} ({followers:,} followers)" + (f" — {info.full_name}" if info.full_name else ""))
+        time.sleep(1.5)
+        return lead
     except Exception as e:
-        print(f"  ! #{hashtag} search failed: {e}")
+        print(f"    ! @{handle} info failed: {e}")
+        return None
+
+
+def scrape_hashtag(cl, hashtag: str, limit: int, vertical: str, city: str, already_contacted: set, existing_handles: set) -> list[dict]:
+    found = []
+    medias = None
+
+    # Try hashtag_medias_top first — more reliable endpoint than recent
+    for method_name in ["hashtag_medias_top", "hashtag_medias_top_v1"]:
+        print(f"  Searching #{hashtag} via {method_name}...")
+        try:
+            method = getattr(cl, method_name)
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(method, hashtag, limit)
+                try:
+                    medias = fut.result(timeout=15)
+                    if medias:
+                        print(f"  ✓ Got {len(medias)} posts from #{hashtag}")
+                        break
+                except FuturesTimeout:
+                    print(f"  ! #{hashtag} {method_name} timed out after 15s — trying next method")
+                    medias = None
+        except Exception as e:
+            print(f"  ! {method_name} error: {e}")
+            medias = None
+
+    # Fallback: search users directly by city + vertical keyword
+    if not medias:
+        query = f"{city} {vertical}".strip()
+        print(f"  → Hashtag endpoints unavailable — falling back to user search: '{query}'")
+        try:
+            with ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(cl.search_users, query, 20)
+                try:
+                    users = fut.result(timeout=15)
+                    seen = set()
+                    for user in (users or []):
+                        if user.username.lower() in seen:
+                            continue
+                        seen.add(user.username.lower())
+                        lead = _process_user(cl, user, vertical, f"search:{query}", already_contacted, existing_handles)
+                        if lead:
+                            found.append(lead)
+                            existing_handles.add(lead["handle"])
+                    return found
+                except FuturesTimeout:
+                    print(f"  ! search_users also timed out — skipping this hashtag")
+                    return found
+        except Exception as e:
+            print(f"  ! search_users fallback failed: {e}")
+            return found
+
+    # Process media results
+    seen_users: set = set()
+    for media in medias:
+        user = media.user
+        if user.username.lower() in seen_users:
+            continue
+        seen_users.add(user.username.lower())
+        lead = _process_user(cl, user, vertical, hashtag, already_contacted, existing_handles)
+        if lead:
+            found.append(lead)
+            existing_handles.add(lead["handle"])
 
     return found
 
@@ -180,9 +224,10 @@ def run(args):
     cl = get_client(account=args.account)
     print("Authenticated.\n")
 
+    city_str = getattr(args, "city", "") or ""
     new_leads = []
     for tag, vertical in hashtags:
-        found = scrape_hashtag(cl, tag, args.limit, vertical, already_contacted, existing_handles)
+        found = scrape_hashtag(cl, tag, args.limit, vertical, city_str, already_contacted, existing_handles)
         new_leads += found
         existing_handles.update(l["handle"] for l in found)  # prevent cross-hashtag dupes
         if len(found):

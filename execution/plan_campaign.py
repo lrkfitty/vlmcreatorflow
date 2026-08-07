@@ -17,65 +17,9 @@ Output:
 
 import os
 import json
-import random
-import glob
 from dotenv import load_dotenv
 
 load_dotenv()
-
-# ── Asset root ────────────────────────────────────────────────────────────────
-_ASSET_ROOT = os.path.join(os.path.dirname(__file__), "..", "assets", "AI Content Creators", "Friends")
-_ASSET_ROOT = os.path.normpath(_ASSET_ROOT)
-
-def _glob_images(folder: str) -> list:
-    exts = ("*.jpg", "*.jpeg", "*.png", "*.JPG", "*.JPEG", "*.PNG", "*.webp", "*.WEBP")
-    files = []
-    for ext in exts:
-        files.extend(glob.glob(os.path.join(folder, ext)))
-    return files
-
-def _angeil_refs() -> list:
-    return [f for f in _glob_images(_ASSET_ROOT) if "angeil" in os.path.basename(f).lower()]
-
-def _male_friend_refs() -> list:
-    return [f for f in _glob_images(_ASSET_ROOT) if any(k in os.path.basename(f).lower() for k in ["black man", "neo.png", "boyfriend"])]
-
-def _female_friend_refs() -> list:
-    """All female friends usable for Shay scenes."""
-    folders = [
-        os.path.join(_ASSET_ROOT, "Black Influencer Models"),
-        os.path.join(_ASSET_ROOT, "Latina Influencers"),
-        os.path.join(_ASSET_ROOT, "White Influencers"),
-    ]
-    refs = []
-    for folder in folders:
-        refs.extend(_glob_images(folder))
-    # also include female-looking refs at root
-    root_female = [f for f in _glob_images(_ASSET_ROOT) if any(k in os.path.basename(f).lower() for k in ["girl", "woman", "jenny", "jen", "ashley", "trish", "kayla", "franscesca", "bella"])]
-    refs.extend(root_female)
-    return refs
-
-def get_companion_images(character_name: str) -> list:
-    """
-    Returns a list of extra_images dicts to inject as companions.
-    - Ty / Tyrie → 1 random from Angeil refs OR male friends
-    - Shay        → 1–4 random female friends
-    - Others      → empty
-    """
-    name_lower = (character_name or "").lower()
-
-    if any(k in name_lower for k in ["ty", "tyrie"]):
-        pool = _angeil_refs() + _male_friend_refs()
-        picks = random.sample(pool, min(1, len(pool))) if pool else []
-        return [{"path": p, "label": f"Cast: {'Angeil' if 'angeil' in p.lower() else 'Friend'}"} for p in picks]
-
-    if "shay" in name_lower:
-        pool = _female_friend_refs()
-        count = random.randint(1, 4)
-        picks = random.sample(pool, min(count, len(pool))) if pool else []
-        return [{"path": p, "label": f"Cast: Friend {i+1}"} for i, p in enumerate(picks)]
-
-    return []
 
 
 def _load_scenario_catalog(world_db_path: str = "world_db.json") -> list:
@@ -101,7 +45,7 @@ def plan_campaign(
     num_posts: int = 10,
     character: str = None,
     world_db_path: str = "world_db.json",
-    model_engine: str = "gemini-3.5-flash",
+    model_engine: str = "gemini-2.0-flash",
 ) -> list:
     """
     Generate N campaign job plans from a high-level content brief.
@@ -179,7 +123,16 @@ OUTPUT: Return ONLY a valid JSON array with exactly {num_posts} objects. Each ob
 
     try:
         genai.configure(api_key=google_key)
-        model = genai.GenerativeModel(model_engine)
+        try:
+            model = genai.GenerativeModel(model_engine)
+        except Exception:
+            try:
+                model = genai.GenerativeModel("gemini-3.5-flash")
+            except Exception:
+                try:
+                    model = genai.GenerativeModel("gemini-2.5-flash")
+                except Exception:
+                    model = genai.GenerativeModel("gemini-1.5-flash")
         response = model.generate_content([system_prompt, user_message])
         raw = response.text.strip()
 
@@ -240,8 +193,6 @@ def build_campaign_job(post_plan: dict, output_base: str, username: str = "defau
         "aspect_ratio": post_plan.get("aspect_ratio", "9:16"),
     }
 
-    companions = get_companion_images(post_plan.get("character", ""))
-
     return {
         "name": post_plan["name"],
         "description": post_plan.get("description", ""),
@@ -252,7 +203,6 @@ def build_campaign_job(post_plan: dict, output_base: str, username: str = "defau
         "outfit_path": None,
         "vibe_path": None,
         "job_type": "image",
-        "extra_images": companions,
     }
 
 
