@@ -15,7 +15,9 @@ try:
     importlib.reload(la_module)
     import load_assets as la_module
     importlib.reload(la_module)
-    from load_assets import load_assets, promote_image_to_asset
+    from load_assets import (load_assets, promote_image_to_asset,
+                             profile_refs as _profile_refs,
+                             profile_voice as _profile_voice)
     import execution.magic_ui as magic_ui_module
     importlib.reload(magic_ui_module)
     from execution.magic_ui import inject_magic_css, magic_text, card_begin, card_end, circular_progress, hover_button, icon_grid_selector, thumbnail_carousel, fidelity_mode_selector
@@ -363,7 +365,8 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
         "char_name": str or None,
         "outfit_name": str or None,
         "env_name": str or None,
-        "mapping_tags": list of str
+        "mapping_tags": list of str,
+        "ref_audio_paths": list of str   # character voice samples (Seedance 2.5)
       }
     """
     rig_results = {
@@ -372,7 +375,8 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
         "char_name": None,
         "outfit_name": None,
         "env_name": None,
-        "mapping_tags": []
+        "mapping_tags": [],
+        "ref_audio_paths": []
     }
     
     with st.expander("🎭 Environment, Character & Outfit Mapping Rig", expanded=True):
@@ -383,6 +387,7 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
         selected_env_paths = []
         selected_env_name = None
         env_names_list = []
+        env_slot_labels = []   # one label PER PATH (a profile contributes several)
         selected_char_path = None
         selected_char_name = None
         selected_fit_path = None
@@ -410,15 +415,19 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                 
                 # Build unique location display dictionary (ensuring NO key collision)
                 loc_opts = {}
+                loc_profile_refs = {}  # display key -> full Environment Profile ref list
                 for r_k, r_v in raw_locs.items():
                     raw_str_k = str(r_k).replace('{My}', '').strip()
                     l_path = None
+                    l_refs = []
                     if isinstance(r_v, dict):
                         disp_name = r_v.get('name') or raw_str_k
                         l_path = r_v.get('default_img') or r_v.get('path')
+                        l_refs = _profile_refs(r_v)
                     elif r_v:
                         disp_name = raw_str_k
                         l_path = str(r_v)
+                        l_refs = _profile_refs(r_v)
                         
                     if l_path:
                         if os.path.sep in disp_name and not disp_name.startswith("http"):
@@ -442,7 +451,9 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                             clean_k = f"{orig_clean} ({dup_counter})"
                             
                         loc_opts[clean_k] = l_path
-                
+                        if len(l_refs) > 1:
+                            loc_profile_refs[clean_k] = l_refs
+
                 # Check for existing generated master stills in session
                 existing_stills = st.session_state.get("selected_env_stills", []) or (
                     [st.session_state["primary_env_img"]] if "primary_env_img" in st.session_state and os.path.exists(st.session_state["primary_env_img"]) else []
@@ -462,19 +473,36 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                 
                 # Also allow multiselect dropdown search
                 state_ms_key = f"{prefix_key}_env_multiselect_v2"
-                if carousel_selected and isinstance(carousel_selected, list):
-                    st.session_state[state_ms_key] = carousel_selected
-                elif state_ms_key not in st.session_state:
-                    st.session_state[state_ms_key] = []
-                    
+                car_key = f"{prefix_key}_rig_loc_multi"
+                prev_car_key = f"_prev_car_{car_key}"
+
+                cur_car = list(carousel_selected) if isinstance(carousel_selected, list) else []
+                prev_car = st.session_state.get(prev_car_key)
+
+                # Only let the carousel drive the multiselect when the carousel
+                # itself changed this run. Unconditionally copying it (the old
+                # behaviour) meant a de-selection in the multiselect was
+                # overwritten on the very next rerun and appeared to re-add itself.
+                if state_ms_key not in st.session_state:
+                    st.session_state[state_ms_key] = list(cur_car)
+                elif prev_car is not None and cur_car != prev_car:
+                    st.session_state[state_ms_key] = list(cur_car)
+                st.session_state[prev_car_key] = list(cur_car)
+
                 env_selection = st.multiselect(
                     "🔍 Search & Select Environment Locations",
                     options=list(loc_opts.keys()),
                     key=state_ms_key
                 )
-                
+
+                # Push the multiselect back onto the carousel so removing an item
+                # clears its highlight too (keeps the two controls in agreement).
+                if list(env_selection) != cur_car:
+                    st.session_state[car_key] = list(env_selection)
+                    st.session_state[prev_car_key] = list(env_selection)
+
                 env_names_list = []
-                active_env_list = env_selection if env_selection else (carousel_selected if isinstance(carousel_selected, list) else [])
+                active_env_list = list(env_selection)
                 
                 if active_env_list:
                     st.markdown("---")
@@ -485,34 +513,78 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                         l_path = loc_opts.get(member_name)
                         
                         if l_path:
-                            selected_env_paths.append(l_path)
+                            prof_refs = loc_profile_refs.get(member_name) or []
                             env_names_list.append(member_name)
-                            
+
                             with env_cols[e_idx % 4]:
                                 st.caption(f"**Image Slot #{e_idx+1}**")
+
+                                # A Profile can supply every angle it holds, but
+                                # that is a CHOICE — never force extra images in.
+                                use_all_angles = False
+                                if prof_refs and len(prof_refs) > 1:
+                                    use_all_angles = st.checkbox(
+                                        f"🎞️ Use all {len(prof_refs)} angles",
+                                        value=True,
+                                        key=f"{prefix_key}_env_allangles_{member_name}_{e_idx}",
+                                        help="Uncheck to attach only the primary image for this location."
+                                    )
+
                                 is_u_env = isinstance(l_path, str) and (l_path.startswith("http://") or l_path.startswith("https://"))
                                 if is_u_env or os.path.exists(str(l_path)):
                                     st.image(l_path, caption=f"Location: {member_name}", use_container_width=True)
                                 else:
                                     st.caption(f"Location: `{member_name}`")
+
+                            if prof_refs and use_all_angles:
+                                for a_i, pr in enumerate(prof_refs):
+                                    if pr not in selected_env_paths:
+                                        selected_env_paths.append(pr)
+                                        env_slot_labels.append(f"{member_name} (Angle {a_i+1})")
+                            elif l_path not in selected_env_paths:
+                                selected_env_paths.append(l_path)
+                                env_slot_labels.append(member_name)
                                     
                     selected_env_name = ", ".join(env_names_list)
                 elif existing_stills:
-                    st.info(f"📸 Using {len(existing_stills)} generated Environment Master Still(s) from session.")
-                    selected_env_paths.extend(existing_stills)
-                    selected_env_name = "Generated Environment Master Stills"
+                    # Opt-in: this used to attach automatically whenever the
+                    # selection was empty, which made de-selecting everything
+                    # look like stills were re-adding themselves.
+                    use_session_stills = st.checkbox(
+                        f"📸 Use {len(existing_stills)} generated Environment Master Still(s) from this session",
+                        value=True,
+                        key=f"{prefix_key}_use_session_stills",
+                        help="Uncheck to ignore stills generated earlier in this session."
+                    )
+                    if use_session_stills:
+                        selected_env_paths.extend(existing_stills)
+                        env_slot_labels.extend([f"Master Still #{i+1}" for i in range(len(existing_stills))])
+                        selected_env_name = "Generated Environment Master Stills"
+                    else:
+                        st.caption("No environment attached.")
                     
             else:
-                # ENVIRONMENT GENERATOR RIG (Cascading 1-4 Stills)
+                # ENVIRONMENT GENERATOR RIG (Cascading Stills -> one Environment Profile)
                 st.markdown("##### 🎨 35mm Cinematic Environment Generator")
-                st.caption("Generate up to 4 cascading stills to build complete 360° architectural coverage for your location.")
-                
+                st.caption("Generate up to 3 cascading stills to build an Environment Profile — full scene coverage and continuity from a single location.")
+
                 env_name_input = st.text_input(
                     "Location / Environment Name",
                     placeholder="e.g. Modern Penthouse Lounge, Rainy Tokyo Alleyway, Tropical Resort Poolside",
                     key=f"{prefix_key}_gen_env_name"
                 )
-                
+
+                # Optional real photo to anchor the profile. When present it becomes
+                # still #1 and every generated angle is continuity-locked to it,
+                # instead of the location being invented from text alone.
+                env_seed_image = st.file_uploader(
+                    "📸 Anchor Photo (Optional) — generate additional angles OF THIS location",
+                    type=['png', 'jpg', 'jpeg'],
+                    accept_multiple_files=False,
+                    key=f"{prefix_key}_env_seed_img",
+                    help="Upload a real photo of the location. It becomes reference #1 and the generated angles match its architecture, materials and lighting."
+                )
+
                 g_col1, g_col2, g_col3 = st.columns(3)
                 with g_col1:
                     env_model_choice = st.selectbox(
@@ -525,7 +597,11 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                         key=f"{prefix_key}_gen_env_model"
                     )
                 with g_col2:
-                    env_still_count = st.slider("Stills to Generate (1 to 4)", 1, 4, 3, key=f"{prefix_key}_gen_env_count")
+                    env_still_count = st.slider(
+                        "Total Stills in Profile (1 to 3)", 1, 3, 3,
+                        key=f"{prefix_key}_gen_env_count",
+                        help="Total reference images in this Environment Profile, including the anchor photo if you uploaded one."
+                    )
                 with g_col3:
                     env_notes = st.text_input(
                         "Textures & Lighting Cues",
@@ -548,7 +624,23 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                             ]
                             
                             gen_stills = []
-                            for idx in range(env_still_count):
+
+                            # An uploaded anchor photo becomes still #1. The
+                            # continuity-lock block below already treats
+                            # gen_stills[0] as the spatial source of truth for
+                            # every later angle, so seeding it here makes the
+                            # generated angles match a REAL location.
+                            if env_seed_image is not None:
+                                seed_path = os.path.join(
+                                    "output", f"temp_env_seed_{prefix_key}{os.path.splitext(env_seed_image.name)[1] or '.png'}"
+                                )
+                                os.makedirs("output", exist_ok=True)
+                                with open(seed_path, "wb") as f_seed:
+                                    f_seed.write(env_seed_image.getbuffer())
+                                gen_stills.append(seed_path)
+                                st.caption(f"📸 Anchored to uploaded photo — generating {max(env_still_count - 1, 0)} matching angle(s).")
+
+                            for idx in range(len(gen_stills), env_still_count):
                                 angle_lbl = angles[idx] if idx < len(angles) else f"Alternate Perspective #{idx+1}"
                                 env_prompt_data = generate_environment_master_prompt(
                                     location_name=f"{env_name_input}. {env_notes}" if env_notes else env_name_input,
@@ -618,8 +710,11 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                                 if is_chk:
                                     chosen_stills.append(s_p)
                                     
-                    selected_env_paths.extend(chosen_stills if chosen_stills else active_gen_stills)
-                    selected_env_name = env_name_input if env_name_input else "Generated Environment Stills"
+                    _env_chosen = chosen_stills if chosen_stills else active_gen_stills
+                    selected_env_paths.extend(_env_chosen)
+                    _env_lbl = env_name_input if env_name_input else "Generated Environment Stills"
+                    env_slot_labels.extend([f"{_env_lbl} (Angle {i+1})" for i in range(len(_env_chosen))])
+                    selected_env_name = _env_lbl
                     
                     # 💾 SAVE TO LOCATIONS ASSET LIBRARY WITH INSTANT REFRESH
                     s_col1, s_col2 = st.columns([2, 1])
@@ -628,19 +723,31 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                     with s_col2:
                         st.write("") # spacing
                         st.write("") 
-                        if st.button("💾 Save to Locations Library", key=f"{prefix_key}_btn_save_loc", use_container_width=True):
+                        if st.button("💾 Save as Environment Profile", key=f"{prefix_key}_btn_save_loc", use_container_width=True):
                             if selected_env_paths:
-                                saved_count = 0
-                                for idx, img_p in enumerate(selected_env_paths):
-                                    if os.path.exists(img_p):
-                                        asset_n = f"{save_loc_name} Still {idx+1}" if len(selected_env_paths) > 1 else save_loc_name
-                                        promote_image_to_asset(img_p, username, "Locations", asset_n, f"Environment still for {save_loc_name}")
-                                        saved_count += 1
-                                from execution.load_assets import load_assets
-                                st.session_state["global_assets"] = load_assets(user_assets_dir=user_asset_path)
-                                st.cache_data.clear()
-                                st.toast(f"✅ Saved {saved_count} Location asset(s) to Library!")
-                                st.rerun()
+                                # Save all chosen angles as ONE grouped profile.
+                                # Previously each still became its own disconnected
+                                # library entry, which lost the continuity link
+                                # between angles of the same location.
+                                from load_assets import promote_multi_image_profile
+                                res_env_save = promote_multi_image_profile(
+                                    [p for p in selected_env_paths if os.path.exists(p)],
+                                    username,
+                                    "Locations",
+                                    save_loc_name,
+                                    prompt=f"Environment profile for {save_loc_name}",
+                                    voice_path=None,
+                                    max_images=3,
+                                )
+                                if res_env_save.get("status") == "success":
+                                    from execution.load_assets import load_assets
+                                    st.session_state["global_assets"] = load_assets(user_assets_dir=user_asset_path)
+                                    st.cache_data.clear()
+                                    n_saved = len(res_env_save.get("reference_images", []))
+                                    st.toast(f"✅ Saved '{save_loc_name}' Environment Profile ({n_saved} angle(s))!")
+                                    st.rerun()
+                                else:
+                                    st.error(f"Save failed: {res_env_save.get('error')}")
                                 
             if selected_env_paths:
                 st.caption(f"✅ **Environment Ready ({len(selected_env_paths)} still(s) attached)**")
@@ -682,14 +789,26 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                                 p_val = v
                                 break
                                 
-                    c_name = str(member_key).replace('{My}', '').strip()
+                    c_name = str(member_key).replace('{My}', '').replace('(My)', '').strip()
                     c_path = None
-                    
+                    c_extra_imgs = []   # Character Profile refs beyond the primary
+                    c_voice = None      # Character Profile voice sample
+
                     if isinstance(p_val, dict):
                         c_name = p_val.get('name', c_name)
                         c_path = p_val.get('default_img') or p_val.get('path')
+                        c_extra_imgs = _profile_refs(p_val)[1:]
+                        c_voice = _profile_voice(p_val)
                     elif isinstance(p_val, str):
                         c_path = p_val
+                        # AssetRef is a str subclass carrying its Profile.
+                        c_extra_imgs = _profile_refs(p_val)[1:]
+                        c_voice = _profile_voice(p_val)
+                        # Prefer the Profile's real name — otherwise the library
+                        # key leaks into the prompt as "character (My) Name".
+                        _pname = getattr(p_val, "profile_name", None)
+                        if _pname:
+                            c_name = _pname
                     elif not p_val and isinstance(member_key, str) and os.path.exists(member_key):
                         c_path = member_key
                         
@@ -718,7 +837,40 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                                         c_path = os.path.join(char_dir, selected_var)
                         else:
                             st.image("https://via.placeholder.com/300x300.png?text=Character+Image", caption=f"Character: {c_name}", use_container_width=True)
-                                
+
+                        # Identity refs sharpen likeness, but each one is a photo
+                        # of the person in SOME outfit. Too many can outvote the
+                        # mapped wardrobe, so keep this dialable per shot.
+                        if c_extra_imgs:
+                            # Is an outfit already mapped to this character? The
+                            # outfit carousel stores its pick in session state, so
+                            # this is readable before the picker re-renders below.
+                            _fit_state = st.session_state.get(f"{prefix_key}_rig_fit_{member_key}_{c_idx}")
+                            _has_outfit = bool(_fit_state) and _fit_state != "None"
+
+                            # st.checkbox's `value` is only an INITIAL value — once
+                            # the widget has state it is ignored. Drop that state
+                            # when outfit-presence flips so the correct default
+                            # applies (wardrobe priority once an outfit is mapped).
+                            _cb_key = f"{prefix_key}_char_allrefs_{member_key}_{c_idx}"
+                            _seen_key = f"_prev_hasfit_{_cb_key}"
+                            if st.session_state.get(_seen_key) != _has_outfit:
+                                st.session_state.pop(_cb_key, None)
+                                st.session_state[_seen_key] = _has_outfit
+
+                            _use_refs = st.checkbox(
+                                f"🎭 Use all {len(c_extra_imgs) + 1} identity refs",
+                                value=not _has_outfit,
+                                key=_cb_key,
+                                help=("Extra identity photos sharpen likeness, but each one shows the "
+                                      "person in some outfit and competes with the mapped wardrobe. "
+                                      "Off by default when an outfit is attached.")
+                            )
+                            if not _use_refs:
+                                c_extra_imgs = []
+                                if _has_outfit:
+                                    st.caption("🧥 Wardrobe priority: sending 1 identity photo so the outfit locks.")
+
                     with c_col2:
                         st.markdown(f"**Attach Outfit to {c_name}**")
                         c_clean = c_name.lower().strip() if c_name else ""
@@ -771,9 +923,17 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                             "name": c_name,
                             "char_path": c_path,
                             "fit_name": f_name,
-                            "fit_path": f_path
+                            "fit_path": f_path,
+                            "extra_imgs": [p for p in c_extra_imgs if p and p != c_path],
+                            "voice_path": c_voice
                         })
-                        st.caption(f"✅ Mapped Slot #{len(selected_characters)}: `{c_name}`" + (f" wearing `{f_name}`" if f_name else ""))
+                        profile_bits = []
+                        if c_extra_imgs:
+                            profile_bits.append(f"{len(c_extra_imgs) + 1} refs")
+                        if c_voice:
+                            profile_bits.append("voice")
+                        prof_note = f" · Profile ({', '.join(profile_bits)})" if profile_bits else ""
+                        st.caption(f"✅ Mapped Slot #{len(selected_characters)}: `{c_name}`" + (f" wearing `{f_name}`" if f_name else "") + prof_note)
                     st.markdown("---")
 
         # -------------------------------------------------------------
@@ -783,7 +943,12 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
         
         # 1. Environment Stills First (Image1, Image2, etc.)
         for e_idx, e_p in enumerate(selected_env_paths[:10]):
-            e_label = env_names_list[e_idx] if e_idx < len(env_names_list) else (selected_env_name or 'Location Master')
+            if e_idx < len(env_slot_labels):
+                e_label = env_slot_labels[e_idx]
+            elif e_idx < len(env_names_list):
+                e_label = env_names_list[e_idx]
+            else:
+                e_label = selected_env_name or 'Location Master'
             rig_imgs.append((f"Image{len(rig_imgs)+1}", e_p, f"Location #{e_idx+1}: {e_label}"))
             
         # 2. Characters and their mapped Outfits Next
@@ -796,23 +961,43 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
             c_tag_name = f"Image{len(rig_imgs)+1}"
             c_entry["char_tag"] = c_tag_name
             rig_imgs.append((c_tag_name, c_p, f"Character: {c_n}"))
-            
+
+            # Outfit sits directly after its character, ahead of any identity
+            # refs, so the wardrobe reference is adjacent to the subject rather
+            # than trailing several photos of them in other clothes.
             if f_p:
                 f_tag_name = f"Image{len(rig_imgs)+1}"
                 c_entry["fit_tag"] = f_tag_name
-                rig_imgs.append((f_tag_name, f_p, f"Outfit for {c_n}: {f_n}"))
+                rig_imgs.append((f_tag_name, f_p, f"Outfit for {c_n}: {f_n} (WARDROBE — this garment only)"))
+
+            # Extra Character Profile references (angles 2..N) sharpen identity.
+            c_entry["extra_tags"] = []
+            for x_i, x_p in enumerate(c_entry.get("extra_imgs") or []):
+                x_tag = f"Image{len(rig_imgs)+1}"
+                c_entry["extra_tags"].append(x_tag)
+                rig_imgs.append((x_tag, x_p, f"Character: {c_n} (Ref {x_i+2} — FACE ONLY, ignore clothing)"))
+
+            # Voice sample rides along as a Seedance audio reference.
+            if c_entry.get("voice_path"):
+                rig_results["ref_audio_paths"].append(c_entry["voice_path"])
             
         if rig_imgs:
             st.markdown("---")
             st.markdown("##### 📌 Active Rig Mapping Slots")
-            cols = st.columns(len(rig_imgs))
-            for i, (slot_tag, img_p, item_n) in enumerate(rig_imgs):
-                with cols[i]:
-                    st.caption(f"**{slot_tag}**")
-                    is_u = isinstance(img_p, str) and (img_p.startswith("http://") or img_p.startswith("https://"))
-                    if img_p and (is_u or os.path.exists(str(img_p))):
-                        st.image(img_p, use_container_width=True)
-                    st.caption(f"`{item_n}`")
+            if rig_results["ref_audio_paths"]:
+                st.caption(f"🎙️ {len(rig_results['ref_audio_paths'])} character voice sample(s) attached as audio references.")
+            # Wrap into rows — Profiles can push this well past a single row.
+            PER_ROW = 6
+            for row_start in range(0, len(rig_imgs), PER_ROW):
+                row_items = rig_imgs[row_start:row_start + PER_ROW]
+                cols = st.columns(len(row_items))
+                for i, (slot_tag, img_p, item_n) in enumerate(row_items):
+                    with cols[i]:
+                        st.caption(f"**{slot_tag}**")
+                        is_u = isinstance(img_p, str) and (img_p.startswith("http://") or img_p.startswith("https://"))
+                        if img_p and (is_u or os.path.exists(str(img_p))):
+                            st.image(img_p, use_container_width=True)
+                        st.caption(f"`{item_n}`")
                     
             # Build API Outputs
             rig_results["primary_image_path"] = rig_imgs[0][1]
@@ -830,19 +1015,39 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
             # INJECTION BUTTON
             if prompt_target_key:
                 if st.button("⚡ Auto-Inject Mapping Rig to Prompt", key=f"{prefix_key}_inject_btn", use_container_width=True):
-                    tag_header = "\n".join([f"{t}: {item_n}" for t, _, item_n in rig_imgs])
+                    tag_header = "\n".join([f"@{t}: {item_n}" for t, _, item_n in rig_imgs])
                     
                     char_pair_sentences = []
+                    identity_lock_sentences = []
                     for c in selected_characters:
                         c_n = c["name"]
-                        c_tag = c.get("char_tag", "")
-                        f_tag = c.get("fit_tag", "")
+                        c_tag = f"@{c.get('char_tag', '')}" if c.get("char_tag") else ""
+                        f_tag = f"@{c.get('fit_tag', '')}" if c.get("fit_tag") else ""
                         f_n = c.get("fit_name", "")
                         
-                        clean_c_n = c_n.replace('{My}', '').strip()
+                        clean_c_n = c_n.replace('{My}', '').replace('(My)', '').strip()
+                        # Multi-reference identity lock: tell the model these
+                        # separate images are ONE person, or it can read them
+                        # as different characters.
+                        x_tags = [f"@{x}" for x in (c.get("extra_tags") or [])]
+                        if x_tags:
+                            all_id_tags = ", ".join([c_tag] + list(x_tags))
+                            id_sentence = (
+                                f"{all_id_tags} are the SAME PERSON ({clean_c_n}) shown from different angles. "
+                                f"Use them ONLY for facial identity, bone structure, skin tone, hair and tattoos"
+                            )
+                            if f_tag:
+                                # Without this the identity photos act as wardrobe
+                                # references and outvote the outfit 3-to-1.
+                                id_sentence += (
+                                    f". They are identity references, NOT wardrobe references — "
+                                    f"completely IGNORE all clothing worn in {all_id_tags}; "
+                                    f"discard that clothing completely"
+                                )
+                            identity_lock_sentences.append(id_sentence)
                         if c_tag and f_tag and f_n:
-                            clean_fit_name = f_n.replace('{My}', '').strip()
-                            char_pair_sentences.append(f"character {clean_c_n} ({c_tag}) strictly wearing the complete wardrobe from outfit {f_tag} ({clean_fit_name})")
+                            clean_fit_name = f_n.replace('{My}', '').replace('(My)', '').strip()
+                            char_pair_sentences.append(f"character {clean_c_n} ({c_tag}) strictly wearing the complete wardrobe garment from {f_tag} ({clean_fit_name})")
                         elif c_tag and f_tag:
                             char_pair_sentences.append(f"character {clean_c_n} ({c_tag}) wearing mapped outfit ({f_tag})")
                         elif c_tag:
@@ -853,20 +1058,54 @@ def render_wan_asset_mapping_rig(prefix_key, prompt_target_key=None):
                     # 3D Spatial Environment Placement & Multi-Angle Camera Directive
                     if selected_env_name:
                         env_directive = (
-                            f"placed INSIDE the 3D environment space of Image1 ({selected_env_name}). "
-                            f"Use Image1 as the master 3D spatial and architectural set anchor for time, place, and location design. "
+                            f"placed INSIDE the 3D environment space of @Image1 ({selected_env_name}). "
+                            f"Use @Image1 as the master 3D spatial and architectural set anchor for time, place, and location design. "
                             f"The camera moves dynamically through different angles, reverse perspectives, spatial depth, "
-                            f"and room angles inside this environment (do NOT restrict camera to static angle of Image1)."
+                            f"and room angles inside this environment (do NOT restrict camera to static angle of @Image1)."
                         )
                     else:
                         env_directive = (
-                            "placed INSIDE the 3D scene location of Image1. "
-                            "Use Image1 as the 3D set anchor, exploring dynamic camera angles, depth, and spatial perspectives inside the space."
+                            "placed INSIDE the 3D scene location of @Image1. "
+                            "Use @Image1 as the 3D set anchor, exploring dynamic camera angles, depth, and spatial perspectives inside the space."
                         )
                     
-                    wardrobe_lock_str = "Strict Wardrobe Lock: Ensure every character wears the full complete clothing items shown in their mapped outfit reference image without altering or omitting jackets, tops, or pants."
-                    
-                    injected_text = f"{tag_header}\n\nCinematic 35mm film shot of {combined_char_str} {env_directive} {wardrobe_lock_str} 16:9 widescreen, organic camera movement, realistic 35mm film lighting, zero CGI."
+                    wardrobe_pairs = [
+                        (f"@{c.get('fit_tag')}", c["name"].replace('{My}', '').replace('(My)', '').strip(), c.get("fit_name"), f"@{c.get('char_tag')}")
+                        for c in selected_characters if c.get("fit_tag")
+                    ]
+                    if wardrobe_pairs:
+                        wardrobe_bits = [
+                            f"Character {char_tag} ({nm}) wears EXCLUSIVELY the complete clothing and garment shown in {tag}"
+                            + (f" ({str(fn).replace('{My}', '').replace('(My)', '').strip()})" if fn else "")
+                            + f". Discard all clothing from {char_tag}'s identity photo and transfer the full garment from {tag} onto {char_tag}"
+                            for tag, nm, fn, char_tag in wardrobe_pairs
+                        ]
+                        wardrobe_lock_str = (
+                            "Strict Wardrobe Binding: " + "; ".join(wardrobe_bits) + ". "
+                            "Reproduce that garment's exact cut, straps, coverage, colour, fabric and detailing "
+                            "as the single source of truth for wardrobe. Do not invent, alter, or replace this outfit with any made-up clothing."
+                        )
+                    else:
+                        wardrobe_lock_str = "Strict Wardrobe Lock: Ensure every character wears the full complete clothing items shown in their mapped outfit reference image without altering or omitting jackets, tops, or pants."
+
+                    # Environment Profile: several slots are the SAME location from
+                    # different angles — spell that out so the model treats them as
+                    # one continuous space (360° spatial lock).
+                    env_slot_count = min(len(selected_env_paths), 10)
+                    env_profile_lock = ""
+                    if env_slot_count > 1:
+                        env_tags = ", ".join(f"@Image{i+1}" for i in range(env_slot_count))
+                        env_profile_lock = (
+                            f" Environment Profile: {env_tags} are the SAME single location shown from "
+                            f"different camera angles — match wall textures, ceiling structure, window layout, "
+                            f"flooring materials and lighting setup across every shot, never invent a new room."
+                        )
+
+                    identity_lock_str = ""
+                    if identity_lock_sentences:
+                        identity_lock_str = " Identity Lock: " + ". ".join(identity_lock_sentences) + "."
+
+                    injected_text = f"{tag_header}\n\nCinematic 35mm film shot of {combined_char_str} {env_directive}{env_profile_lock}{identity_lock_str} {wardrobe_lock_str} 16:9 widescreen, organic camera movement, realistic 35mm film lighting, zero CGI."
                     st.session_state[prompt_target_key] = injected_text
                     st.toast("✅ Dynamic 3D Spatial & Strict Wardrobe Rig tags injected into Prompt!")
                     st.rerun()
@@ -4693,8 +4932,18 @@ if selection == "Wan & Seedance Studio":
             # 1. Gather all reference images and videos upfront FIRST!
             extra_imgs = list(rig_anim_res["extra_ref_paths"])
             extra_vids = []
-            
+
             max_extra_allowed = 49 if "2.5" in wan_model_flavor else 8
+
+            # Profiles can contribute many refs (env angles + per-character
+            # angles). Older models accept far fewer, so trim before sending.
+            if len(extra_imgs) > max_extra_allowed:
+                st.warning(
+                    f"⚠️ {len(extra_imgs)} reference images mapped but "
+                    f"{wan_model_flavor} accepts {max_extra_allowed} — using the first {max_extra_allowed}. "
+                    f"Switch to a Seedance 2.5 variant to use the full set."
+                )
+                extra_imgs = extra_imgs[:max_extra_allowed]
             if "Reference-to-Video" in wan_model_flavor or "Seedance" in wan_model_flavor:
                 bulk_uploads_st = st.session_state.get("studio_wan_extra_imgs_bulk", [])
                 if bulk_uploads_st:
@@ -4792,6 +5041,8 @@ if selection == "Wan & Seedance Studio":
                              )
                         
                         out_dir = get_user_out_dir("Videos")
+                        # Character Profile voice samples -> Seedance audio refs
+                        rig_audios = list(rig_anim_res.get("ref_audio_paths") or [])
                         res = generate_wan_video(
                             prompt=final_wan_prompt,
                             image_path=anim_image_path,
@@ -4799,6 +5050,8 @@ if selection == "Wan & Seedance Studio":
                             duration=anim_dur,
                             aspect_ratio=anim_ar.split(" ")[0],
                             ref_video_path=ref_video_url,
+                            ref_audio_path=rig_audios[0] if rig_audios else None,
+                            extra_audio_paths=rig_audios[1:] if len(rig_audios) > 1 else None,
                             extra_images=extra_imgs if extra_imgs else None,
                             extra_videos=extra_vids if extra_vids else None,
                             model=target_engine,

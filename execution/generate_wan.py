@@ -73,14 +73,14 @@ def extract_last_frame_as_base64(video_path):
 
 def image_to_base64_data_uri(img_path_or_url):
     """
-    Converts a local file path or HTTP URL to an optimized lightweight base64 data URI.
-    Resizes images to max 640px at JPEG quality 65 to keep total request payload lightweight (<100KB per image)
-    and prevent network connection socket timeouts or HTTP 502 payload size limit errors.
+    Converts a local file path or HTTP URL to an optimized high-fidelity base64 data URI.
+    Resizes images to max 1280px at JPEG quality 85 to preserve fine fabric textures, patterns, and facial details
+    for Seedance 2.5 and Wan vision encoders while keeping payload transmission fast.
     """
     if not img_path_or_url:
         return None
         
-    # If HTTP URL, try fetching locally to convert to lightweight base64
+    # If HTTP URL, try fetching locally to convert to high-fidelity base64
     if str(img_path_or_url).startswith(("http://", "https://")):
         try:
             resp = requests.get(img_path_or_url, timeout=15)
@@ -88,13 +88,13 @@ def image_to_base64_data_uri(img_path_or_url):
                 from PIL import Image
                 from io import BytesIO
                 img = Image.open(BytesIO(resp.content))
-                max_dim = 640
+                max_dim = 1280
                 if max(img.width, img.height) > max_dim:
                     img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
                 buffer = BytesIO()
-                img.save(buffer, format="JPEG", quality=65)
+                img.save(buffer, format="JPEG", quality=85)
                 encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
                 return f"data:image/jpeg;base64,{encoded}"
         except Exception as err:
@@ -107,7 +107,7 @@ def image_to_base64_data_uri(img_path_or_url):
             from io import BytesIO
             
             img = Image.open(img_path_or_url)
-            max_dim = 640
+            max_dim = 1280
             if max(img.width, img.height) > max_dim:
                 img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
                 
@@ -115,7 +115,7 @@ def image_to_base64_data_uri(img_path_or_url):
                 img = img.convert('RGB')
                 
             buffer = BytesIO()
-            img.save(buffer, format="JPEG", quality=65)
+            img.save(buffer, format="JPEG", quality=85)
             encoded = base64.b64encode(buffer.getvalue()).decode('utf-8')
             return f"data:image/jpeg;base64,{encoded}"
         except Exception as e:
@@ -286,10 +286,14 @@ def generate_wan_image(prompt, image_path, size="2K", output_folder="output", ex
     except Exception as e:
         return {"status": "failed", "error": str(e), "logs": logs}
 
-def generate_wan_video(prompt, image_path, resolution="1080P", duration=5, aspect_ratio="16:9", ref_video_path=None, ref_audio_path=None, extra_images=None, extra_videos=None, model="alibaba/wan-2.7/image-to-video", output_folder="output", status_callback=None):
+def generate_wan_video(prompt, image_path, resolution="1080P", duration=5, aspect_ratio="16:9", ref_video_path=None, ref_audio_path=None, extra_images=None, extra_videos=None, extra_audio_paths=None, model="alibaba/wan-2.7/image-to-video", output_folder="output", status_callback=None):
     """
     Animates an image using Seedance 2.5 / 2.0 or Wan 2.7 models via Atlas Cloud API.
     Supports multi-subject image references (up to 50), video references, and audio/voiceover references.
+
+    extra_audio_paths: additional audio references beyond ref_audio_path — used to
+    pass one voice sample per cast member so Seedance 2.5 keeps each character's
+    voice consistent. Capped at the model's documented 10 audio references.
     """
     brand_name = "Seedance" if "seedance" in model.lower() else "Wan 2.7"
     file_prefix = "seedance_video" if "seedance" in model.lower() else "wan27_video"
@@ -420,18 +424,37 @@ def generate_wan_video(prompt, image_path, resolution="1080P", duration=5, aspec
              if videos_payload:
                  payload["reference_videos"] = videos_payload
                  
-             # Reference Audios / Voiceover
-             if ref_audio_path:
-                 a_url = ref_audio_path
-                 if not a_url.startswith(("http://", "https://")) and os.path.exists(a_url):
+             # Reference Audios / Voiceover (primary + per-character voice samples)
+             def process_audio_ref(a_path):
+                 """Returns a URL Seedance can fetch, uploading local files to S3."""
+                 if not a_path:
+                     return None
+                 if a_path.startswith(("http://", "https://")):
+                     return a_path
+                 if os.path.exists(a_path):
                      try:
                          from execution.s3_uploader import upload_file_obj
-                         with open(a_url, "rb") as f_ref:
-                             s3_url = upload_file_obj(f_ref, object_name=f"ref_audios/{os.path.basename(a_url)}")
-                         if s3_url: a_url = s3_url
+                         with open(a_path, "rb") as f_ref:
+                             s3_url = upload_file_obj(f_ref, object_name=f"ref_audios/{os.path.basename(a_path)}")
+                         if s3_url:
+                             return s3_url
                      except Exception as s3_e:
                          logs.append(f"⚠️ Audio S3 Upload warning: {s3_e}")
-                 payload["reference_audios"] = [a_url]
+                     return a_path
+                 return None
+
+             audios_payload = []
+             for a_item in [ref_audio_path] + list(extra_audio_paths or []):
+                 a_res = process_audio_ref(a_item)
+                 if a_res and a_res not in audios_payload:
+                     if len(audios_payload) >= 10:
+                         logs.append("⚠️ Reached max of 10 audio references for Seedance 2.5.")
+                         break
+                     audios_payload.append(a_res)
+                     logs.append(f"Encoded audio reference #{len(audios_payload)}: {os.path.basename(str(a_item))}")
+
+             if audios_payload:
+                 payload["reference_audios"] = audios_payload
                  
         elif "reference-to-video" in model:
              if not ref_video_path:
